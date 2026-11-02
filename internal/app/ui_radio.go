@@ -204,6 +204,69 @@ func (a *app) startHeartMode() {
 	}()
 }
 
+// fmSky is the landscape the personal FM's card wears: a photograph from
+// the day's wallpapers — the same pool the weather radio wears — taken
+// anew each time the page opens.
+type fmSky struct {
+	url     string    // the photograph chosen
+	shown   string    // the one that showed last, while the next comes
+	tries   int       // photographs turned away for failing to come
+	hover   bool      // the pointer is on the card
+	sweepAt time.Time // when the light began to pass over it
+}
+
+// pick takes another landscape than the one it wears, from the day's
+// photographs, and starts it loading.
+func (s *fmSky) pick(a *app, post func(func())) {
+	if a.wx == nil {
+		a.wx = newWx()
+		a.wx.art = a.art
+	}
+	a.wx.ensureShot(post)
+	shots := a.wx.shots
+	if len(shots) == 0 {
+		return
+	}
+	n := a.wx.rng.Intn(len(shots))
+	for i := range shots {
+		c := shots[(n+i)%len(shots)]
+		if c.URL != s.url && !a.wx.washed[c.URL] {
+			s.url = c.URL
+			a.art.get(c.URL, false)
+			return
+		}
+	}
+	if s.url == "" {
+		s.url = shots[n].URL
+		a.art.get(s.url, false)
+	}
+}
+
+// bmp is the landscape's bitmap, or the one that showed while the next
+// comes: the card never goes bare between openings.
+func (s *fmSky) bmp(a *app) *ui.Bitmap {
+	if s.url != "" {
+		if art := a.art.get(s.url, false); art != nil {
+			if art.bmp != nil {
+				s.shown, s.tries = s.url, 0
+				return art.bmp
+			}
+			// The one chosen cannot be had: take another, a few times
+			// over, rather than sit on a photograph that never comes.
+			if art.failed && s.url != s.shown && s.tries < 3 {
+				s.tries++
+				s.pick(a, a.post)
+			}
+		}
+	}
+	if s.shown != "" {
+		if art := a.art.get(s.shown, false); art != nil && art.bmp != nil {
+			return art.bmp
+		}
+	}
+	return nil
+}
+
 // fmPage is the personal FM: what it plays, large, over its cover's
 // colors, with the FM's own controls, and heart mode below.
 func (a *app) fmPage(c *ui.Context) {
@@ -226,7 +289,9 @@ func (a *app) fmPage(c *ui.Context) {
 				for i, m := range fmModes {
 					labels[i] = m.label
 				}
-				if segmented(c.Key("fm-mode"), &mode, labels...) {
+				// The modes, in liquid glass: the page's own light
+				// shows through them.
+				if glassSegmented(c.Key("fm-mode"), &mode, labels...) {
 					a.fmMode = mode
 					// Playing the FM, it changes to the mode at once.
 					if strings.HasPrefix(a.pl.Radio(), "fm:") {
@@ -249,24 +314,58 @@ func (a *app) fmCard(c *ui.Context) {
 	if onFM {
 		tr = pl.Current()
 	}
-	var art *artwork
-	if tr != nil {
-		art = a.art.get(netease.Sized(tr.Album.PicURL, 600), true)
+	// The card wears a landscape, another each time the page opens.
+	if a.sky.url == "" {
+		a.sky.pick(a, a.post)
 	}
-	card := ui.Box(c.Key("fm-card")).Height(320).Radius(24).Background(ui.Hex("#232328")).TextColor(white).
+	bmp := a.sky.bmp(a)
+	base := ui.Hex("#1b1b20")
+	card := ui.Box(c.Key("fm-card")).Height(320).Radius(24).Background(base).TextColor(white).
 		Shadow(0, 18, 44, -16, a.pal.cardShade)
-	in := artIn(card, backdrop(art))
-	card.Children(func() {
-		if in < 1 {
-			ui.Box(c).Absolute().Top(0).Left(0).Right(0).Bottom(0).Radius(24).
-				LinearGradient(ui.LinearGradient{Angle: 135, Oklab: true, From: ui.Oklch(0.42, 0.14, 20), To: ui.Oklch(0.3, 0.1, 300)})
+	// The light passes over the card as the pointer comes onto it, once
+	// each time it does.
+	if card.Hovered() {
+		if !a.sky.hover {
+			a.sky.hover = true
+			a.sky.sweepAt = c.Now()
 		}
-		artImage(c, backdrop(art), 24, in)
+	} else {
+		a.sky.hover = false
+	}
+	card.Children(func() {
+		if bmp != nil {
+			ui.Image(c, bmp).Absolute().Top(0).Left(0).Right(0).Bottom(0).Fit(ui.Cover).Radius(24)
+		} else {
+			ui.Box(c).Absolute().Top(0).Left(0).Right(0).Bottom(0).Radius(24).
+				LinearGradient(ui.LinearGradient{Angle: 135, Oklab: true, From: ui.Oklch(0.32, 0.06, 20), To: ui.Oklch(0.24, 0.05, 300)})
+		}
+		// The landscape fades out to the left, into the card's own dark,
+		// and stands clear at its right: the words keep their ground and
+		// the photograph keeps its weather.
 		ui.Box(c).Absolute().Top(0).Left(0).Right(0).Bottom(0).Radius(24).
 			LinearGradient(ui.LinearGradient{Angle: 90, Stops: []ui.GradientStop{
-				{Color: ui.RGBA(0, 0, 0, 0.35), At: 0},
-				{Color: ui.RGBA(0, 0, 0, 0.1), At: 1},
+				{Color: base.Alpha(0.96), At: 0},
+				{Color: base.Alpha(0.92), At: 0.18},
+				{Color: base.Alpha(0.8), At: 0.38},
+				{Color: base.Alpha(0.58), At: 0.56},
+				{Color: base.Alpha(0.3), At: 0.74},
+				{Color: base.Alpha(0.08), At: 0.9},
+				{Color: base.Alpha(0), At: 1},
 			}})
+		// Its foot, so the words stand off it.
+		ui.Box(c).Absolute().Top(0).Left(0).Right(0).Bottom(0).Radius(24).
+			LinearGradient(ui.LinearGradient{Angle: 180, Stops: []ui.GradientStop{
+				{Color: ui.RGBA(0, 0, 0, 0), At: 0},
+				{Color: ui.RGBA(0, 0, 0, 0.06), At: 0.55},
+				{Color: ui.RGBA(0, 0, 0, 0.38), At: 1},
+			}})
+		// A clock of its own while the light crosses, and no longer.
+		if !a.sky.sweepAt.IsZero() && c.Now().Sub(a.sky.sweepAt) <= time.Second {
+			ui.Box(c).Size(1, 1).Loop("fmsweep", 900*time.Millisecond, ui.Linear)
+		}
+		ui.Box(c).Absolute().Top(0).Left(0).Right(0).Bottom(0).Draw(func(p *ui.Painter, r ui.Rect) {
+			p.Clip(r, 24, func() { lightSweep(p, r, a.sky.sweepAt, c.Now()) })
+		})
 		ui.Row(c).Absolute().Top(0).Left(0).Right(0).Bottom(0).Padding(36, 40).Gap(40).AlignItems(ui.Center).Children(func() {
 			a.fmCovers(c, tr)
 			ui.Column(c).Grow(1).Shrink(1).MinWidth(0).Gap(8).Children(func() {
@@ -366,33 +465,128 @@ func (a *app) fmCovers(c *ui.Context, tr *netease.Track) {
 	})
 }
 
-// heartCard starts heart mode: songs like those the listener likes.
+// heartCard starts heart mode: songs like those the listener likes. It
+// stands on the page warmed by the heart — its own color with a breath of
+// red in it, a glow at its foot, and a button of beaten glass.
 func (a *app) heartCard(c *ui.Context, p palette) {
 	on := a.pl.Radio() == heartRadio
-	ui.Row(c).Padding(22, 26).Gap(20).Radius(18).AlignItems(ui.Center).Background(p.hover).Children(func() {
-		ui.Box(c).Size(56, 56).Radius(16).Center().Shrink(0).
-			LinearGradient(ui.LinearGradient{Angle: 135, Oklab: true, From: ui.Oklch(0.72, 0.17, 10), To: ui.Oklch(0.58, 0.22, 350)}).
-			TextColor(white).Children(func() { ui.Icon(c, iconHeartFill).Size(26, 26) })
-		ui.Column(c).Grow(1).Shrink(1).MinWidth(0).Gap(4).Children(func() {
-			ui.Text(c, "从你喜欢的音乐出发").FontSize(15).FontWeight(700)
-			ui.Text(c, "根据你红心过的歌曲，智能推荐风格相似的音乐，与你的喜欢穿插播放").FontSize(12.5).TextColor(p.muted)
-		})
-		if on {
-			if pillButton(c.Key("exit-heart"), iconX, "退出心动模式", p.press.Over(p.bg), p.text).Clicked() {
-				a.exitRadio()
+	warm := ui.Oklch(0.66, 0.2, 12)
+	card := ui.Row(c).Padding(22, 26).Gap(20).Radius(22).AlignItems(ui.Center).
+		Shadow(0, 10, 28, -14, p.cardShade)
+	card.Draw(func(pt *ui.Painter, r ui.Rect) {
+		pt.Clip(r, 22, func() {
+			pt.FillGradient(r, ui.LinearGradient{Angle: 120, Oklab: true, Stops: []ui.GradientStop{
+				{At: 0, Color: p.bg.Mix(warm, 0.13)},
+				{At: 0.5, Color: p.bg.Mix(warm, 0.06)},
+				{At: 1, Color: p.bg.Mix(ui.Oklch(0.58, 0.14, 342), 0.09)},
+			}}, 22)
+			// A glow under the heart, brighter while it beats.
+			glow := float32(0.45)
+			if on {
+				glow = 1
 			}
-		}
-		label := "开启心动模式"
-		switch {
-		case a.profile == nil:
-			label = "登录后开启"
-		case on:
-			label = "正在播放"
-		case a.radioStarting == heartRadio:
-			label = "正在开启…"
-		}
-		if pillButton(c.Key("heart"), iconHeartFill, label, p.accent, p.onAccent).Clicked() {
-			a.startHeartMode()
-		}
+			pt.FillGradient(ui.Rect{X: r.X - r.W*0.05, Y: r.Y - r.H*0.3, W: r.W * 0.6, H: r.H * 1.6},
+				ui.LinearGradient{Angle: 90, Stops: []ui.GradientStop{
+					{At: 0, Color: warm.Alpha(0.12 * glow)},
+					{At: 1, Color: warm.Alpha(0)},
+				}}, 0)
+			// Its rim, lit warmer as the heart is on.
+			pt.Stroke(ui.Rect{X: r.X + 0.5, Y: r.Y + 0.5, W: r.W - 1, H: r.H - 1},
+				warm.Alpha(0.14+0.1*glow), 22, 1)
+		})
 	})
+	card.Children(func() {
+		// The heart itself, a drop of red glass.
+		beat := ui.Box(c).Size(58, 58).Radius(19).Shrink(0).Center().
+			LinearGradient(ui.LinearGradient{Angle: 150, Oklab: true,
+				From: ui.Oklch(0.74, 0.18, 16), To: ui.Oklch(0.56, 0.23, 350)}).
+			Shadow(0, 10, 22, -8, warm.Alpha(0.45)).TextColor(white)
+		pose := ui.Pose{}
+		if card.Hovered() {
+			pose.Scale = 1.04
+		}
+		beat.AnimatePose(pose, ui.Animation{Spring: ui.SpringOptions{Duration: 500 * time.Millisecond, Bounce: 0.3}})
+		beat.Children(func() {
+			ui.Box(c).Absolute().Top(0).Left(0).Right(0).Bottom(0).Radius(19).
+				LinearGradient(ui.LinearGradient{Angle: 180, Stops: []ui.GradientStop{
+					{At: 0, Color: ui.RGBA(255, 255, 255, 0.36)},
+					{At: 0.6, Color: ui.RGBA(255, 255, 255, 0)},
+				}})
+			ui.Icon(c, iconHeartFill).Size(27, 27)
+		})
+		ui.Column(c).Grow(1).Shrink(1).MinWidth(0).Gap(5).Children(func() {
+			ui.Text(c, "从你喜欢的音乐出发").FontSize(15.5).FontWeight(800).LetterSpacing(-0.2)
+			ui.Text(c, "根据你红心过的歌曲，智能推荐风格相似的音乐，与你的喜欢穿插播放").FontSize(12.5).
+				TextColor(p.muted).LineHeight(1.45)
+		})
+		ui.Row(c).Gap(10).AlignItems(ui.Center).Children(func() {
+			if on {
+				if glassPill(c, c.Key("exit-heart"), iconX, "退出心动模式", p).Clicked() {
+					a.exitRadio()
+				}
+			}
+			label := "开启心动模式"
+			switch {
+			case a.profile == nil:
+				label = "登录后开启"
+			case on:
+				label = "正在播放"
+			case a.radioStarting == heartRadio:
+				label = "正在开启…"
+			}
+			// The heart's own button: a lozenge of lit red, warmer under
+			// the pointer.
+			btn := ui.ButtonBase(c.Key("heart")).Height(40).PaddingX(20).Gap(8).Radius(999).
+				AlignItems(ui.Center).TextColor(white).Background(ui.Transparent)
+			var hot float32
+			if btn.Hovered() {
+				hot = 1
+			}
+			hot = btn.AnimateTo("hot", hot, ui.Animation{Duration: 140 * time.Millisecond})
+			btn.Draw(func(pt *ui.Painter, r ui.Rect) {
+				pt.Shadow(r, r.H/2, 0, 7, 18, -4, warm.Alpha(0.28+0.24*hot))
+				pt.FillGradient(r, ui.LinearGradient{Angle: 150, Oklab: true, Stops: []ui.GradientStop{
+					{At: 0, Color: ui.Oklch(0.7+0.04*hot, 0.19, 16)},
+					{At: 1, Color: ui.Oklch(0.57+0.04*hot, 0.23, 352)},
+				}}, r.H/2)
+				pt.Stroke(ui.Rect{X: r.X + 0.5, Y: r.Y + 0.5, W: r.W - 1, H: r.H - 1},
+					ui.RGBA(255, 255, 255, 0.24), r.H/2-0.5, 1)
+			})
+			press := ui.Pose{}
+			if btn.Pressed() {
+				press.Scale = 0.96
+			}
+			btn.AnimatePose(press, ui.Snappy)
+			btn.Children(func() {
+				ui.Icon(c, iconHeartFill).Size(15, 15)
+				ui.Text(c, label).FontSize(13.5).FontWeight(650).SingleLine()
+			})
+			if btn.Clicked() {
+				a.startHeartMode()
+			}
+		})
+	})
+}
+
+// glassPill is a quiet button of the page's own glass, for the way out of
+// what the heart's button starts.
+func glassPill(c *ui.Context, key any, icon *ui.SVG, label string, p palette) ui.Element {
+	b := ui.ButtonBase(c.Key(key)).Height(40).PaddingX(18).Gap(8).Radius(999).AlignItems(ui.Center).TextColor(p.text)
+	fill := p.hover
+	if b.Hovered() {
+		fill = p.press
+	}
+	b.Background(b.AnimateColor("bg", fill, ui.Animation{Duration: 120 * time.Millisecond}))
+	pose := ui.Pose{}
+	if b.Pressed() {
+		pose.Scale = 0.96
+	}
+	b.AnimatePose(pose, ui.Snappy)
+	b.Children(func() {
+		if icon != nil {
+			ui.Icon(c, icon).Size(14, 14)
+		}
+		ui.Text(c, label).FontSize(13.5).FontWeight(600).SingleLine()
+	})
+	return b
 }

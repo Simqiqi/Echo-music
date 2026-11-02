@@ -23,14 +23,14 @@ const (
 // lyricCard is what a shared card says: the line being sung, the ones
 // around it, and what plays.
 type lyricCard struct {
-	title    string
-	artist   string
-	before   string
-	line     string
-	after    string
-	trans    string // the line's translation, if it has one
-	color    ui.Color
-	cover    *ui.Bitmap
+	title  string
+	artist string
+	before string
+	line   string
+	after  string
+	trans  string // the line's translation, if it has one
+	color  ui.Color
+	cover  *ui.Bitmap
 }
 
 // lyricCardOf gathers what a card would say of what plays: the line being

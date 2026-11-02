@@ -61,3 +61,59 @@ func TestExitHeartMode(t *testing.T) {
 		t.Fatalf("from Now Playing: radio %q, current %v", a.pl.Radio(), a.pl.Current())
 	}
 }
+
+// The FM card's draw layer — the light's — must not stand between the
+// listener and the controls on it.
+func TestFMCardControlsClickable(t *testing.T) {
+	a := newTestApp()
+	a.settings = defaultSettings()
+	a.profile = &netease.Profile{UserID: 1, Nickname: "听众"}
+	a.pl.Cue([]netease.Track{{ID: 1, Name: "晚风"}})
+	a.pl.AttachRadio(fmRadio(netease.FMDefault), func(func([]netease.Track)) {})
+	a.route = route{page: pageFM}
+	tt := ui.NewTester(a.view, 1200, 800)
+	tt.Frame()
+	if err := tt.Click("播放/暂停"); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	if a.pl.Playing() {
+		t.Fatal("play button did not toggle")
+	}
+	if err := tt.Click("播放/暂停"); err != nil {
+		t.Fatal(err)
+	}
+	if !a.pl.Playing() {
+		t.Fatal("play button did not toggle back")
+	}
+	if err := tt.Click("下一首"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// The pointer's arrival on the card starts the light, once each time.
+func TestFMSweepOnHover(t *testing.T) {
+	a := newTestApp()
+	a.settings = defaultSettings()
+	a.pl.Cue([]netease.Track{{ID: 1, Name: "晚风"}})
+	a.pl.AttachRadio(fmRadio(netease.FMDefault), func(func([]netease.Track)) {})
+	a.route = route{page: pageFM}
+	tt := ui.NewTester(a.view, 1200, 800)
+	tt.Frame()
+	tt.Move(600, 300)
+	tt.Advance(200 * time.Millisecond)
+	tt.Frame()
+	if a.sky.sweepAt.IsZero() {
+		t.Fatal("hover did not start the light")
+	}
+	if !a.sky.hover {
+		t.Fatal("card not marked hovered")
+	}
+	// Off the card, the light waits for the pointer to come back.
+	tt.Move(600, 700)
+	tt.Advance(time.Second)
+	tt.Frame()
+	if a.sky.hover {
+		t.Fatal("card still marked hovered")
+	}
+}

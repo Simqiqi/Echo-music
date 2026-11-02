@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/egoist/mygo/ui"
@@ -319,6 +320,37 @@ func artImage(c *ui.Context, bmp *ui.Bitmap, radius, in float32) {
 	}
 }
 
+// lightSweep draws light passing over r once, when it began at at: a soft
+// band of it, crossing as a glossy surface catches the light when a hand
+// comes near. Both the sky's strip and the FM's card wear it.
+func lightSweep(p *ui.Painter, r ui.Rect, at, now time.Time) {
+	const crossing = 820 * time.Millisecond
+	d := now.Sub(at)
+	if at.IsZero() || d < 0 || d > crossing {
+		return
+	}
+	t := float32(d) / float32(crossing)
+	// Smooth at both ends, so the light arrives and leaves without a
+	// seam.
+	t = t * t * (3 - 2*t)
+	cx, cy := r.X+r.W/2, r.Y+r.H/2
+	span := r.W + r.H
+	band := span * 0.24
+	x := -span*0.7 + t*(span*1.7)
+	// Brighter as it crosses the middle, so the sweep reads at once.
+	strength := 0.6 + 0.55*float32(math.Sin(float64(t)*math.Pi))
+	p.Transform(ui.Rotation(15), cx, cy, func() {
+		p.FillGradient(ui.Rect{X: cx + x - band/2, Y: cy - span, W: band, H: span * 2},
+			ui.LinearGradient{Angle: 90, Stops: []ui.GradientStop{
+				{At: 0, Color: ui.RGBA(255, 255, 255, 0)},
+				{At: 0.42, Color: ui.RGBA(255, 255, 255, 0.08*strength)},
+				{At: 0.5, Color: ui.RGBA(255, 255, 255, 0.17*strength)},
+				{At: 0.58, Color: ui.RGBA(255, 255, 255, 0.08*strength)},
+				{At: 1, Color: ui.RGBA(255, 255, 255, 0)},
+			}}, 0)
+	})
+}
+
 // clock formats a duration as minutes and seconds.
 func clock(d time.Duration) string {
 	if d < 0 {
@@ -450,6 +482,73 @@ func segmented(c *ui.Context, selected *int, labels ...string) bool {
 				seg.Background(divider)
 			}
 			seg.Children(func() { ui.Text(c, l).FontSize(13).TextColor(t.Text).SingleLine() })
+		}
+	})
+	return *selected != before
+}
+
+// glassSegmented is a segmented control of liquid glass, as macOS draws
+// one over a photograph: a capsule of frosted light that takes the color
+// of what shows behind it, its rim catching the light, and the chosen
+// segment a raised lozenge that glides to the next as it changes. It
+// reports whether the user chose another.
+func glassSegmented(c *ui.Context, selected *int, labels ...string) bool {
+	t := c.Theme()
+	const height, inset = 32, 3
+	radius := float32(height) / 2
+	width := float32(0)
+	for _, l := range labels {
+		w, _ := c.MeasureText(0, ui.Span{Text: l, Size: 12.5})
+		width = max(width, w+32)
+	}
+	// The body of the glass: white light, thicker at its head than where
+	// it passes through.
+	body, under := ui.RGBA(255, 255, 255, 0.2), ui.RGBA(255, 255, 255, 0.05)
+	rim, lozenge := ui.RGBA(255, 255, 255, 0.36), ui.RGBA(255, 255, 255, 0.97)
+	if t.Dark {
+		body, under = ui.RGBA(255, 255, 255, 0.15), ui.RGBA(255, 255, 255, 0.04)
+		rim, lozenge = ui.RGBA(255, 255, 255, 0.28), ui.RGBA(255, 255, 255, 0.93)
+	}
+	before := *selected
+	parts := ui.SegmentedBase(c, selected, len(labels))
+	at := parts.Track.AnimateTo("at", float32(*selected), ui.Animation{Spring: ui.SpringOptions{Duration: 320 * time.Millisecond, Bounce: 0.18}})
+	parts.Track.Height(height).Padding(inset).Radius(radius).Draw(func(p *ui.Painter, r ui.Rect) {
+		// A lens: shadow beneath it, light through it.
+		p.Shadow(r, radius, 0, 6, 18, -2, ui.RGBA(0, 0, 0, 0.16))
+		p.FillGradient(r, ui.LinearGradient{Angle: 165, Oklab: true, Stops: []ui.GradientStop{
+			{At: 0, Color: body}, {At: 1, Color: under},
+		}}, radius)
+		// Its rim, and the light gathering along its foot.
+		p.Stroke(ui.Rect{X: r.X + 0.5, Y: r.Y + 0.5, W: r.W - 1, H: r.H - 1}, rim, radius-0.5, 1)
+		p.FillGradient(r, ui.LinearGradient{Angle: 180, Stops: []ui.GradientStop{
+			{At: 0, Color: ui.RGBA(255, 255, 255, 0.14)},
+			{At: 0.55, Color: ui.RGBA(255, 255, 255, 0)},
+			{At: 1, Color: ui.RGBA(255, 255, 255, 0)},
+		}}, radius)
+		// The lozenge, a drop of the same glass caught by the light.
+		pill := ui.Rect{X: r.X + inset + at*width, Y: r.Y + inset, W: width, H: r.H - 2*inset}
+		p.Shadow(pill, radius-2, 0, 2, 9, 0, ui.RGBA(0, 0, 0, 0.22))
+		p.FillGradient(pill, ui.LinearGradient{Angle: 180, Stops: []ui.GradientStop{
+			{At: 0, Color: lozenge},
+			{At: 0.6, Color: ui.RGBA(255, 255, 255, 0.82)},
+			{At: 1, Color: ui.RGBA(255, 255, 255, 0.62)},
+		}}, radius-2)
+		p.Stroke(pill, ui.RGBA(255, 255, 255, 0.72), radius-2, 1)
+	}).Children(func() {
+		for i, l := range labels {
+			chosen := i == *selected
+			seg := parts.Segment(i).Width(width).Height(height - 2*inset).Center().Radius(radius - 2)
+			if !chosen && seg.Hovered() {
+				seg.Background(ui.RGBA(255, 255, 255, 0.1))
+			}
+			seg.Children(func() {
+				txt := ui.Text(c, l).FontSize(12.5).SingleLine()
+				if chosen {
+					txt.FontWeight(650).TextColor(ui.Hex("#141416"))
+				} else {
+					txt.FontWeight(560).TextColor(t.Text.Alpha(0.66))
+				}
+			})
 		}
 	})
 	return *selected != before

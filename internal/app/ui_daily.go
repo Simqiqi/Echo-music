@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"math"
+	"math/rand/v2"
 	"strings"
 	"time"
 
@@ -38,11 +39,12 @@ func (a *app) dailyArt(c *ui.Context, now time.Time, size float32) {
 }
 
 // dailyCard leads the home page: the day's songs, in the colors of their
-// first cover, the day's date set huge and faint behind them. The first
-// cover is a sleeve with its record peeking out, the next two behind it;
-// on wide pages the first picks are listed between. Under the pointer the
-// covers fan and the record slides out, turning; while the day's songs
-// play it turns on, and grooves ripple out from it across the card.
+// first cover, the day's date set huge and faint behind them. An aurora of
+// sound crosses the card — waves that breathe on their own and rise with
+// the music while it plays — and the first covers hang over it as discs of
+// glass, bobbing on the crests; while the day's songs play the first one's
+// sheen turns. The first picks are listed between, under the pointer the
+// card leans to it and a sheen sweeps it.
 func (a *app) dailyCard(c *ui.Context, now time.Time) {
 	songs := a.daily
 	if len(songs) == 0 {
@@ -51,16 +53,11 @@ func (a *app) dailyCard(c *ui.Context, now time.Time) {
 	w, _ := c.Size()
 	inner := w - sidebarWidth - 2*pagePad
 	still := c.Preferences().ReduceMotion
-	art := a.art.get(netease.Sized(songs[0].Album.PicURL, 600), true)
 	card := ui.ButtonBase(c.Key("daily")).Height(dailyHeight).Radius(dailyRadius).FocusRing(false).Label("每日推荐").TextColor(white)
 	hovered := card.Hovered()
 	ours, playing := a.dailyPlaying()
 
-	// The cover's colors, eased in as it loads.
-	deep, rich, glow := dailyColors(art)
-	fade := ui.Animation{Duration: 600 * time.Millisecond}
-	deep, rich, glow = card.AnimateColor("deep", deep, fade), card.AnimateColor("rich", rich, fade), card.AnimateColor("glow", glow, fade)
-	card.Background(deep)
+	card.Background(a.dailyRainbow(c.Now()).deep)
 	lift := card.AnimateTo("lift", b2f(hovered), ui.Snappy)
 	card.Shadow(0, 14+8*lift, 34+12*lift, -14, a.pal.cardShade)
 	// A sheen sweeps across once as the pointer comes in.
@@ -74,27 +71,32 @@ func (a *app) dailyCard(c *ui.Context, now time.Time) {
 	// The card leans a few degrees toward the pointer, seen in
 	// perspective, as a card held to the light: it asks for frames while
 	// the pointer moves over it, and eases back to flat as it leaves.
-	var rx, ry float32
+	// The discs of glass lean with it, nearer ones farther, so the sky
+	// they hang in has depth.
+	var px, py float32
+	var over bool
 	if !still {
-		if px, py, over := card.PointerPosition(); over {
-			ry = -((px/inner)*2 - 1) * 4
-			rx = ((py/dailyHeight)*2 - 1) * 3
-		}
+		px, py, over = card.PointerPosition()
+	}
+	var rx, ry float32
+	if over {
+		ry = -((px/inner)*2 - 1) * 4
+		rx = ((py/dailyHeight)*2 - 1) * 3
 	}
 	rx = card.AnimateTo("rx", rx, ui.Snappy)
 	ry = card.AnimateTo("ry", ry, ui.Snappy)
 	card.Transform(ui.Perspective(1200).Then(ui.RotationX(rx)).Then(ui.RotationY(ry)))
-
-	// The record: tucked in, out a little under the pointer, out while it
-	// plays.
-	out := float32(0)
-	switch {
-	case ours:
-		out = 1
-	case hovered:
-		out = 0.6
+	gx := float32(0)
+	gy := float32(0)
+	if over {
+		gx = (px/inner - 0.5) * 16
+		gy = (py/dailyHeight - 0.5) * 8
 	}
-	out = card.AnimateTo("out", out, ui.Animation{Spring: ui.SpringOptions{Duration: 700 * time.Millisecond, Bounce: 0.25}})
+	gx = card.AnimateTo("gx", gx, ui.Snappy)
+	gy = card.AnimateTo("gy", gy, ui.Snappy)
+
+	// The playing disc's sheen turns while the songs play, and drifts a
+	// little under the pointer.
 	turn := 0.0
 	switch {
 	case still:
@@ -103,21 +105,38 @@ func (a *app) dailyCard(c *ui.Context, now time.Time) {
 	case hovered:
 		turn = 0.12
 	}
-	showStack, showPicks, showDay := inner >= 620, inner >= 1040, inner >= 900
-	backdrop := backdrop(art)
+	showPicks, showDay := inner >= 1040, inner >= 900
+	picksW := float32(0)
+	if showPicks {
+		picksW = picksWidth + 28
+	}
+	// The words and the picks keep clear of the discs of glass, which
+	// hang at the card's right.
+	textW := max(232, inner-2*dailyPadX-28-picksW-galaxyWidth)
 
 	card.Children(func() {
 		ui.Box(c).Absolute().Top(0).Left(0).Right(0).Bottom(0).PassThrough().Draw(func(p *ui.Painter, r ui.Rect) {
-			spin := &a.dailySpin
-			if spin.step(p.Now(), turn) {
+			lv, live := a.pl.Levels()
+			a.dailyWave.step(p.Now(), lv, live)
+			if a.dailySpin.step(p.Now(), turn) || live || (hovered && !still) {
 				p.AnimationFrameRate(dailyRate)
 			}
-			// Where the record turns: at the right, in its sleeve's stack.
-			cx := r.X + r.W - dailyPadX - 120
-			if showStack {
-				cx = r.X + r.W - dailyPadX - stackWidth + sleeveLeft + sleeveSize/2 + recordOut(out)
+			// The rainbow runs across the card with the clock, so the page
+			// asks for frames while it shows.
+			if !still {
+				p.AnimationFrameRate(dailyHueRate)
 			}
-			drawDailyBackdrop(p, r, backdrop, deep, rich, glow, cx, float32(spin.angle), sweep)
+			rb := a.dailyRainbow(p.Now())
+			drawDailyBackdrop(p, r, rb, sweep)
+			p.Clip(r, dailyRadius, func() {
+				drawAurora(p, r, &a.dailyWave, p.Now(), rb.rich, rb.glow)
+				// Deeper behind the words, over the wave, so they keep
+				// their ground while the aurora shines at the right.
+				p.FillGradient(r, ui.LinearGradient{Angle: 90, Stops: []ui.GradientStop{
+					{Color: rb.deep.Alpha(0.86), At: 0}, {Color: rb.deep.Alpha(0.3), At: 0.34}, {Color: rb.deep.Alpha(0), At: 0.56},
+				}}, 0)
+				a.drawGalaxy(p, r, now, songs, rb.deep, rb.rich, rb.glow, float32(a.dailySpin.angle), still, playing && live, gx, gy)
+			})
 			// The day, set huge and faint after the words, cut off by the
 			// foot, where the covers leave it room.
 			if showDay {
@@ -126,7 +145,7 @@ func (a *app) dailyCard(c *ui.Context, now time.Time) {
 			}
 		})
 		ui.Row(c).Absolute().Top(0).Left(0).Right(0).Bottom(0).Padding(0, dailyPadX).Gap(28).AlignItems(ui.Center).Children(func() {
-			ui.Column(c).Grow(1).Shrink(1).MinWidth(0).Gap(6).Children(func() {
+			ui.Column(c).Grow(1).Shrink(1).MinWidth(0).MaxWidth(textW).Gap(6).Children(func() {
 				ui.Textf(c, "%d月%d日 %s · %s", now.Month(), now.Day(), weekday(now), a.dailyNote()).FontSize(12).FontWeight(600).LetterSpacing(0.3).TextColor(white.Alpha(0.66)).MaxLines(1)
 				ui.Text(c, "每日推荐").FontSize(32).FontWeight(800).LetterSpacing(-0.8).LineHeight(1.15)
 				ui.Text(c, dailyArtists(songs)).FontSize(13).TextColor(white.Alpha(0.8)).MaxLines(1)
@@ -140,9 +159,8 @@ func (a *app) dailyCard(c *ui.Context, now time.Time) {
 			if showPicks {
 				a.dailyPicks(c, songs, ours)
 			}
-			if showStack {
-				a.dailyStack(c, songs, hovered && !still, out)
-			}
+			// Room at the right for the discs of glass.
+			ui.Box(c).Width(galaxyWidth).Shrink(0)
 		})
 	})
 	if card.Clicked() {
@@ -150,27 +168,20 @@ func (a *app) dailyCard(c *ui.Context, now time.Time) {
 	}
 }
 
-// The daily card's measures; the stack of covers is laid out by hand.
+// The daily card's measures; the wave and its discs are laid out by hand.
 const (
 	dailyHeight = 212
 	dailyRadius = 24
 	dailyPadX   = 32
-	stackWidth  = 300
-	sleeveLeft  = 64 // where the first cover's sleeve is in the stack
-	sleeveSize  = 156
-	recordSize  = 146
+	picksWidth  = 236 // the column of the day's first songs
+	galaxyWidth = 296 // the room the discs of glass hang in, at the right
 )
 
 // dailyRate is how many frames a second the daily card draws what moves
-// on it, its record turning and the bars on its play button: every frame
+// on it, its wave breathing and the bars on its play button: every frame
 // of a 120 Hz display, it redrew the whole card 120 times a second, for
-// motion that looks as smooth at half of that; at a quarter, the record's
-// label steps.
+// motion that looks as smooth at half of that.
 const dailyRate = 60
-
-// recordOut is how far right of its sleeve's middle the record's is, as
-// far out as out.
-func recordOut(out float32) float32 { return 30 + 46*out }
 
 // dailyPlaying reports whether the day's songs are what plays, and whether
 // they play now rather than paused.
@@ -182,57 +193,74 @@ func (a *app) dailyPlaying() (ours, playing bool) {
 	return true, a.pl.Playing()
 }
 
-// dailyColors returns the card's colors for the day's first cover: a deep
-// and a rich shade of its hue, a little turned, and a bright one to glow,
-// at depths that white reads over whatever the cover. A gray cover, or one
-// still loading, takes NetEase's red.
-func dailyColors(art *artwork) (deep, rich, glow ui.Color) {
-	h, s := 356.0, 0.74
-	if art != nil && !art.failed {
-		th, ts, _ := hsv(float64(art.tint.R)/255, float64(art.tint.G)/255, float64(art.tint.B)/255)
-		if ts > 0.15 {
-			h, s = th, min(max(ts*1.2, 0.5), 0.78)
-		}
-	}
-	return hsvColor(h, s, 0.24), hsvColor(math.Mod(h+16, 360), s*0.9, 0.5), hsvColor(math.Mod(h+32, 360), s*0.55, 1)
+// dailyRainbow is the daily card's colors: a rainbow that begins at a hue
+// of its own — another each time the home page opens — and runs across the
+// card with the clock, its colors drifting like a slow river.
+type dailyRainbow struct {
+	hue  float64  // where its band of hues begins, in degrees
+	deep ui.Color // the dark ground the words stand on
+	rich ui.Color // the color the wave of sound is drawn in
+	glow ui.Color // the light the discs of glass hang in
 }
 
-// drawDailyBackdrop paints the daily card in r: a gradient of the cover's
-// colors, the cover itself blurred faintly through it, a glow where the
-// record turns at cx, and grooves rippling out from it, which travel as
-// the record turns to angle; and, as sweep goes from 0 to 1, a sheen
-// crossing it.
-func drawDailyBackdrop(p *ui.Painter, r ui.Rect, blurred *ui.Bitmap, deep, rich, glow ui.Color, cx, angle, sweep float32) {
-	cy := r.Y + r.H/2
+// dailyHueRate is how many frames a second the card redraws to carry the
+// rainbow along: its hues move slowly enough that this reads as smooth,
+// and slowly enough not to cost a frame rate of its own.
+const dailyHueRate = 30
+
+// dailyHueDrift is how fast it runs, in degrees a second: a whole turn of
+// hues in half a minute.
+const dailyHueDrift = 12
+
+// rollDailyRainbow takes the rainbow at another hue, each time the home
+// page opens.
+func (a *app) rollDailyRainbow() {
+	a.dailyHue, a.dailyHued = rand.Float64()*360, true
+}
+
+// dailyRainbow is the card's colors for now: the hue it begins at, carried
+// on by the clock, and the shades the words and the wave are drawn in.
+func (a *app) dailyRainbow(now time.Time) dailyRainbow {
+	if !a.dailyHued {
+		a.rollDailyRainbow()
+	}
+	h := math.Mod(a.dailyHue+float64(now.UnixNano())/1e9*dailyHueDrift, 360)
+	return dailyRainbow{
+		hue:  h,
+		deep: hsvColor(math.Mod(h+200, 360), 0.72, 0.17),
+		rich: hsvColor(math.Mod(h+120, 360), 0.74, 0.5),
+		glow: hsvColor(math.Mod(h+40, 360), 0.55, 1),
+	}
+}
+
+// veil is the rainbow itself: a band of hues laid across the card, faint
+// enough that the words read over it and bright enough to be a rainbow.
+func (d dailyRainbow) veil() []ui.GradientStop {
+	const n = 10
+	ss := make([]ui.GradientStop, n)
+	for i := range ss {
+		h := math.Mod(d.hue+330*float64(i)/float64(n-1), 360)
+		ss[i] = ui.GradientStop{At: float32(i) / float32(n-1), Color: hsvColor(h, 0.95, 0.68).Alpha(0.52)}
+	}
+	return ss
+}
+
+// drawDailyBackdrop paints the daily card in r: the rainbow across it, dark
+// behind the words and running bright toward the right, and, as sweep goes
+// from 0 to 1, a sheen crossing it.
+func drawDailyBackdrop(p *ui.Painter, r ui.Rect, d dailyRainbow, sweep float32) {
 	p.Clip(r, dailyRadius, func() {
+		// The ground: deep, its hue turning with the rainbow, so white
+		// reads over whatever color runs across it.
 		p.FillGradient(r, ui.LinearGradient{Angle: 100, Oklab: true, Stops: []ui.GradientStop{
-			{Color: deep, At: 0.1}, {Color: rich, At: 0.85}, {Color: rich.Mix(deep, 0.3), At: 1},
+			{Color: d.deep, At: 0},
+			{Color: hsvColor(math.Mod(d.hue+250, 360), 0.72, 0.34), At: 0.55},
+			{Color: hsvColor(math.Mod(d.hue+300, 360), 0.68, 0.4), At: 1},
 		}}, 0)
-		if blurred != nil {
-			p.ImageRegion(blurred, ui.Rect{W: 48, H: 48}, coverRect(r, 48, 48), ui.ImageOptions{Tint: white.Alpha(0.28)})
-		}
-		// Deeper behind the words, at the left.
-		p.FillGradient(r, ui.LinearGradient{Angle: 90, Stops: []ui.GradientStop{
-			{Color: deep.Alpha(0.85), At: 0}, {Color: deep.Alpha(0), At: 0.6},
-		}}, 0)
-		// The glow behind the record, and light from above.
-		p.Shadow(ui.Rect{X: cx - 60, Y: cy - 60, W: 120, H: 120}, 60, 0, 0, 140, 30, glow.Alpha(0.32))
+		// The rainbow over it.
+		p.FillGradient(r, ui.LinearGradient{Angle: 100, Stops: d.veil()}, 0)
+		// Light from above, as on a stage.
 		p.Shadow(ui.Rect{X: r.X + r.W*0.3, Y: r.Y - 80, W: r.W * 0.4, H: 40}, 20, 0, 0, 120, 0, white.Alpha(0.08))
-		// Grooves rippling out, fainter as they go, travelling a groove a
-		// turn by whole pixels of the screen, which the rings are drawn
-		// at: the card around the record is drawn again only as they move
-		// one, not for each frame the record turns.
-		const gap = 18
-		off := float32(math.Round(float64(angle/360*gap*p.Scale()))) / p.Scale()
-		for rr := float32(recordSize/2+6) + off; rr < r.W; rr += gap {
-			a := 0.05 * (1 - (rr-recordSize/2)/(r.H*1.6))
-			if a <= 0.004 {
-				break
-			}
-			// Faded in as each leaves the record.
-			a *= min(1, (rr-recordSize/2-6)/gap)
-			p.Stroke(ui.Rect{X: cx - rr, Y: cy - rr, W: 2 * rr, H: 2 * rr}, white.Alpha(a), rr, 1)
-		}
 		if sweep > 0 && sweep < 1 {
 			at := -0.25 + 1.5*sweep
 			p.FillGradient(r, ui.LinearGradient{Angle: 110, Stops: []ui.GradientStop{
@@ -244,6 +272,121 @@ func drawDailyBackdrop(p *ui.Painter, r ui.Rect, blurred *ui.Bitmap, deep, rich,
 	})
 	// A hairline of light around its edge, as on glass.
 	p.Stroke(r, white.Alpha(0.1), dailyRadius, 1)
+}
+
+// auroraY is where the wave of sound stands at x: three slow swells it
+// breathes with on its own, and the music itself, dealt over the card's
+// bands, rising toward its right where the discs hang.
+func auroraY(r ui.Rect, x float32, w *barState, t float64) float32 {
+	f := clamp01((x - r.X) / r.W)
+	y := r.Y + r.H*0.58
+	y += 8 * float32(math.Sin(t*0.9+float64(f)*4.2))
+	y += 5 * float32(math.Sin(t*1.7+float64(f)*9.1+1.7))
+	y += 3 * float32(math.Sin(t*2.3+float64(f)*14.3+4.1))
+	band := int(f * f * float32(player.Bands-1))
+	v := w.group(max(0, band-2), min(player.Bands, band+3))
+	return y - (8+40*f*f)*(0.2+v*1.6)
+}
+
+// drawAurora paints the wave of sound across r: curtains of light
+// standing on its crest, a soft body built of stacked strokes, the crest
+// itself, a band of glow behind it, a thin highlight of light along its
+// top, and specks of stardust through the sky above it.
+func drawAurora(p *ui.Painter, r ui.Rect, w *barState, now time.Time, rich, glow ui.Color) {
+	t := float64(now.UnixNano()) / 1e9
+	// Curtains: bands of glow hanging over the crest, swaying slowly.
+	for x := r.X + 24; x < r.X+r.W-12; x += 42 {
+		y := auroraY(r, x, w, t)
+		h := 54 + 26*float32(math.Sin(float64(x)*0.021+t*0.35))
+		p.FillGradient(ui.Rect{X: x - 14, Y: y - h, W: 28, H: h},
+			ui.LinearGradient{Angle: 180, Stops: []ui.GradientStop{
+				{Color: glow.Alpha(0.02), At: 0},
+				{Color: glow.Alpha(0.09), At: 0.72},
+				{Color: glow.Alpha(0.15), At: 1},
+			}}, 0)
+	}
+	pass := func(off, width float32, col ui.Color) {
+		var pts [][2]float32
+		for x := r.X - 8; x <= r.X+r.W+8; x += 14 {
+			pts = append(pts, [2]float32{x, auroraY(r, x, w, t) + off})
+		}
+		p.StrokePolyline(pts, width, col)
+	}
+	pass(14, 34, rich.Alpha(0.08))
+	pass(7, 22, rich.Alpha(0.12))
+	pass(0, 3, rich.Alpha(0.72))
+	pass(13, 1.8, glow.Alpha(0.55))
+	pass(-9, 1.3, white.Alpha(0.38))
+	// Stardust: a speck here and there in the sky over the wave,
+	// brighter over its right, where the aurora is strongest.
+	for x := r.X + 12; x < r.X+r.W-12; x += 30 {
+		seed := float32(math.Sin(float64(x)*12.9898) * 43758.5453)
+		f := seed - float32(math.Floor(float64(seed)))
+		if f < 0.4 {
+			continue
+		}
+		y := auroraY(r, x, w, t) - 2 - f*30
+		d := 1.6 + f*1.8
+		a := 0.08 + 0.26*f*clamp01((x-r.X)/r.W+0.2)
+		p.Fill(ui.Rect{X: x - d/2, Y: y - d/2, W: d, H: d}, white.Alpha(a), d/2)
+	}
+}
+
+// drawGalaxy hangs the day's first covers over the wave as discs of
+// glass: each rides its crest, bobbing gently, lit from above and
+// glowing in the card's color beneath, the nearer ones leaning further
+// with the pointer; the first, while its songs play, carries a sheen
+// that slowly turns.
+func (a *app) drawGalaxy(p *ui.Painter, r ui.Rect, now time.Time, songs []netease.Track, deep, rich, glow ui.Color, spin float32, still, live bool, gx, gy float32) {
+	t := float64(now.UnixNano()) / 1e9
+	for i := range min(3, len(songs)) {
+		d := [...]float32{98, 74, 56}[i]
+		fromRight := [...]float32{80, 178, 264}[i]
+		// The nearer a disc, the further it leans with the pointer.
+		depth := 1 - 0.3*float32(i)
+		x := r.X + r.W - dailyPadX - fromRight + gx*depth
+		cy := auroraY(r, x-gx*depth, &a.dailyWave, t) - d*0.18 + gy*depth
+		if !still {
+			bob := 3 + float32(i)
+			if live {
+				bob += 3
+			}
+			cy += bob * float32(math.Sin(t*(1.1+0.23*float64(i))+float64(i)*1.9))
+		}
+		rect := ui.Rect{X: x - d/2, Y: cy - d/2, W: d, H: d}
+		// The glow it throws around it, in three soft rings, and the pool
+		// of light it casts on the wave below.
+		for k, rr := range [...]float32{0.06, 0.05, 0.04} {
+			grow := float32(k+1) * d * 0.12
+			p.Fill(ui.Rect{X: rect.X - grow, Y: rect.Y - grow, W: d + 2*grow, H: d + 2*grow}, glow.Alpha(rr), d/2+grow)
+		}
+		p.Fill(ui.Rect{X: rect.X + d*0.12, Y: rect.Y + d*0.82, W: d * 0.76, H: d * 0.26}, glow.Alpha(0.22), d*0.13)
+		p.Clip(rect, d/2, func() {
+			if bmp := bitmap(a.art.get(netease.Sized(songs[i].Album.PicURL, 240), false)); bmp != nil {
+				p.Image(bmp, rect, ui.Cover)
+			} else {
+				p.Fill(rect, rich, d/2)
+			}
+			// Light on the glass, strongest at its upper left, and its
+			// own shade at the foot, so it reads as a sphere.
+			p.FillGradient(rect, ui.LinearGradient{Angle: 160, Stops: []ui.GradientStop{
+				{Color: white.Alpha(0.3), At: 0}, {Color: white.Alpha(0.05), At: 0.38}, {Color: white.Alpha(0), At: 0.56},
+			}}, d/2)
+			p.FillGradient(rect, ui.LinearGradient{Angle: 180, Stops: []ui.GradientStop{
+				{Color: ui.RGBA(0, 0, 0, 0), At: 0.62}, {Color: ui.RGBA(0, 0, 0, 0.28), At: 1},
+			}}, d/2)
+			if i == 0 && live && !still {
+				p.FillConicGradient(rect, ui.ConicGradient{Angle: spin, Stops: []ui.GradientStop{
+					{Color: white.Alpha(0), At: 0}, {Color: white.Alpha(0.12), At: 0.1}, {Color: white.Alpha(0), At: 0.22},
+					{Color: white.Alpha(0), At: 0.55}, {Color: white.Alpha(0.1), At: 0.65}, {Color: white.Alpha(0), At: 0.78},
+					{Color: white.Alpha(0), At: 1},
+				}}, d/2)
+			}
+		})
+		// The rim of the glass, and the halo it catches.
+		p.Stroke(rect, white.Alpha(0.32), d/2, 1.2)
+		p.Stroke(ui.Rect{X: rect.X - 3, Y: rect.Y - 3, W: d + 6, H: d + 6}, glow.Alpha(0.16), d/2+3, 1)
+	}
 }
 
 func b2f(b bool) float32 {
@@ -363,7 +506,7 @@ func (a *app) dailyPlayButton(c *ui.Context, songs []netease.Track, ours, playin
 // its bars; each plays the day's songs from it.
 func (a *app) dailyPicks(c *ui.Context, songs []netease.Track, ours bool) {
 	cur := a.pl.Current()
-	ui.Column(c.Key("picks")).Width(236).Shrink(0).Gap(2).Children(func() {
+	ui.Column(c.Key("picks")).Width(picksWidth).Shrink(0).Gap(2).Children(func() {
 		for i := range min(3, len(songs)) {
 			tr := &songs[i]
 			row := ui.ButtonBase(c.Key(tr.ID)).Row().Gap(12).Padding(7, 12).Radius(12).AlignItems(ui.Center).FocusRing(false).Label(tr.Name).
@@ -392,81 +535,6 @@ func (a *app) dailyPicks(c *ui.Context, songs []netease.Track, ours bool) {
 			}
 		}
 	})
-}
-
-// dailyStack is the day's first cover, as a sleeve with its record out as
-// far as out, the two covers after it behind; fanned, they spread.
-func (a *app) dailyStack(c *ui.Context, songs []netease.Track, fanned bool, out float32) {
-	spring := ui.Animation{Spring: ui.SpringOptions{Duration: 600 * time.Millisecond, Bounce: 0.3}}
-	ui.Box(c.Key("stack")).Size(stackWidth, sleeveSize).Shrink(0).Children(func() {
-		// The covers behind, the farthest first.
-		for i := min(2, len(songs)-1); i >= 1; i-- {
-			size := float32(sleeveSize - 18*i)
-			pose := ui.Pose{Rotate: -5 * float32(i), Y: 2}
-			if fanned {
-				pose = ui.Pose{Rotate: -9 * float32(i), X: -10 * float32(i), Y: -2}
-			}
-			cov := ui.Box(c.Key(i)).Absolute().Left(sleeveLeft-30*float32(i)).Top((sleeveSize-size)/2).Size(size, size).Radius(10).
-				Opacity(1-0.12*float32(i)).Shadow(0, 10, 22, -6, ui.RGBA(0, 0, 0, 0.45))
-			cov.AnimatePose(pose, spring)
-			cov.Children(func() { a.coverFill(c, songs[i].Album.PicURL, 240, 10) })
-		}
-		// The record, behind its sleeve.
-		mid := float32(sleeveLeft + sleeveSize/2)
-		ui.Box(c.Key("record")).Absolute().Left(mid+recordOut(out)-recordSize/2).Top((sleeveSize-recordSize)/2).
-			Size(recordSize, recordSize).Radius(recordSize/2).Shadow(0, 8, 20, -4, ui.RGBA(0, 0, 0, 0.5)).
-			Draw(func(p *ui.Painter, r ui.Rect) {
-				drawRecord(p, r, bitmap(a.art.get(netease.Sized(songs[0].Album.PicURL, 240), false)), float32(a.dailySpin.angle))
-			})
-		// The sleeve.
-		sleeve := ui.Box(c.Key("sleeve")).Absolute().Left(sleeveLeft).Top(0).Size(sleeveSize, sleeveSize).Radius(12).
-			Shadow(0, 16, 30, -8, ui.RGBA(0, 0, 0, 0.5))
-		sleeve.AnimatePose(ui.Pose{Rotate: -2 * b2f(fanned), Y: -3 * b2f(fanned)}, spring)
-		sleeve.Children(func() {
-			a.coverFill(c, songs[0].Album.PicURL, 400, 12)
-			// Light on its gloss, and its edge.
-			ui.Box(c).Absolute().Top(0).Left(0).Right(0).Bottom(0).Radius(12).PassThrough().Border(1, white.Alpha(0.14)).
-				LinearGradient(ui.LinearGradient{Angle: 145, Stops: []ui.GradientStop{
-					{Color: white.Alpha(0.22), At: 0}, {Color: white.Alpha(0), At: 0.42},
-					{Color: ui.RGBA(0, 0, 0, 0), At: 0.7}, {Color: ui.RGBA(0, 0, 0, 0.18), At: 1},
-				}})
-		})
-	})
-}
-
-// drawRecord paints a vinyl record in r, its label the cover bmp, turned
-// to angle: grooves catching the light, which stays where it is as the
-// record turns, round a label that turns with it.
-func drawRecord(p *ui.Painter, r ui.Rect, bmp *ui.Bitmap, angle float32) {
-	d := r.W
-	cx, cy := r.X+d/2, r.Y+d/2
-	p.Fill(r, ui.Hex("#0e0e10"), d/2)
-	for i, rr := 0, d*0.21; rr < d*0.48; i, rr = i+1, rr+2.2 {
-		a := float32(0.035)
-		if i%3 == 0 {
-			a = 0.07
-		}
-		p.Stroke(ui.Rect{X: cx - rr, Y: cy - rr, W: 2 * rr, H: 2 * rr}, white.Alpha(a), rr, 0.7)
-	}
-	// The light on it, in two opposite fans.
-	p.FillConicGradient(r, ui.ConicGradient{Angle: 20, Stops: []ui.GradientStop{
-		{Color: white.Alpha(0), At: 0}, {Color: white.Alpha(0.13), At: 0.08}, {Color: white.Alpha(0), At: 0.2},
-		{Color: white.Alpha(0), At: 0.5}, {Color: white.Alpha(0.13), At: 0.58}, {Color: white.Alpha(0), At: 0.7},
-		{Color: white.Alpha(0), At: 1},
-	}}, d/2)
-	p.Stroke(r, white.Alpha(0.1), d/2, 1)
-	// The label, turning: clipped still, its cover turning inside.
-	lr := d * 0.18
-	label := ui.Rect{X: cx - lr, Y: cy - lr, W: 2 * lr, H: 2 * lr}
-	p.Fill(label, ui.Hex("#d8262d"), lr)
-	if bmp != nil {
-		p.Clip(label, lr, func() {
-			p.Transform(ui.Rotation(angle), cx, cy, func() { p.Image(bmp, label, ui.Cover) })
-		})
-	}
-	p.Stroke(label, ui.RGBA(0, 0, 0, 0.35), lr, 1.5)
-	// The spindle hole.
-	p.Fill(ui.Rect{X: cx - 2.5, Y: cy - 2.5, W: 5, H: 5}, ui.Hex("#0e0e10"), 2.5)
 }
 
 // dailyNote says, shortly, how the day's songs are picked.

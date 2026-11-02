@@ -41,7 +41,7 @@ func TestAccentSwatches(t *testing.T) {
 	setThemeSource = func(mygo.ThemeSource) {}
 	defer func() { setThemeSource = old }()
 
-	tt := ui.NewTester(a.settingsTestView, 520, 900)
+	tt := ui.NewTester(a.settingsTestView, 520, 940)
 	tt.Frame()
 	if err := tt.Click("强调色蓝"); err != nil {
 		t.Fatal(err)

@@ -13,6 +13,7 @@ import (
 
 	"netease-music-mygo/internal/lyrics"
 	"netease-music-mygo/internal/netease"
+	"netease-music-mygo/internal/player"
 )
 
 // A cover of stripes, so that the specks of the record show where on the
@@ -212,6 +213,73 @@ func TestParticleLayoutKeepsTheLineItsBand(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+// The record beats to the song: a strike of the drum (the bass leaping)
+// brings it a breath forward, the breath dies away while the bass holds,
+// and in silence it stands as it stands.
+func TestPulseStateSteps(t *testing.T) {
+	var p pulseState
+	now := time.Now()
+	quiet, loud := [player.Bands]float32{}, [player.Bands]float32{}
+	for i := range loud {
+		loud[i] = 0.9
+	}
+	if v := p.step(now, quiet, false); v != 0 {
+		t.Errorf("in silence the record comes forward %v, want it still", v)
+	}
+	p.step(now.Add(16*time.Millisecond), quiet, true)
+	if v := p.step(now.Add(32*time.Millisecond), loud, true); v < 0.4 {
+		t.Errorf("the bass leapt and the record came forward %v, want it a good way forward", v)
+	}
+	// It settles back while the bass holds, the strike dying away.
+	var peak, last float32
+	for i := range 60 {
+		v := p.step(now.Add(time.Duration(48+i*16)*time.Millisecond), loud, true)
+		peak, last = max(peak, v), v
+	}
+	if last > peak*0.6 {
+		t.Errorf("the strike has died and the record still stands %v forward of the %v it leapt to, want it settling back", last, peak)
+	}
+	// And in silence it comes no further.
+	for i := range 40 {
+		p.step(now.Add(time.Duration(2+i)*time.Second), quiet, false)
+	}
+	if v := p.step(now.Add(10*time.Second), quiet, false); v != 0 {
+		t.Errorf("in silence the record comes forward %v, want it still", v)
+	}
+}
+
+// The record comes forward at a strike: at the full push its specks stand a
+// breath wider than at rest, and no more than a breath, for the cover must
+// go on reading as the cover.
+func TestParticleRecordComesForward(t *testing.T) {
+	const w, h = 360, 360
+	const ext = 200
+	spanAt := func(push float32) int {
+		view := func(c *ui.Context) {
+			box := ui.Box(c).Absolute().Top(0).Left(0).Right(0).Bottom(0)
+			box.Draw(func(p *ui.Painter, r ui.Rect) {
+				drawParticles(p, r, ui.NewBitmap(stripedCover()), stripeColors[2],
+					ui.Point{X: w / 2.0, Y: h / 2.0}, ext, 0, 0, push, 0)
+			})
+		}
+		tt := ui.NewTester(view, w, h)
+		tt.SetDark(true)
+		tt.Frame()
+		left, right, ok := litSpan(tt.Image(), h/2)
+		if !ok {
+			t.Fatalf("push %v: no speck of the cover anywhere along the middle", push)
+		}
+		return right - left + 1
+	}
+	rest, pushed := spanAt(0), spanAt(1)
+	if pushed <= rest {
+		t.Errorf("the record stands %v across at rest and %v at the strike, want it a breath wider as it comes forward", rest, pushed)
+	}
+	if pushed > rest+rest/20 {
+		t.Errorf("the record stands %v across at rest and %v at the strike, want no more than a twentieth wider", rest, pushed)
 	}
 }
 

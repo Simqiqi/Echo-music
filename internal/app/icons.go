@@ -31,6 +31,7 @@ var (
 	iconHome      = strokeIcon(`<path d="M12 3 4 9v11a1 1 0 0 0 1 1h4v-6h6v6h4a1 1 0 0 0 1-1V9z"/>`)
 	iconDaily     = strokeIcon(`<rect x="3" y="4.5" width="18" height="16.5" rx="2.5"/><path d="M8 2.5v4"/><path d="M16 2.5v4"/><path d="M3 10h18"/>`)
 	iconCharts    = strokeIcon(`<path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/>`)
+	iconWeekly    = strokeIcon(`<path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 5-6"/>`)
 	iconQueue     = strokeIcon(`<path d="M16 5H3"/><path d="M11 12H3"/><path d="M11 19H3"/><path d="M21 16V5"/><circle cx="18" cy="16" r="3"/>`)
 	iconLyrics    = strokeIcon(`<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8"/><path d="M8 13h5"/>`)
 	iconDown      = strokeIcon(`<path d="m6 9 6 6 6-6"/>`)
@@ -47,6 +48,7 @@ var (
 
 var (
 	iconRadio   = strokeIcon(`<circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49"/><path d="M7.76 16.24a6 6 0 0 1 0-8.49"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M4.93 19.07a10 10 0 0 1 0-14.14"/>`)
+	iconWeather = strokeIcon(`<circle cx="7" cy="8" r="3"/><path d="M7 2.5v1.2"/><path d="m2.9 5.4.9.9"/><path d="m11.2 6.3.9-.9"/><path d="M2.5 9.5h1.2"/><path d="M13.5 9.5h-1"/><path d="M9.5 15.5a4.5 4.5 0 0 1 8.7-1.5 3.5 3.5 0 0 1-.7 6.9H9a3.5 3.5 0 0 1 .5-5.4"/>`)
 	iconMoon    = strokeIcon(`<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>`)
 	iconTrash   = strokeIcon(`<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>`)
 	iconThumb   = strokeIcon(`<path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/>`)
@@ -63,6 +65,9 @@ var iconThumbFill = ui.MustParseSVG([]byte(`<svg xmlns="http://www.w3.org/2000/s
 
 var (
 	iconReload   = strokeIcon(`<path d="M20 7v5h-5"/><path d="M20 12a8 8 0 1 0-2.3 5.7"/>`)
+	iconPin      = strokeIcon(`<path d="M12 21.5s-7-6.6-7-11.5a7 7 0 0 1 14 0c0 4.9-7 11.5-7 11.5z"/><circle cx="12" cy="10" r="2.6"/>`)
+	iconPhoto    = strokeIcon(`<rect x="3" y="4" width="18" height="16" rx="3.5"/><circle cx="8.6" cy="9.6" r="1.6"/><path d="m3.6 17.4 4.7-4.7 3.9 3.9 3.1-3.1 5.1 5.1"/>`)
+	iconSunrise  = strokeIcon(`<path d="M12 3v4"/><path d="m5.6 9.6-1.4-1.4"/><path d="m18.4 9.6 1.4-1.4"/><path d="M3 18h18"/><path d="M7 18a5 5 0 0 1 10 0"/><path d="M2 21.5h20"/>`)
 	iconUpDown   = strokeIcon(`<path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/>`)
 	iconSettings = strokeIcon(`<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>`)
 	iconSignOut  = strokeIcon(`<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>`)

@@ -7,6 +7,8 @@ import (
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/plugins/glass"
 	"github.com/egoist/mygo/ui"
+
+	"netease-music-mygo/internal/player"
 )
 
 // openSettings shows the settings over the page instead of a window of
@@ -182,6 +184,21 @@ func (a *app) settingsBody(c *ui.Context, p palette, liquid bool) {
 				a.changed()
 			}
 		})
+		row("均衡器", "按预设调整音色的走向，对每一首歌都生效", func() {
+			labels := make([]string, len(player.EQPresets))
+			chosen := labels[0]
+			for i, p := range player.EQPresets {
+				labels[i] = p.Label
+				if p.Label == s.EqPreset {
+					chosen = p.Label
+				}
+			}
+			if fieldSelect(c.Key("eq"), &chosen, labels, p).Changed() {
+				s.EqPreset = chosen
+				a.applyEq()
+				a.changed()
+			}
+		})
 		row("音量均衡", "按网易云音乐测得的响度调整每首歌的音量，让歌曲听起来一样响", func() {
 			if ui.Switch(c.Key("normalize"), &s.Normalize).Label("音量均衡").Changed() {
 				a.pl.SetVolume(a.volume)
@@ -331,4 +348,15 @@ func (a *app) settingsBody(c *ui.Context, p palette, liquid bool) {
 
 	// At the very foot: who keeps this, and where they are found.
 	group("开发者", func() { a.developerCard(c, p) })
+}
+
+// applyEq sets the player's equalizer to the shape the settings name.
+func (a *app) applyEq() {
+	for _, p := range player.EQPresets {
+		if p.Label == a.settings.EqPreset {
+			a.pl.EQ.Set(p.Gains)
+			return
+		}
+	}
+	a.pl.EQ.Set([10]float64{})
 }

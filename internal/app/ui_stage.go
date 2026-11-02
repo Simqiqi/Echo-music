@@ -221,14 +221,14 @@ func (a *app) foliaLine(c *ui.Context, l *lyrics.Line, pos time.Duration, f, w, 
 		Wrap().Justify(justify).AlignContent(ui.Center).AlignItems(ui.Center).Translate(0, lift).
 		Opacity(fade).PassThrough().Children(func() {
 		for i, word := range l.Words {
-			a.stageWord(c.Key(i), word, shapes[i], pos, f, accent)
+			a.stageWord(c.Key(i), word, shapes[i], pos, f, accent, 0)
 		}
 	})
 }
 
 // stageWord shows a word as it is at pos: waiting to be sung, being sung,
 // or sung.
-func (a *app) stageWord(c *ui.Context, word lyrics.Word, s wordShape, pos time.Duration, f float32, accent ui.Color) {
+func (a *app) stageWord(c *ui.Context, word lyrics.Word, s wordShape, pos time.Duration, f float32, accent ui.Color, shadow float32) {
 	const lookahead = 80 * time.Millisecond
 	start := word.Start - lookahead
 	end := max(word.End, word.Start+150*time.Millisecond)
@@ -263,6 +263,13 @@ func (a *app) stageWord(c *ui.Context, word lyrics.Word, s wordShape, pos time.D
 	}
 
 	box := ui.Box(c).MarginEnd(s.margin).Translate(x, y).Rotate(rotate).Scale(scale, scale).Opacity(opacity)
+	if shadow > 0.01 {
+		// A shadow to read by: a soft dark pad under the word, no wider
+		// than the word and rounded, so that it reads on whatever it is
+		// sung over. It hangs on the word itself, so that no edge of it
+		// is ever seen but the word's own.
+		box = box.Background(ui.RGBA(0, 0, 0, 0.42*shadow)).Radius(f * 0.35)
+	}
 	box.Children(func() {
 		text := ui.Text(c.Key("body"), word.Text).FontSize(f).FontWeight(800).NoWrap().TextColor(color)
 		if blur > 0.3 {

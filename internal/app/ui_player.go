@@ -429,6 +429,9 @@ func (a *app) playerBar(c *ui.Context) {
 				a.nowPlaying = true
 			}
 			a.likeButton(c.Key("like"), tr, 16, p.muted).Margin(0, 0, 0, 4).Shrink(0)
+			if tr != nil {
+				a.miniSpectrum(c, p.accent)
+			}
 		})
 
 		// Controls over the progress.
@@ -478,4 +481,48 @@ func (a *app) playerBar(c *ui.Context) {
 		shell.Translate(0, -v)
 		bar.Translate(0, -v)
 	}
+}
+
+// miniSpectrumState is what the little spectrum of the bar remembers from
+// the frame before: each band of it falls as the music lets it, so that the
+// bars breathe instead of flickering.
+type miniSpectrumState struct {
+	v  [player.Bands]float32
+	at time.Time
+}
+
+// miniSpectrum is a little spectrum of what plays now, drawn at the left of
+// the bar between the song and the controls: a row of thin bars, each
+// rising with its band of the music and falling as the band lets go. Still
+// when the music is still.
+func (a *app) miniSpectrum(c *ui.Context, color ui.Color) {
+	st := &a.miniSpec
+	box := ui.Box(c.Key("mini-spectrum")).Height(22).Grow(1).MinWidth(30).MaxWidth(120).
+		AlignSelf(ui.Center).Margin(0, 8, 0, 4).Shrink(1)
+	box.Draw(func(p *ui.Painter, r ui.Rect) {
+		lv, live := a.pl.Levels()
+		dt := float32(min(max(p.Now().Sub(st.at).Seconds(), 0.001), 0.1))
+		st.at = p.Now()
+		n := len(st.v)
+		step := r.W / float32(n)
+		bw := max(step*0.55, 1.5)
+		for i, v := range lv {
+			want := clamp01(v * 1.6)
+			prev := st.v[i]
+			var cur float32
+			if want > prev {
+				cur = want // rise at once, fall at ease
+			} else {
+				cur = max(prev-dt*2.2, want)
+			}
+			st.v[i] = cur
+			h := max(cur*float32(r.H-4), 2)
+			x := r.X + float32(i)*step + (step-bw)/2
+			p.Fill(ui.Rect{X: x, Y: r.Y + r.H - h, W: bw, H: h}, color.Alpha(0.4+0.6*cur), bw/2)
+		}
+		if live {
+			// While the music plays the spectrum keeps asking for frames.
+			p.AnimationFrameRate(30)
+		}
+	})
 }

@@ -159,6 +159,10 @@ func (a *app) load(r route) {
 	switch r.page {
 	case pageHome:
 		a.freshenHome()
+		// The day's first pick wears another landscape each time it opens,
+		// and the daily card another rainbow.
+		a.sky.pick(a, a.post)
+		a.rollDailyRainbow()
 	case pagePlaylist:
 		a.loadPlaylist(r.id, false)
 	case pageSearch:
@@ -173,6 +177,18 @@ func (a *app) load(r route) {
 		a.loadPodcast(r.id)
 	case pagePodcasts:
 		a.loadPodcastTab()
+	case pageWeather:
+		// Another sky each time the page opens, from the photographs
+		// already in hand; the weather itself is kept between openings.
+		if a.wx == nil {
+			a.wx = newWx()
+			a.wx.art = a.art
+		}
+		a.wx.rollShot(a.post)
+		a.wx.ensure(a.post, nil)
+	case pageFM:
+		// The FM's card wears another landscape each time it opens.
+		a.sky.pick(a, a.post)
 	}
 }
 
@@ -225,7 +241,9 @@ func (a *app) sidebar(c *ui.Context) {
 		ui.Scroll(c.Key("nav")).TrackScroll(&a.navScroll).Grow(1).Margin(0, -6).Padding(0, 6).Gap(4).Children(func() {
 			a.navItem(c, iconHome, "为你推荐", route{page: pageHome})
 			a.navItem(c, iconDaily, "每日推荐", route{page: pageDaily})
+			a.navItem(c, iconWeekly, "听歌周报", route{page: pageWeekly})
 			a.navItem(c, iconRadio, "私人 FM", route{page: pageFM})
+			a.navItem(c, iconWeather, "天气电台", route{page: pageWeather})
 			a.navItem(c, iconCharts, "排行榜", route{page: pageCharts})
 			a.navItem(c, iconPodcast, "播客", route{page: pagePodcasts})
 			if a.searched.query != "" {
@@ -396,43 +414,119 @@ func edgeShown(el ui.Element, under bool) float32 {
 	return el.AnimateTo("shown", target, ui.Animation{Duration: 180 * time.Millisecond})
 }
 
-// pageTop is the strip over the top of a page, frosting what scrolls under
-// it as macOS 26's hard scroll edge does: it drags the window, and holds
-// the back button once there is a page to go back to.
+// pageTop is the capsule over the top of a page: a floating pane of
+// Liquid Glass, inset from every edge as the player's bar is from the foot,
+// which drags the window, holds the back and forward buttons, and names the
+// section the page has scrolled to — a name that rises into it as the one
+// before sinks away.
 func (a *app) pageTop(c *ui.Context) {
 	top, _ := a.insets(c)
-	// Liquid Glass: the strip is a pane of it, the page's content bending
-	// and frosting under its rim as it scrolls by; else, macOS 26's hard
-	// scroll edge, which frosts what passes under it against the page's
-	// ground.
-	var mat ui.Material = glass.ScrollEdge{Hard: true, Background: a.pal.bg}
+	y, h := topCapsule(top)
+	// Where the strip was is still the window's to drag, along its whole
+	// width.
+	ui.Box(c.Key("top-strip")).Absolute().Top(0).Left(0).Right(0).Height(top).DragWindow()
+	// The capsule itself: glass where the app wears it, and a quiet plate
+	// of the page's own ground where it does not.
+	shell := ui.Box(c.Key("top-capsule")).Absolute().Top(y).Left(topCapsuleSide).Right(topCapsuleSide).
+		Height(h).Radius(h / 2).DragWindow()
 	if a.settings.glassOn() {
-		mat = glass.Glass{Clarity: a.glassClarity(0.45)}
+		shell.Material(glass.Glass{Clarity: a.glassClarity(0.45)})
+	} else {
+		shell.Background(a.pal.bg).Border(1, a.pal.hairline)
 	}
-	edge := ui.Box(c.Key("top-edge")).Absolute().Top(0).Left(0).Right(0).Height(top).DragWindow().Material(mat)
-	edge.Opacity(edgeShown(edge, a.underTop))
-	if len(a.history) > 0 || len(a.forward) > 0 {
-		ui.Row(c).Absolute().Top(0).Left(20).Height(topBar(c)).AlignItems(ui.Center).Children(func() {
-			// The two buttons share one pane of glass, a capsule that
-			// holds them as a bead holds two: they stay round within it.
-			bar := ui.Row(c).Gap(4).Padding(4).Radius(999).AlignItems(ui.Center)
-			if a.settings.glassOn() {
-				bar.Material(glass.Glass{Clarity: a.glassClarity(0.5)})
+	shell.Shadow(0, 8, 24, -10, a.pal.cardShade)
+	// What it holds: the way back, and the name of where the page has got
+	// to; the name changes with the page, not with the bar.
+	bar := ui.Row(c).Absolute().Top(y).Left(topCapsuleSide).Right(topCapsuleSide).Height(h).
+		Padding(4, 12).Gap(8).AlignItems(ui.Center).Clip()
+	bar.Children(func() {
+		if len(a.history) > 0 || len(a.forward) > 0 {
+			back := a.navButton(c, "back", iconBack, "返回").Disabled(len(a.history) == 0)
+			if len(a.history) == 0 {
+				back.Opacity(0.35)
 			}
-			bar.Children(func() {
-				back := a.navButton(c, "back", iconBack, "返回").Disabled(len(a.history) == 0)
-				if len(a.history) == 0 {
-					back.Opacity(0.35)
-				}
-				if back.Clicked() {
-					a.back()
-				}
-				if len(a.forward) > 0 && a.navButton(c, "forward", iconForward, "前进").Clicked() {
-					a.goForward()
-				}
-			})
+			if back.Clicked() {
+				a.back()
+			}
+			if len(a.forward) > 0 && a.navButton(c, "forward", iconForward, "前进").Clicked() {
+				a.goForward()
+			}
+		}
+		title := a.navTitle
+		if title == "" {
+			title = a.navName()
+		}
+		a.navLabel(c, title)
+	})
+}
+
+// The capsule's measures: a little air above it, and its height, which the
+// strip over a page holds.
+const (
+	topCapsuleInset = 6
+	topCapsuleSide  = 14
+	topCapsuleTall  = 40
+)
+
+// topCapsule is where the capsule over a page sits and how tall it is.
+func topCapsule(top float32) (y, h float32) {
+	return topCapsuleInset, min(topCapsuleTall, top-2*topCapsuleInset)
+}
+
+// barLine is where the capsule's foot is: the line a section's name has to
+// cross to be taken up by it.
+func (a *app) barLine(c *ui.Context) float32 {
+	top, _ := a.insets(c)
+	y, h := topCapsule(top)
+	return y + h
+}
+
+// navLabel is the name the capsule shows: a new one rises into it as the
+// one before sinks away, rather than replacing it in place.
+func (a *app) navLabel(c *ui.Context, title string) {
+	t := ui.Text(c.Key("nav-"+title), title).FontSize(13).FontWeight(650).LetterSpacing(-0.1).
+		MaxLines(1).TextColor(a.pal.text)
+	if !c.Preferences().ReduceMotion && a.settings.transitions() {
+		t.Transition(ui.ElementTransition{
+			Animation: &ui.Animation{Spring: ui.SpringOptions{Duration: 320 * time.Millisecond, Bounce: 0.18}},
+			Enter:     &ui.Motion{Y: 9, Opacity: 0},
+			Exit:      &ui.Motion{Y: -9, Opacity: 0},
 		})
 	}
+}
+
+// navName is what the capsule says before a section has scrolled under it:
+// the page's own name.
+func (a *app) navName() string {
+	switch a.route.page {
+	case pageHome:
+		return "为你推荐"
+	case pageDaily:
+		return "每日推荐"
+	case pageWeekly:
+		return "听歌周报"
+	case pageFM:
+		return "私人 FM"
+	case pageWeather:
+		return "天气电台"
+	case pageCharts:
+		return "排行榜"
+	case pagePodcasts:
+		return "播客"
+	case pagePodcast:
+		return "播客节目"
+	case pageSearch:
+		return "搜索结果"
+	case pagePlaylist:
+		return "歌单"
+	case pageArtist:
+		return "歌手"
+	case pageAlbum:
+		return "专辑"
+	case pageUser:
+		return "用户"
+	}
+	return "Echo"
 }
 
 // navButton is a page's back or forward button: a round bead of its own
@@ -468,8 +562,9 @@ func (a *app) content(c *ui.Context) {
 	if a.scrolled != a.route {
 		a.trackList, a.pageScroll, a.scrolled = ui.ListState{}, ui.ScrollState{}, a.route
 	}
-	// Pages mark where their content is, as they scroll.
-	a.underTop, a.underBottom = false, false
+	// Pages mark where their content is, as they scroll, and which section
+	// the capsule names.
+	a.underTop, a.underBottom, a.navTitle = false, false, ""
 	// Keyed by where it shows, a page is a new one as the listener goes
 	// elsewhere, and comes in faint, from a little below, rather than
 	// appearing whole.
@@ -491,6 +586,8 @@ func (a *app) pageOf(c *ui.Context) {
 		a.homePage(c)
 	case pageDaily:
 		a.dailyPage(c)
+	case pageWeekly:
+		a.weeklyPage(c)
 	case pageCharts:
 		a.chartsPage(c)
 	case pagePlaylist:
@@ -499,6 +596,8 @@ func (a *app) pageOf(c *ui.Context) {
 		a.searchPage(c)
 	case pageFM:
 		a.fmPage(c)
+	case pageWeather:
+		a.weatherPage(c)
 	case pageArtist:
 		a.artistPage(c)
 	case pageAlbum:

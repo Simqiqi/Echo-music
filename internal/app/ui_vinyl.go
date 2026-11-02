@@ -70,6 +70,42 @@ func (a *app) vinylDisc(c *ui.Context, art *artwork, size float32) {
 					Absolute().Top((d - hd) / 2).Left((d - hd) / 2)
 			})
 		})
+
+		// The tonearm, hung from a pivot past the platter's upper right:
+		// while the music plays its head rests on the record, and while
+		// the record waits it swings up and out of the way. It moves on a
+		// spring, as a real arm does when a hand sets it down.
+		arm := ui.Box(c.Key("tonearm")).Size(d*0.62, d*0.62).
+			Absolute().Top(d * 0.01).Left(d * 0.44)
+		rest, set := float32(-26), float32(2)
+		pose := ui.Pose{Rotate: rest}
+		if pl.Playing() {
+			pose.Rotate = set
+		}
+		arm.AnimatePose(pose, ui.Animation{Spring: ui.SpringOptions{Duration: 700 * time.Millisecond, Bounce: 0.12}})
+		arm.Children(func() {
+			// The arm itself, a bar turning about the pivot at its right
+			// end, and the head that holds the needle at its left.
+			bar := ui.Box(c.Key("arm-bar")).Absolute().Top(d*0.075).Right(d*0.045).
+				Size(d*0.5, d*0.024).TransformOrigin(1, 0.5).Rotate(-33)
+			bar.Children(func() {
+				ui.Box(c).Fill().Radius(d*0.012).Background(ui.RGB(196, 198, 206)).
+					Shadow(0, 2, 6, -1, ui.RGBA(0, 0, 0, 0.5))
+				// The head, at the arm's far end, tipped toward the record.
+				head := d * 0.055
+				ui.Box(c.Key("head")).Size(head, head*0.8).Radius(head * 0.2).
+					Background(ui.RGB(72, 72, 80)).Absolute().Left(-head * 0.7).Top(-head * 0.24).Rotate(8)
+			})
+			// The pivot it all turns about.
+			hub := d * 0.085
+			ui.Box(c.Key("pivot")).Size(hub, hub).Radius(hub/2).
+				Background(ui.RGB(96, 96, 104)).Border(1.5, ui.RGB(150, 150, 158)).
+				Absolute().Top(d*0.062 - hub/2 + d*0.012).Right(d * 0.03)
+			hubDot := hub * 0.38
+			ui.Box(c.Key("pivot-dot")).Size(hubDot, hubDot).Radius(hubDot / 2).
+				Background(ui.RGB(40, 40, 46)).
+				Absolute().Top(d*0.062 - hubDot/2 + d*0.012).Right(d*0.03 + (hub-hubDot)/2)
+		})
 	})
 }
 

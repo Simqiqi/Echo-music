@@ -171,7 +171,7 @@ func (a *app) userPhoto(c *ui.Context, url string, ringed bool) {
 	ui.Box(c).Size(size, size).Radius(size/2).Center().Background(rim).
 		Shadow(0, 18, 40, -10, p.cardShade).Children(func() {
 		inner := size - 6
-		ui.Box(c).Size(inner, inner).Radius(inner/2).Children(func() {
+		ui.Box(c).Size(inner, inner).Radius(inner / 2).Children(func() {
 			a.coverFill(c, url, 600, inner/2)
 		})
 	})

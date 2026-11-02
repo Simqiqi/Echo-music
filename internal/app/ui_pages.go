@@ -30,8 +30,14 @@ func (a *app) heading(c *ui.Context, title, sub string) {
 	})
 }
 
+// section is the name of a stretch of a page: once it has scrolled under
+// the capsule over the page, the capsule takes it up.
 func (a *app) section(c *ui.Context, title string) ui.Element {
-	return ui.Text(c, title).FontSize(19).FontWeight(700).LetterSpacing(-0.3).Margin(34, 0, 14, 0)
+	el := ui.Text(c, title).FontSize(19).FontWeight(700).LetterSpacing(-0.3).Margin(34, 0, 14, 0)
+	if b := el.Bounds(); b.W > 0 && b.Y+b.H <= a.barLine(c) {
+		a.navTitle = title
+	}
+	return el
 }
 
 func (a *app) homePage(c *ui.Context) {
@@ -56,21 +62,22 @@ func (a *app) homePage(c *ui.Context) {
 		}
 		a.dailyCard(c, now)
 
+		if heard := a.weekly.recent(now, 6); len(heard) > 0 {
+			a.section(c, "最近在听")
+			a.recentRow(c, heard)
+		}
+
 		if len(a.recPlaylists) > 0 {
 			a.section(c, "今日为你推荐")
-			ui.Grid(c).Columns(a.columns(c, 168)).GapX(20).GapY(28).Children(func() {
-				for i := range a.recPlaylists[:min(len(a.recPlaylists), a.columns(c, 168)*2)] {
-					a.playlistCard(c.Key(a.recPlaylists[i].ID), &a.recPlaylists[i])
-				}
-			})
+			a.pickGrid(c)
 		}
 
 		a.section(c, "官方榜单")
 		official := a.charts[:min(4, len(a.charts))]
-		cols := min(4, max(2, a.columns(c, 260)))
-		ui.Grid(c).Columns(cols).Gap(20).Children(func() {
+		cols := min(4, max(2, a.columns(c, 168)))
+		ui.Grid(c).Columns(cols).GapX(20).GapY(28).Children(func() {
 			for i := range official {
-				a.chartCard(c.Key(official[i].ID), &official[i])
+				a.chartCardCompact(c.Key(official[i].ID), &official[i])
 			}
 		})
 
@@ -128,6 +135,157 @@ func (a *app) chartsPage(c *ui.Context) {
 // under the pointer, where a play button shows on it.
 func (a *app) playlistCard(c *ui.Context, pl *netease.Playlist) {
 	if a.coverCard(c, pl.Name, pl.Cover(), pl.PlayCount, pl.UpdateFreq, func() { a.loadPlaylist(pl.ID, true) }) {
+		a.open(route{page: pagePlaylist, id: pl.ID})
+	}
+}
+
+// pickGrid is the day's picks: the first of them large, as the page's one
+// hero, and the rest of the first two rows laid around it.
+func (a *app) pickGrid(c *ui.Context) {
+	cols := a.columns(c, 168)
+	// The hero holds the first two columns of both rows, so the grid
+	// takes two fewer cards than it had room for.
+	n := min(len(a.recPlaylists), max(1, cols*2-4))
+	ui.Grid(c).Columns(cols).GapX(20).GapY(28).Children(func() {
+		a.focusCard(c.Key(a.recPlaylists[0].ID), &a.recPlaylists[0]).ColumnSpan(2).RowSpan(2)
+		for i := 1; i < n; i++ {
+			a.playlistCard(c.Key(a.recPlaylists[i].ID), &a.recPlaylists[i])
+		}
+	})
+}
+
+// focusCard is the first of the day's picks, large: it wears a landscape,
+// another each time the page opens — clear at its left, dissolving into
+// the card's dark by its right — with its name and its numbers over the
+// foot, a mark saying what it is at the head. The button on it plays it;
+// the rest opens it.
+func (a *app) focusCard(c *ui.Context, pl *netease.Playlist) ui.Element {
+	card := ui.ButtonBase(c).Fill().Radius(16).FocusRing(false).Label(pl.Name).TextColor(white).
+		Background(ui.Hex("#20242b"))
+	hovered := card.Hovered()
+	pose := ui.Pose{}
+	if hovered {
+		pose.Scale = 1.012
+	}
+	card.AnimatePose(pose, ui.Snappy)
+	// The landscape, another each time the page opens; it shows as soon
+	// as it has loaded, which asks for a frame of its own.
+	bmp := a.sky.bmp(a)
+	base := ui.Hex("#20242b")
+	if a.sky.url == "" {
+		a.sky.pick(a, a.post)
+		bmp = a.sky.bmp(a)
+	}
+	// The light passes over it as the pointer comes onto it, once each
+	// time it does; the sky keeps the times, and only one card shows.
+	if hovered {
+		if !a.sky.hover {
+			a.sky.hover = true
+			a.sky.sweepAt = c.Now()
+		}
+	} else {
+		a.sky.hover = false
+	}
+	card.Children(func() {
+		ui.Box(c).Absolute().Top(0).Left(0).Right(0).Bottom(0).Draw(func(p *ui.Painter, r ui.Rect) {
+			p.Clip(r, 16, func() {
+				if bmp != nil {
+					p.Image(bmp, r, ui.Cover)
+				}
+				// The landscape stands clear at the left and dissolves,
+				// by the right, into the card's own dark: the way the FM's
+				// card fades, turned about — the words keep their ground
+				// and the photograph keeps its weather.
+				p.FillGradient(r, ui.LinearGradient{Angle: 90, Stops: []ui.GradientStop{
+					{At: 0, Color: base.Alpha(0)},
+					{At: 0.18, Color: base.Alpha(0.08)},
+					{At: 0.38, Color: base.Alpha(0.2)},
+					{At: 0.56, Color: base.Alpha(0.42)},
+					{At: 0.74, Color: base.Alpha(0.7)},
+					{At: 0.9, Color: base.Alpha(0.92)},
+					{At: 1, Color: base.Alpha(1)},
+				}}, 0)
+				// Its foot, so the name stands off the photograph.
+				p.FillGradient(r, ui.LinearGradient{Angle: 180, Stops: []ui.GradientStop{
+					{At: 0, Color: ui.RGBA(0, 0, 0, 0)},
+					{At: 0.45, Color: ui.RGBA(0, 0, 0, 0.1)},
+					{At: 1, Color: ui.RGBA(0, 0, 0, 0.78)},
+				}}, 0)
+				lightSweep(p, r, a.sky.sweepAt, c.Now())
+			})
+		})
+		// A clock of its own while the light crosses, and no longer.
+		if !a.sky.sweepAt.IsZero() && c.Now().Sub(a.sky.sweepAt) <= time.Second {
+			ui.Box(c).Size(1, 1).Loop("skysweep", 900*time.Millisecond, ui.Linear)
+		}
+		ui.Row(c).Absolute().Top(12).Left(12).Padding(4, 9).Radius(999).Gap(5).AlignItems(ui.Center).
+			Background(ui.RGBA(0, 0, 0, 0.32)).Border(1, ui.RGBA(255, 255, 255, 0.14)).Children(func() {
+			ui.Icon(c, iconDaily).Size(11, 11).TextColor(white.Alpha(0.9))
+			ui.Text(c, "今日首选").FontSize(10.5).FontWeight(700).TextColor(white.Alpha(0.94))
+		})
+		ui.Column(c).Absolute().Left(16).Right(16).Bottom(14).Gap(5).Children(func() {
+			ui.Text(c, pl.Name).FontSize(20).FontWeight(800).LetterSpacing(-0.4).MaxLines(2).LineHeight(1.22)
+			ui.Row(c).Gap(7).AlignItems(ui.Center).Children(func() {
+				if pl.PlayCount > 0 {
+					ui.Icon(c, iconHeadset).Size(11, 11).TextColor(white.Alpha(0.7))
+					ui.Text(c, plays(pl.PlayCount)).FontSize(11.5).FontWeight(600).TextColor(white.Alpha(0.78))
+				}
+				if pl.TrackCount > 0 {
+					ui.Box(c).Size(3, 3).Radius(1.5).Background(white.Alpha(0.4))
+					ui.Textf(c, "%d 首", pl.TrackCount).FontSize(11.5).FontWeight(600).TextColor(white.Alpha(0.78))
+				}
+			})
+		})
+		a.coverPlayButton(c, hovered, func() { a.loadPlaylist(pl.ID, true) })
+	})
+	if card.Clicked() {
+		a.open(route{page: pagePlaylist, id: pl.ID})
+	}
+	return card
+}
+
+// recentRow is what the app heard lately, laid compactly: a cover, the
+// song's name, and who sings it — clicking any of them goes on with it.
+func (a *app) recentRow(c *ui.Context, tracks []netease.Track) {
+	p := a.pal
+	ui.Grid(c).Columns(a.columns(c, 216)).GapX(16).GapY(4).Children(func() {
+		for i := range tracks {
+			tr, at := tracks[i], i
+			card := ui.ButtonBase(c.Key(tr.ID)).Padding(8).Radius(12).Gap(11).AlignItems(ui.Center).
+				FocusRing(false).Label(tr.Name)
+			hovered := card.Hovered()
+			fill := ui.Transparent
+			if hovered {
+				fill = p.hover
+			}
+			card.Background(card.AnimateColor("bg", fill, ui.Animation{Duration: 120 * time.Millisecond}))
+			card.Children(func() {
+				ui.Box(c).Size(44, 44).Radius(9).Shrink(0).Children(func() {
+					a.coverFill(c, tr.Album.PicURL, 200, 9)
+					if hovered {
+						ui.Box(c).Absolute().Top(0).Left(0).Right(0).Bottom(0).Radius(9).
+							Background(ui.RGBA(0, 0, 0, 0.36)).Center().Children(func() {
+							ui.Icon(c, iconPlay).Size(14, 14).TextColor(white).Margin(0, 0, 0, 1)
+						})
+					}
+				})
+				ui.Column(c).Grow(1).Shrink(1).MinWidth(0).Gap(3).Children(func() {
+					ui.Text(c, tr.Name).FontSize(13).FontWeight(600).SingleLine()
+					ui.Text(c, tr.ArtistNames()).FontSize(11.5).TextColor(p.muted).SingleLine()
+				})
+			})
+			if card.Clicked() {
+				a.pl.PlayQueue(tracks, at)
+			}
+		}
+	})
+}
+
+// chartCardCompact is a chart as the small card a row of them takes: its
+// cover, its name, and how often it refreshes. The full card with its top
+// three songs stays for the charts page, where a card has room.
+func (a *app) chartCardCompact(c *ui.Context, pl *netease.Playlist) {
+	if a.coverCard(c, pl.Name, pl.Cover(), 0, pl.UpdateFreq, func() { a.loadPlaylist(pl.ID, true) }) {
 		a.open(route{page: pagePlaylist, id: pl.ID})
 	}
 }

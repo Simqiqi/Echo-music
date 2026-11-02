@@ -23,6 +23,7 @@ type artwork struct {
 	bmp      *ui.Bitmap
 	backdrop *ui.Bitmap
 	tint     ui.Color // the cover's most vivid color
+	lum      float32  // how bright it is overall, 0 dark to 1 white
 	failed   bool
 	used     time.Time // when it was last asked for
 }
@@ -67,6 +68,10 @@ func (c *artCache) sweep(now time.Time) {
 
 // get returns the cover at url, or nil while it loads.
 func (c *artCache) get(url string, backdrop bool) *artwork {
+	return c.fetch(url, backdrop)
+}
+
+func (c *artCache) fetch(url string, backdrop bool) *artwork {
 	if url == "" {
 		return nil
 	}
@@ -91,8 +96,10 @@ func (c *artCache) get(url string, backdrop bool) *artwork {
 		<-c.sem
 		var blurred *image.RGBA
 		var tint ui.Color
+		var lum float32
 		if err == nil {
 			tint = dominantColor(img)
+			lum = artLum(img)
 			if backdrop {
 				blurred = blurImage(img)
 			}
@@ -103,7 +110,7 @@ func (c *artCache) get(url string, backdrop bool) *artwork {
 				c.art[key] = &artwork{failed: true, used: c.now()}
 				return
 			}
-			a := &artwork{bmp: bmp, tint: tint, used: c.now()}
+			a := &artwork{bmp: bmp, tint: tint, lum: lum, used: c.now()}
 			if blurred != nil {
 				a.backdrop = ui.NewBitmap(blurred)
 			}
@@ -285,6 +292,25 @@ func dominantColor(img image.Image) ui.Color {
 	return ui.RGB(uint8(sum[best][0]/w*255), uint8(sum[best][1]/w*255), uint8(sum[best][2]/w*255))
 }
 
+// artLum returns how bright img is overall, from 0 for black to 1 for
+// white: the light a photograph throws, which a report of the weather
+// has to read over.
+func artLum(img image.Image) float32 {
+	small := shrink(img, 24)
+	var sum float64
+	for i := 0; i < len(small.Pix); i += 4 {
+		r := float64(small.Pix[i]) / 255
+		g := float64(small.Pix[i+1]) / 255
+		b := float64(small.Pix[i+2]) / 255
+		sum += 0.2126*r + 0.7152*g + 0.0722*b
+	}
+	n := len(small.Pix) / 4
+	if n == 0 {
+		return 0
+	}
+	return float32(sum / float64(n))
+}
+
 func hsv(r, g, b float64) (h, s, v float64) {
 	mx, mn := math.Max(r, math.Max(g, b)), math.Min(r, math.Min(g, b))
 	v = mx
@@ -333,6 +359,33 @@ func blurImage(img image.Image) *image.RGBA {
 		out.Pix[4*i+3] = 255
 	}
 	return out
+}
+
+// boxBlurRect blurs px of w×h pixels by a box of radius r, across then
+// down, clamping at the edges.
+func boxBlurRect(px, tmp [][3]float64, w, h, r int) {
+	at := func(i, n int) int { return max(0, min(n-1, i)) }
+	d := float64(2*r + 1)
+	for y := range h {
+		for x := range w {
+			var s [3]float64
+			for k := -r; k <= r; k++ {
+				p := px[y*w+at(x+k, w)]
+				s[0], s[1], s[2] = s[0]+p[0], s[1]+p[1], s[2]+p[2]
+			}
+			tmp[y*w+x] = [3]float64{s[0] / d, s[1] / d, s[2] / d}
+		}
+	}
+	for y := range h {
+		for x := range w {
+			var s [3]float64
+			for k := -r; k <= r; k++ {
+				p := tmp[at(y+k, h)*w+x]
+				s[0], s[1], s[2] = s[0]+p[0], s[1]+p[1], s[2]+p[2]
+			}
+			px[y*w+x] = [3]float64{s[0] / d, s[1] / d, s[2] / d}
+		}
+	}
 }
 
 // boxBlur blurs px of n×n pixels by a box of radius r, across then down,

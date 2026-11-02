@@ -152,6 +152,30 @@ func init() {
 				mygo.RunOnMain(mygo.App.Quit)
 				return
 			}
+			if os.Getenv("NM_SCENE") == "home" {
+				// The home page as it opens, on top, for its layout: the
+				// screen is grabbed from outside.
+				time.Sleep(5 * time.Second)
+				mygo.RunOnMain(func() {
+					a.win.SetAlwaysOnTop(true)
+					a.pageScroll.ScrollTo(0, 0, ui.Smooth)
+				})
+				time.Sleep(25 * time.Second)
+				mygo.RunOnMain(mygo.App.Quit)
+				return
+			}
+			if os.Getenv("NM_SCENE") == "fm" {
+				// The personal FM, playing, muted, on top, for its card's
+				// looks: the screen is grabbed from outside.
+				time.Sleep(4 * time.Second)
+				mygo.RunOnMain(func() { a.win.SetAlwaysOnTop(true) })
+				step(0, func() { a.volume = 0; a.pl.SetVolume(0); a.playFM() })
+				time.Sleep(6 * time.Second)
+				step(0, func() { a.open(route{page: pageFM}) })
+				time.Sleep(22 * time.Second)
+				mygo.RunOnMain(mygo.App.Quit)
+				return
+			}
 			if os.Getenv("NM_SCENE") == "np" {
 				time.Sleep(5 * time.Second)
 				shot("q-home", a.win)

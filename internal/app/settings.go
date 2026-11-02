@@ -47,6 +47,12 @@ type settings struct {
 	// ParticleLyricMid stands the line being sung across the middle of the
 	// particles page, over the record, rather than under it.
 	ParticleLyricMid bool `json:"particleLyricMid,omitempty"`
+	// ParticleShape is the shape of the specks of the particles page: 0
+	// round, 1 square, 2 a star of four points.
+	ParticleShape int `json:"particleShape,omitempty"`
+	// EqPreset is the equalizer's shape, as eqPresets names it, "" being
+	// that it stands aside.
+	EqPreset string `json:"eqPreset,omitempty"`
 	// Volume is where the volume was left, from 0 to 1.
 	Volume float64 `json:"volume"`
 	// Normalize evens out the loudness of tracks, by what NetEase
@@ -55,6 +61,9 @@ type settings struct {
 	// HotComments shows a song's hot comments in its quiet parts, in
 	// place of the lyrics (quietComment): the listener turns it on.
 	HotComments bool `json:"hotComments"`
+	// WxAutoPlay starts the weather's own songs as the weather radio
+	// opens, where nothing plays yet: the listener turns it on.
+	WxAutoPlay bool `json:"wxAutoPlay"`
 	// Fog fills Now Playing's backdrop with fog of the cover's color,
 	// rising and swelling with the bass: an experiment the listener turns
 	// on. Backdrop holds the same answer, and what it says wins.

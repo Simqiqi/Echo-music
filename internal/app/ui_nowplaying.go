@@ -112,6 +112,7 @@ func (a *app) nowPlayingView(c *ui.Context) {
 		// that keeps the line being sung on the particles page.
 		ui.Row(c).Absolute().Top(8).Right(12).Gap(8).AlignItems(ui.Center).Children(func() {
 			if a.npPane == paneParticles {
+				a.particleShapePicker(c, tint)
 				a.particleLyricPlace(c, tint)
 				a.particleLyricSwitch(c, tint)
 			}

@@ -27,6 +27,8 @@ type Player struct {
 	post func(func())
 	// Quality returns the stream level to load, as the settings say.
 	Quality func() string
+	// EQ, if set, is the equalizer the songs play through.
+	EQ *EQ
 	// Normalize reports whether to even out the loudness of tracks, as
 	// the settings say.
 	Normalize func() bool
@@ -720,7 +722,12 @@ func (p *Player) loadSkipping(at, skipped int, play bool, from time.Duration) {
 			}
 			p.stream, p.info = s, info
 			p.gain = normGain(info)
-			p.out = audio.NewPlayer(s)
+			if p.EQ != nil {
+				p.EQ.SetStream(s.SampleRate(), s.Channels())
+				p.out = audio.NewPlayer(eqDecoder{stream: s, eq: p.EQ})
+			} else {
+				p.out = audio.NewPlayer(s)
+			}
 			// From its middle, as a session picked up again, it fades in.
 			// A natural end hands over more slowly than a skip does,
 			// coming up from silence either way when transitions are on.

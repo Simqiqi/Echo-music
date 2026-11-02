@@ -25,6 +25,8 @@ const (
 	pageUser
 	pagePodcast
 	pagePodcasts
+	pageWeekly
+	pageWeather
 )
 
 type route struct {
@@ -70,8 +72,11 @@ type app struct {
 	likedPrograms, askedPrograms map[int64]bool
 
 	daily       []netease.Track
-	dailySpin   spinState // the record on the daily card
+	dailySpin   spinState // the sheen that turns on the daily card's playing disc
 	dailyBars   barState  // the bars on its play button
+	dailyWave   barState  // the wave of sound that crosses the daily card
+	dailyHue    float64   // where the rainbow across the daily card begins
+	dailyHued   bool      // whether a hue has been taken yet
 	npBars      barState  // the spectrum under Now Playing's cover
 	featured    []netease.Playlist
 	charts      []netease.Playlist
@@ -120,6 +125,7 @@ type app struct {
 
 	fmMode        int    // the FM mode chosen, in fmModes
 	radioStarting string // the radio asked for its first songs, or ""
+	sky           fmSky  // the landscape the FM's card wears
 
 	scrub      float64
 	scrubbing  bool
@@ -132,6 +138,7 @@ type app struct {
 	// underTop and underBottom say whether the page has content under its
 	// bars, which show their scroll edges then.
 	underTop, underBottom bool
+	navTitle              string // the section the capsule over the page names
 	barScrub              scrubState
 	npScrub               scrubState
 	backdropCache         backdropCache           // the backdrop of Now Playing, as last painted
@@ -147,6 +154,10 @@ type app struct {
 	wall3                 wall3State              // the wall of covers turning in depth, as it is spun
 	recAt, recLyric       ui.Rect                 // where the particles page stands its record, and the line being sung
 	recTilt               tiltState               // how the record leans after the pointer
+	pulse                 pulseState              // the bass of the song playing, for the record to beat to
+	miniSpec              miniSpectrumState       // the little spectrum of the bar, as it falls
+	weekly                *weeklyState            // the week's listening, as the app hears it
+	wx                    *wxState                // the sky outside, and the music it asks for
 	quiet                 quietState              // the quiet parts of the song playing, for its hot comments
 	captions              captionState            // the episode playing's captions, and the model that writes them
 	sig                   playerSig
@@ -236,6 +247,8 @@ func Run() error {
 		a.art = newArtCache(a.post)
 		a.pl = player.New(a.post)
 		a.pl.Quality = func() string { return a.settings.Quality }
+		a.pl.EQ = player.NewEQ()
+		a.applyEq()
 		a.pl.Normalize = func() bool { return a.settings.Normalize }
 		a.pl.Transition = func() bool { return a.settings.transitions() }
 		a.pl.Cache = newSongCache(a.settings.CacheMB)
@@ -243,6 +256,21 @@ func Run() error {
 			a.keepSession()
 			a.syncCaptions()
 		}
+		a.weekly = newWeekly()
+		// The weather is read from what was kept before the window
+		// stands; asking the sky waits until there is a window to post
+		// the answer to.
+		a.wx = newWx()
+		a.wx.art = a.art
+		// The week's listening, heard a quarter minute at a time.
+		go func() {
+			t := time.NewTicker(15 * time.Second)
+			for now := range t.C {
+				if tr := a.pl.Current(); tr != nil && a.pl.Playing() {
+					a.weekly.add(now, *tr, 15)
+				}
+			}
+		}()
 		a.volume = a.settings.Volume
 		a.pl.SetVolume(a.volume)
 		a.win = mygo.NewWindow(mygo.WindowOptions{
@@ -264,6 +292,9 @@ func Run() error {
 		})
 		a.setMenu()
 		a.boot()
+		// Now that there is a window to post the answer to, the sky is
+		// asked for: the page will have it before it is opened.
+		a.wx.warm(a.post)
 		// The notch player is macOS's, over its menu bar: elsewhere it would
 		// hang at the top of the screen as a black box.
 		if runtime.GOOS == "darwin" {

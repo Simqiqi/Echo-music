@@ -10,6 +10,7 @@ import (
 
 	"netease-music-mygo/internal/lyrics"
 	"netease-music-mygo/internal/netease"
+	"netease-music-mygo/internal/player"
 )
 
 // The particle record is the cover of the song playing shattered into
@@ -33,6 +34,8 @@ var Cen vec2
 var Ext float
 var Yaw float
 var Pitch float
+var Push float
+var Shape float
 
 func hash(p vec2) float {
 	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
@@ -46,7 +49,10 @@ func Fragment(dst vec4, pos vec2) vec4 {
 	// The cover stands where the pane puts it, its middle at Cen and its
 	// side Ext: smaller than the pane, so that it floats there rather than
 	// fills it, and leaving the foot of the pane for the line being sung.
-	S := Ext
+	// The record comes a little forward at every strike of the drum: it
+	// grows toward the eye, its edges running out a breath, and settles
+	// back as the strike dies. Only a breath, so that the cover holds.
+	S := Ext * (1.0 + Push*0.035)
 	cen := Cen
 	// A speck every few DIPs, so that the specks make the cover out as the
 	// cover itself, and it reads the same however big the pane is.
@@ -69,7 +75,7 @@ func Fragment(dst vec4, pos vec2) vec4 {
 	sy := sin(Yaw)
 	cp := cos(Pitch)
 	sp := sin(Pitch)
-	fz := 2.4
+	fz := 2.4 - 0.35*Push
 	X := q.x
 	Y := -q.y
 	nx := sy
@@ -105,10 +111,21 @@ func Fragment(dst vec4, pos vec2) vec4 {
 	// none is left: the cover comes apart into the dark rather than ending
 	// at a line, and the dark between it and the pane is the pane's own.
 	vis := step(hash(id*1.7 + vec2(3.1, 8.4)), mask)
-	dd := length(pos - hp)
+	dx := pos.x - hp.x
+	dy := pos.y - hp.y
 	rad := cell * (0.46 + 0.10*h.y) * near
-	m := (1.0 - smoothstep(rad*0.30, rad, dd)) * vis
-	col += cH * m * (0.5 + 0.5*mask) * (1.0 + 0.40*(near-1.0))
+	// The speck itself, as the listener asks: round, square, or a star of
+	// four points. Each keeps to the cell, so that the cover reads as the
+	// cover whichever they are.
+	ax := abs(dx)
+	ay := abs(dy)
+	mRound := 1.0 - smoothstep(rad*0.30, rad, length(vec2(dx, dy)))
+	mSquare := 1.0 - smoothstep(rad*0.58, rad*0.88, max(ax, ay))
+	mStar := 1.0 - smoothstep(rad*0.62, rad*0.92, (ax+ay)*0.78 + max(ax, ay)*0.22)
+	sq := clamp(Shape, 0.0, 1.0) * (1.0 - clamp(Shape-1.0, 0.0, 1.0))
+	st := clamp(Shape-1.0, 0.0, 1.0)
+	m := (mRound*(1.0-sq-st) + mSquare*sq + mStar*st) * vis
+	col += cH * m * (0.5 + 0.5*mask) * (1.0 + 0.40*(near-1.0)) * (1.0 + 0.22*Push)
 	return vec4(col, 1)
 }
 `
@@ -123,6 +140,41 @@ const (
 	particleLeanYaw   = 0.34 // 19° either way about its own up
 	particleLeanPitch = 0.22 // 13° either way about its own across
 )
+
+// pulseState is the song playing as the record feels it: the bass of it,
+// smoothed, and the strike of the drum as a leap of that bass, which brings
+// the record a breath toward the eye and dies away after.
+type pulseState struct {
+	lv   barState
+	prev float32 // the bass as the last frame held it
+	kick float32 // the strike of the drum, up at a leap, dying after
+	at   time.Time
+}
+
+// step takes the player's spectrum and returns how far the record comes
+// forward, from 0 to 1: a little with the bass, and more with the strike of
+// the drum, which swallows back into silence as the strike dies.
+func (p *pulseState) step(now time.Time, lv [player.Bands]float32, live bool) float32 {
+	p.lv.step(now, lv, live)
+	dt := float32(min(max(now.Sub(p.at).Seconds(), 0.001), 0.05))
+	p.at = now
+	var raw float32
+	for i := 0; i < 6; i++ {
+		raw += lv[i]
+	}
+	raw /= 6
+	if live {
+		if on := (raw - p.prev) * 2.2; on > p.kick {
+			p.kick = on
+		}
+	}
+	p.prev = raw
+	p.kick = min(1, max(0, p.kick-dt*3.2))
+	if !live && p.kick < 0.01 {
+		return 0
+	}
+	return min(1, 0.3*p.lv.group(0, 6)+0.7*p.kick)
+}
 
 // tiltState is how the record leans after the pointer over the particles
 // page: where it leans now, where the pointer asks it to, and when it was
@@ -154,12 +206,13 @@ func absFloat(v float32) float32 {
 // drawParticles paints the particle record of r: the cover art in specks
 // about cen, ext across, turned yaw about its own up and pitch about its
 // across, with tint as the color of its dark. Square to the eye at yaw and
-// pitch of nought, it leans only as it is asked to.
-func drawParticles(p *ui.Painter, r ui.Rect, art *ui.Bitmap, tint ui.Color, cen ui.Point, ext, yaw, pitch float32) {
+// pitch of nought, it leans only as it is asked to; push, from nought to
+// one, brings it a breath toward the eye.
+func drawParticles(p *ui.Painter, r ui.Rect, art *ui.Bitmap, tint ui.Color, cen ui.Point, ext, yaw, pitch, push float32, shape int) {
 	recordShader().Draw(p, r, shader.Options{
 		Uniforms: map[string]any{
 			"Tint": tint, "Cen": [2]float32{cen.X, cen.Y}, "Ext": ext,
-			"Yaw": yaw, "Pitch": pitch,
+			"Yaw": yaw, "Pitch": pitch, "Push": push, "Shape": float32(shape),
 		},
 		Images: [4]*ui.Bitmap{art},
 	})
@@ -280,6 +333,7 @@ func particleLayout(top, w, h float32, lyrics, mid bool) (rec ui.Rect, line ui.R
 // floating in a dark of them, with no frame between the two.
 func (a *app) particleRecord(c *ui.Context, tr *netease.Track, art *artwork, at ui.Rect) {
 	area := ui.Box(c.Key("particles")).Absolute().Top(0).Left(0).Right(0).Bottom(0)
+	pl := a.pl
 	area.Children(func() {
 		tint := ui.RGB(110, 110, 140)
 		if art != nil {
@@ -298,8 +352,15 @@ func (a *app) particleRecord(c *ui.Context, tr *netease.Track, art *artwork, at 
 				p.AnimationFrameRate(30)
 				return
 			}
+			lv, live := pl.Levels()
+			push := a.pulse.step(p.Now(), lv, live)
 			drawParticles(p, r, bmp, tint, cen, at.W,
-				particleLeanYaw*a.recTilt.x, particleLeanPitch*a.recTilt.y)
+				particleLeanYaw*a.recTilt.x, particleLeanPitch*a.recTilt.y, push, a.settings.ParticleShape)
+			// The record beats while the song plays: it asks for frames of
+			// its own until the song stops and its last strike dies away.
+			if live || push > 0.002 {
+				p.AnimationFrameRate(60)
+			}
 		})
 	})
 }
@@ -315,19 +376,6 @@ func (a *app) particleLyrics(c *ui.Context, accent ui.Color, w float32, at ui.Re
 	pl := a.pl
 	lines, loaded := pl.Lyrics()
 	band := ui.Box(c.Key("particle-lyrics")).Absolute().Left(0).Right(0).Top(at.Y).Height(at.H).PassThrough()
-	if a.settings.ParticleLyricMid {
-		// Over the record the words ask a veil of dark to read against:
-		// it thickens about the line and thins toward either edge, so
-		// that the record still shows through it.
-		band.Draw(func(p *ui.Painter, r ui.Rect) {
-			p.FillGradient(r, ui.LinearGradient{Angle: 90, Stops: []ui.GradientStop{
-				{Color: ui.RGBA(6, 6, 9, 0), At: 0},
-				{Color: ui.RGBA(6, 6, 9, 0.55), At: 0.44},
-				{Color: ui.RGBA(6, 6, 9, 0.55), At: 0.56},
-				{Color: ui.RGBA(6, 6, 9, 0), At: 1},
-			}}, 0)
-		})
-	}
 	band.Children(func() {
 		if len(lines) == 0 {
 			if !loaded {
@@ -347,7 +395,9 @@ func (a *app) particleLyrics(c *ui.Context, accent ui.Color, w float32, at ui.Re
 			return
 		}
 		f := min(32, max(20, w*0.024))
-		a.particleLine(c, &lines[cur], pos, f, w, at.H, accent)
+		// Over the record the words ask a shadow to read against; it
+		// hangs on each word, so that no edge of it is ever seen.
+		a.particleLine(c, &lines[cur], pos, f, w, at.H, accent, a.settings.ParticleLyricMid)
 	})
 }
 
@@ -355,13 +405,17 @@ func (a *app) particleLyrics(c *ui.Context, accent ui.Color, w float32, at ui.Re
 // the record: the words of the stage's classic visualizer, sprung into
 // their places and glowing as they are sung, but kept together and to the
 // middle, where the band is narrow and a line of the stage would scatter.
-func (a *app) particleLine(c *ui.Context, l *lyrics.Line, pos time.Duration, f, w, h float32, accent ui.Color) {
+func (a *app) particleLine(c *ui.Context, l *lyrics.Line, pos time.Duration, f, w, h float32, accent ui.Color, shadow bool) {
 	shapes := stageShapes(c, l, f)
 	ui.Row(c.Key(l.At)).Absolute().Top(0).Left(0).Right(0).Bottom(0).Padding(0, w*0.06).
 		Wrap().Justify(ui.Center).AlignContent(ui.Center).AlignItems(ui.Center).
 		PassThrough().Children(func() {
+		var shade float32
+		if shadow {
+			shade = 1
+		}
 		for i, word := range l.Words {
-			a.stageWord(c.Key(i), word, shapes[i], pos, f, accent)
+			a.stageWord(c.Key(i), word, shapes[i], pos, f, accent, shade)
 		}
 	})
 }
@@ -405,6 +459,38 @@ func (a *app) particlePlaceChip(c *ui.Context, name string, on, mid bool, accent
 		a.settings.ParticleLyricMid = mid
 		a.settings.save()
 	}
+}
+
+// particleShapePicker is the choice of what the specks of the particles
+// page look like: round, square, or a star of four points.
+func (a *app) particleShapePicker(c *ui.Context, accent ui.Color) {
+	names := []string{"圆点", "方块", "星形"}
+	tr := ui.Row(c.Key("particle-shape")).Height(npTabsHeight).Padding(0, 9, 0, 12).Gap(7).
+		Radius(999).AlignItems(ui.Center).Background(white.Alpha(0.08)).Label("粒子形态")
+	tr.Children(func() {
+		ui.Text(c, "形态").FontSize(13).FontWeight(600).TextColor(white.Alpha(0.75)).SingleLine()
+		ui.Row(c).Gap(2).Padding(2).Radius(999).Background(white.Alpha(0.06)).Children(func() {
+			for i, name := range names {
+				on := a.settings.ParticleShape == i
+				chip := ui.Row(c.Key(name)).Height(npTabsHeight-12).Padding(0, 8).Radius(999).
+					AlignItems(ui.Center).Label("粒子" + name)
+				if on {
+					chip.Background(accent.Alpha(0.92))
+				} else if chip.Hovered() {
+					chip.Background(white.Alpha(0.14))
+				}
+				fg := white.Alpha(0.7)
+				if on {
+					fg = white
+				}
+				ui.Text(c, name).FontSize(12).FontWeight(600).TextColor(fg).SingleLine()
+				if chip.Clicked() && !on {
+					a.settings.ParticleShape = i
+					a.settings.save()
+				}
+			}
+		})
+	})
 }
 
 // particleLyricSwitch is the switch in the corner of the particles page
