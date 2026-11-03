@@ -2,10 +2,12 @@ package app
 
 import (
 	"math/rand/v2"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/egoist/mygo/ui"
+	"netease-music-mygo/internal/lyrics"
 
 	"netease-music-mygo/internal/netease"
 )
@@ -126,6 +128,7 @@ func (a *app) exitRadio() {
 		return
 	}
 	a.pl.EndRadio()
+	a.fmSeed = ""
 	label := radioLabel(name)
 	if name != heartRadio {
 		label = "私人 FM"
@@ -195,6 +198,7 @@ func (a *app) startHeartMode() {
 				return
 			}
 			more = playable(more)
+			a.fmSeed = seed.Name
 			if fromPlaying && a.pl.Current() != nil && a.pl.Current().ID == seed.ID {
 				a.pl.RadioFrom(heartRadio, more, a.radioFeed(heartRadio))
 				return
@@ -301,6 +305,7 @@ func (a *app) fmPage(c *ui.Context) {
 			})
 		})
 		a.fmCard(c)
+		a.fmRecent(c)
 		a.section(c, "心动模式")
 		a.heartCard(c, p)
 	})
@@ -320,7 +325,7 @@ func (a *app) fmCard(c *ui.Context) {
 	}
 	bmp := a.sky.bmp(a)
 	base := ui.Hex("#1b1b20")
-	card := ui.Box(c.Key("fm-card")).Height(320).Radius(24).Background(base).TextColor(white).
+	card := ui.Box(c.Key("fm-card")).Height(360).Radius(24).Background(base).TextColor(white).
 		Shadow(0, 18, 44, -16, a.pal.cardShade)
 	// The light passes over the card as the pointer comes onto it, once
 	// each time it does.
@@ -400,7 +405,13 @@ func (a *app) fmCard(c *ui.Context) {
 				default:
 					a.artistLinks(c, tr, white.Alpha(0.7), white, true).FontSize(14).SingleLine()
 				}
-				ui.Row(c).Gap(14).AlignItems(ui.Center).Margin(20, 0, 0, -8).Children(func() {
+				if reason := a.fmReason(); reason != "" {
+					ui.Row(c).Margin(2, 0, 4, 0).Gap(6).AlignItems(ui.Center).Children(func() {
+						ui.Box(c).Size(5, 5).Radius(999).Background(white.Alpha(0.55)).Shrink(0)
+						ui.Text(c, reason).FontSize(12.5).TextColor(white.Alpha(0.62)).SingleLine()
+					})
+				}
+				ui.Row(c).Gap(14).AlignItems(ui.Center).Margin(14, 0, 0, -8).Children(func() {
 					if a.profile != nil {
 						if iconButton(c.Key("trash"), iconTrash, 20, white.Alpha(0.8), "不喜欢").Clicked() {
 							a.trashFM()
@@ -423,6 +434,7 @@ func (a *app) fmCard(c *ui.Context) {
 						pl.Next()
 					}
 				})
+				a.fmLyricPeek(c)
 			})
 		})
 	})
@@ -589,4 +601,123 @@ func glassPill(c *ui.Context, key any, icon *ui.SVG, label string, p palette) ui
 		ui.Text(c, label).FontSize(13.5).FontWeight(600).SingleLine()
 	})
 	return b
+}
+
+// fmReason says why the personal FM plays what it plays now: where the
+// heart mode began, or what the mode the listener chose leans toward.
+func (a *app) fmReason() string {
+	if a.pl.Radio() == heartRadio && a.fmSeed != "" {
+		return "从你喜欢的《" + a.fmSeed + "》出发"
+	}
+	switch fmModes[a.fmMode].mode {
+	case netease.FMFamiliar:
+		return "偏向你熟悉的风格与声音"
+	case netease.FMExplore:
+		return "带你去还没听过的角落"
+	default:
+		return "顺着你的口味，一首接一首"
+	}
+}
+
+// fmLyricPeek shows the line being sung and the one after it, over the
+// FM's own card: the words at a glance, in the card's own white. A click
+// opens them in the lyrics pane.
+func (a *app) fmLyricPeek(c *ui.Context) {
+	pl := a.pl
+	lines, loaded := pl.Lyrics()
+	if !loaded || len(lines) == 0 || pl.Current() == nil {
+		return
+	}
+	pos := pl.Position()
+	cur := lyrics.Index(lines, pos)
+	if pl.Playing() && cur+1 < len(lines) {
+		c.After(lines[cur+1].At - pos + 20*time.Millisecond)
+	}
+	sung := ""
+	if cur >= 0 {
+		sung = strings.TrimSpace(lines[cur].Text)
+	}
+	next := ""
+	for i := cur + 1; i < len(lines) && next == ""; i++ {
+		next = strings.TrimSpace(lines[i].Text)
+	}
+	if sung == "" && next == "" {
+		return
+	}
+	row := ui.ButtonBase(c.Key("fm-lyric")).Column().AlignItems(ui.Start).Gap(3).
+		Margin(16, 0, 0, 0).Padding(8, 10).Radius(10).FocusRing(false).Label("歌词速览")
+	bg := ui.Transparent
+	if row.Hovered() {
+		bg = white.Alpha(0.08)
+	}
+	row.Background(row.AnimateColor("bg", bg, ui.Animation{Duration: 160 * time.Millisecond}))
+	row.Children(func() {
+		if sung != "" {
+			ui.Text(c, sung).FontSize(13).FontWeight(600).TextColor(white.Alpha(0.92)).SingleLine()
+		}
+		if next != "" {
+			ui.Text(c, next).FontSize(12).TextColor(white.Alpha(0.55)).SingleLine()
+		}
+	})
+	if row.Clicked() {
+		a.nowPlaying, a.npPane = true, paneLyrics
+	}
+}
+
+// fmRecent lists the songs the personal FM just played, so the listener
+// may return to one: the FM flows on and forgets them otherwise. A click
+// jumps back to that song in the radio's queue.
+func (a *app) fmRecent(c *ui.Context) {
+	pl := a.pl
+	radio := pl.Radio()
+	if radio == "" || (radio != heartRadio && !strings.HasPrefix(radio, "fm:")) {
+		return
+	}
+	order, at := pl.PlayOrder()
+	if at <= 0 {
+		return
+	}
+	var idx []int
+	for k := at - 1; k >= 0 && len(idx) < 6; k-- {
+		idx = append(idx, order[k])
+	}
+	if len(idx) == 0 {
+		return
+	}
+	a.section(c, "刚刚播过")
+	p := a.pal
+	ui.Column(c).Gap(8).Children(func() {
+		for _, qi := range idx {
+			tr, at := &pl.Queue()[qi], qi
+			card := ui.ButtonBase(c.Key("fmr" + strconv.Itoa(at))).Padding(8).Radius(12).Gap(12).
+				AlignItems(ui.Center).FocusRing(false).Label(tr.Name)
+			hovered := card.Hovered()
+			fill := ui.Transparent
+			if hovered {
+				fill = p.hover
+			}
+			card.Background(card.AnimateColor("bg", fill, ui.Animation{Duration: 120 * time.Millisecond}))
+			card.Children(func() {
+				ui.Box(c).Size(44, 44).Radius(9).Shrink(0).Children(func() {
+					a.coverFill(c, tr.Album.PicURL, 200, 9)
+					if hovered {
+						ui.Box(c).Absolute().Top(0).Left(0).Right(0).Bottom(0).Radius(9).
+							Background(ui.RGBA(0, 0, 0, 0.36)).Center().Children(func() {
+							ui.Icon(c, iconPlay).Size(14, 14).TextColor(white).Margin(0, 0, 0, 1)
+						})
+					}
+				})
+				ui.Column(c).Grow(1).Shrink(1).MinWidth(0).Gap(3).Children(func() {
+					ui.Text(c, tr.Name).FontSize(13).FontWeight(600).TextColor(p.text).SingleLine()
+					ui.Text(c, tr.ArtistNames()).FontSize(11.5).TextColor(p.muted).SingleLine()
+				})
+				if a.profile != nil {
+					a.likeButton(c.Key("fmrl"+strconv.Itoa(at)), tr, 16, p.muted)
+				}
+			})
+			if card.Clicked() {
+				pl.Jump(at)
+			}
+		}
+	})
 }

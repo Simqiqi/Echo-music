@@ -28,6 +28,16 @@ func (p *Player) SetLyrics(lines []lyrics.Line) {
 	p.lyrics, p.lyricsLoaded = lines, true
 }
 
+// SetAt puts the player at order position at, as if it had played there:
+// the views that list what just played read it without loading anything.
+func (p *Player) SetAt(at int) {
+	if at < 0 || at >= len(p.order) {
+		return
+	}
+	p.at = at
+	p.track = &p.queue[at]
+}
+
 // Hold makes the player play at pos with nothing to play: its position
 // stays there.
 func (p *Player) Hold(pos time.Duration) {

@@ -5,6 +5,7 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
@@ -31,9 +32,13 @@ func TestWeeklyFrame(t *testing.T) {
 	// Covers for the record and the rows, striped so that they read.
 	for i, id := range []int64{1, 2, 3, 4} {
 		pic := fmt.Sprintf("pic%d", id)
-		aw := &artwork{bmp: ui.NewBitmap(stripedCover()), tint: stripeColors[i%len(stripeColors)]}
-		a.art.art[netease.Sized(pic, 300)] = aw
-		a.art.art[netease.Sized(pic, 160)] = aw
+		aw := &artwork{bmp: ui.NewBitmap(stripedCover()), tint: stripeColors[i%len(stripeColors)], used: a.art.now()}
+		for _, size := range []int{160, 300, 500} {
+			key := netease.Sized(pic, size)
+			a.art.art[key] = aw
+			// The poster asks for the blurred backdrop of the cover.
+			a.art.art[key+"#backdrop"] = aw
+		}
 		a.weekly.data.Tracks[id] = weeklyTrack{Name: a.weekly.data.Tracks[id].Name, Pic: pic}
 	}
 	artists := map[int64]string{1: "周杰伦", 2: "周杰伦", 3: "陈粒", 4: "汪苏泷"}
@@ -44,8 +49,18 @@ func TestWeeklyFrame(t *testing.T) {
 	}
 	os.MkdirAll(dir, 0o755)
 	a.route = route{page: pageWeekly}
-	tt := ui.NewTester(a.view, 1100, 720)
+	h := 720
+	if v := os.Getenv("NM_H"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			h = n
+		}
+	}
+	tt := ui.NewTester(a.view, 1100, h)
 	tt.SetDark(os.Getenv("NM_DARK") != "")
+	// The ring sweeps in and the clock's cells arrive over about a
+	// second of the tester's own time; advance past it, so the frame
+	// shows the page settled.
+	tt.Advance(1600 * time.Millisecond)
 	tt.Frame()
 	name := "weekly.png"
 	if os.Getenv("NM_DARK") != "" {

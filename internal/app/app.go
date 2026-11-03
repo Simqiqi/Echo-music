@@ -125,6 +125,7 @@ type app struct {
 
 	fmMode        int    // the FM mode chosen, in fmModes
 	radioStarting string // the radio asked for its first songs, or ""
+	fmSeed        string // the song the heart mode began with, named for its reason
 	sky           fmSky  // the landscape the FM's card wears
 
 	scrub      float64
@@ -157,11 +158,13 @@ type app struct {
 	pulse                 pulseState              // the bass of the song playing, for the record to beat to
 	miniSpec              miniSpectrumState       // the little spectrum of the bar, as it falls
 	weekly                *weeklyState            // the week's listening, as the app hears it
-	wx                    *wxState                // the sky outside, and the music it asks for
-	quiet                 quietState              // the quiet parts of the song playing, for its hot comments
-	captions              captionState            // the episode playing's captions, and the model that writes them
-	sig                   playerSig
-	quitting              bool
+	weekSky               weekSweep               // the light that crosses the week's poster
+
+	wx       *wxState     // the sky outside, and the music it asks for
+	quiet    quietState   // the quiet parts of the song playing, for its hot comments
+	captions captionState // the episode playing's captions, and the model that writes them
+	sig      playerSig
+	quitting bool
 
 	settings     settings
 	settingsOpen bool  // the settings card covers the page

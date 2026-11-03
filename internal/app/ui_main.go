@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"math"
 	"runtime"
 	"time"
 
@@ -238,19 +239,55 @@ func (a *app) sidebar(c *ui.Context) {
 	ui.Column(c).Fill().Padding(top, 14, 14, 14).Gap(4).DragWindow().Children(func() {
 		a.searchField(c)
 
-		ui.Scroll(c.Key("nav")).TrackScroll(&a.navScroll).Grow(1).Margin(0, -6).Padding(0, 6).Gap(4).Children(func() {
-			a.navItem(c, iconHome, "为你推荐", route{page: pageHome})
-			a.navItem(c, iconDaily, "每日推荐", route{page: pageDaily})
-			a.navItem(c, iconWeekly, "听歌周报", route{page: pageWeekly})
-			a.navItem(c, iconRadio, "私人 FM", route{page: pageFM})
-			a.navItem(c, iconWeather, "天气电台", route{page: pageWeather})
-			a.navItem(c, iconCharts, "排行榜", route{page: pageCharts})
-			a.navItem(c, iconPodcast, "播客", route{page: pagePodcasts})
-			if a.searched.query != "" {
-				a.navItem(c, iconSearch, "搜索结果", a.searched)
-			}
-			a.myPlaylists(c, "我的歌单", a.mine, true, &a.mineCollapsed)
-			a.myPlaylists(c, "收藏的歌单", a.saved, false, &a.savedCollapsed)
+		// #31 滚动渐隐：顶/底毛玻璃，随滚动柔化边缘。
+		// 渐变作为覆盖在滚动区之上的绝对定位层，确保在内容之上合成，
+		// 不被滚动子项遮挡（在 Scroll 自身 Draw 上绘制会被其子项盖住）。
+		navWrap := ui.Box(c.Key("nav-wrap")).Grow(1).Margin(0, -6)
+		navWrap.Children(func() {
+			sc := ui.Scroll(c.Key("nav")).TrackScroll(&a.navScroll).Fill().Padding(0, 6).Gap(4)
+			sc.Children(func() {
+				a.navItem(c, iconHome, "为你推荐", route{page: pageHome}, 0)
+				a.navItem(c, iconDaily, "每日推荐", route{page: pageDaily}, 1)
+				a.navItem(c, iconWeekly, "听歌周报", route{page: pageWeekly}, 2)
+				a.navItem(c, iconRadio, "私人 FM", route{page: pageFM}, 3)
+				a.navItem(c, iconWeather, "天气电台", route{page: pageWeather}, 4)
+				a.navItem(c, iconCharts, "排行榜", route{page: pageCharts}, 5)
+				a.navItem(c, iconPodcast, "播客", route{page: pagePodcasts}, 6)
+				if a.searched.query != "" {
+					a.navItem(c, iconSearch, "搜索结果", a.searched, 7)
+				}
+				a.myPlaylists(c, "我的歌单", a.mine, true, &a.mineCollapsed)
+				a.myPlaylists(c, "收藏的歌单", a.saved, false, &a.savedCollapsed)
+			})
+			// 顶部柔化：随向上滚动量淡入，把内容溶进背景。
+			// PassThrough：仅作装饰合成层，不拦截指针，否则会盖住顶部「为你推荐」的点击。
+			ui.Box(c.Key("nav-top-fade")).Absolute().Top(0).Left(0).Right(0).Height(26).PassThrough().
+				Draw(func(dr *ui.Painter, r ui.Rect) {
+					top := float32(0)
+					if a.navScroll.Y > 0 {
+						top = a.navScroll.Y / 24
+						if top > 1 {
+							top = 1
+						}
+					}
+					if top > 0.01 {
+						dr.FillGradient(r, ui.LinearGradient{From: a.pal.bg.Alpha(top), To: a.pal.bg.Alpha(0), Angle: 90}, 0)
+					}
+				})
+			// 底部柔化：随接近底部淡入。PassThrough 同上，避免遮挡底部项点击。
+			ui.Box(c.Key("nav-bot-fade")).Absolute().Bottom(0).Left(0).Right(0).Height(26).PassThrough().
+				Draw(func(dr *ui.Painter, r ui.Rect) {
+					bot := float32(0)
+					if a.navScroll.MaxY > 0 && a.navScroll.Y < a.navScroll.MaxY {
+						bot = (a.navScroll.MaxY - a.navScroll.Y) / 24
+						if bot > 1 {
+							bot = 1
+						}
+					}
+					if bot > 0.01 {
+						dr.FillGradient(r, ui.LinearGradient{From: a.pal.bg.Alpha(0), To: a.pal.bg.Alpha(bot), Angle: 90}, 0)
+					}
+				})
 		})
 
 		// The words of the moment, then what plays, as a card at the foot
@@ -263,10 +300,23 @@ func (a *app) sidebar(c *ui.Context) {
 	})
 }
 
-func (a *app) navItem(c *ui.Context, icon *ui.SVG, label string, r route) {
+func (a *app) navItem(c *ui.Context, icon *ui.SVG, label string, r route, index int) {
 	p := a.pal
 	selected := a.route.page == r.page && !a.nowPlaying
 	b := ui.ButtonBase(c.Key(label)).Height(34).PaddingX(10).Gap(10).Radius(8).AlignItems(ui.Center).Justify(ui.Start).FocusRing(false)
+	playing := r.page == pageFM && selected && a.pl.Playing()
+	reduce := c.Preferences().ReduceMotion
+	// #26 错峰入场：淡入并轻滑，按 index 递延，像菜单依次展开。
+	if !reduce {
+		b.Transition(ui.ElementTransition{
+			Enter: &ui.Motion{Opacity: 0, X: -12},
+			Animation: &ui.Animation{
+				Duration: 380 * time.Millisecond,
+				Delay:    time.Duration(index) * 45 * time.Millisecond,
+				Ease:     ui.EaseOut,
+			},
+		})
+	}
 	bg := ui.Transparent
 	switch {
 	case selected:
@@ -284,13 +334,36 @@ func (a *app) navItem(c *ui.Context, icon *ui.SVG, label string, r route) {
 		color = a.songAccent
 	}
 	b.Children(func() {
-		ui.Icon(c, icon).Size(17, 17).TextColor(color)
-		textColor := p.text
-		if selected {
-			// The label stays ink, as a pill's label does.
-			textColor = p.text
-		}
-		ui.Text(c, label).FontSize(13.5).FontWeight(500).TextColor(textColor)
+		// #27 图标：hover 放大；选中态持续轻微呼吸。#30 播放中：图标外呼吸光环。
+		ui.Box(c.Key("ic")).Size(19, 19).AlignItems(ui.Center).Justify(ui.Center).
+			Draw(func(dr *ui.Painter, r ui.Rect) {
+				if !playing || reduce {
+					return
+				}
+				now := dr.Now()
+				f := float64(now.UnixNano()%int64(1800*time.Millisecond)) / float64(1800*time.Millisecond)
+				ph := float32(0.5 - 0.5*math.Cos(2*math.Pi*f))
+				op := 0.16 + 0.30*ph
+				rad := 9 + 4*ph
+				cx, cy := r.X+r.W/2, r.Y+r.H/2
+				dr.Stroke(ui.Rect{X: cx - rad, Y: cy - rad, W: 2 * rad, H: 2 * rad}, a.songAccent.Alpha(op), rad, 1.6)
+			}).
+			Children(func() {
+				ic := ui.Icon(c, icon).Size(17, 17).TextColor(color)
+				var s float32
+				if selected && !reduce {
+					s = ic.Loop("nav-ic-"+label, 2*time.Second, ui.EaseInOut)
+				}
+				sc := float32(1)
+				if b.Hovered() {
+					sc = 1.15
+				}
+				if selected && !reduce {
+					sc *= 1 + 0.05*s
+				}
+				ic.Scale(sc, sc)
+			})
+		ui.Text(c, label).FontSize(13.5).FontWeight(500).TextColor(p.text)
 		if selected {
 			// A bar of the accent at the item's left edge, sliding in
 			// from further left as it arrives.
@@ -302,6 +375,19 @@ func (a *app) navItem(c *ui.Context, icon *ui.SVG, label string, r route) {
 				})
 			}
 		}
+	})
+	// #29 hover 涟漪：指针处柔和亮斑，绘于背景层，不拦截点击。
+	b.Draw(func(dr *ui.Painter, r ui.Rect) {
+		x, y, over := b.PointerPosition()
+		if !over {
+			return
+		}
+		now := dr.Now()
+		f := float64(now.UnixNano()%int64(1600*time.Millisecond)) / float64(1600*time.Millisecond)
+		ph := float32(0.5 - 0.5*math.Cos(2*math.Pi*f))
+		rad := 10 + 26*ph
+		op := 0.05 + 0.07*ph
+		dr.Fill(ui.Rect{X: x - rad, Y: y - rad, W: 2 * rad, H: 2 * rad}, a.songAccent.Alpha(op), rad)
 	})
 	if b.Clicked() {
 		a.open(r)
@@ -317,7 +403,24 @@ func (a *app) sidebarNowPlaying(c *ui.Context, tr *netease.Track) {
 	}
 	card.Background(card.AnimateColor("bg", bg, ui.Animation{Duration: 160 * time.Millisecond}))
 	card.Children(func() {
-		a.cover(c, tr.Album.PicURL, 96, 40, 6).Shadow(0, 2, 6, 0, p.cardShade)
+		cov := a.cover(c, tr.Album.PicURL, 96, 40, 6)
+		cov.Shadow(0, 2, 6, 0, p.cardShade)
+		if a.pl.Playing() && !c.Preferences().ReduceMotion {
+			// #28 呼吸：原先用 cov.Loop 缩放封面，会让侧栏常驻 60fps 整窗重建
+			// （在「为你推荐」等非正在播放页播放时尤其拖累）。改为 30fps 的 Draw
+			// 呼吸光环——不触发视图重建，重绘成本大降，仍有呼吸感。
+			cov.Draw(func(dr *ui.Painter, r ui.Rect) {
+				f := float64(dr.Now().UnixNano()%int64(2000*time.Millisecond)) / float64(2000*time.Millisecond)
+				ph := float32(0.5 - 0.5*math.Cos(2*math.Pi*f))
+				// 外扩 4px，画一圈随相位呼吸的强调色光晕（30fps，不触发整窗重建）。
+				rr := ui.Rect{X: r.X - 4, Y: r.Y - 4, W: r.W + 8, H: r.H + 8}
+				op := 0.28 + 0.34*ph
+				rad := 9 + 3*ph
+				dr.Stroke(rr, a.songAccent.Alpha(op), rad, 3)
+				dr.AnimationFrameRate(30)
+				dr.AnimationFrameRate(30)
+			})
+		}
 		ui.Column(c).Grow(1).Shrink(1).MinWidth(0).Gap(2).Children(func() {
 			ui.Text(c, tr.Name).FontSize(12.5).FontWeight(600).SingleLine()
 			a.artistLinks(c, tr, p.muted, p.text).FontSize(11.5).SingleLine()
