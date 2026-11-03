@@ -243,11 +243,27 @@ func init() {
 				step(0, func() { a.pageScroll.ScrollTo(0, 100000, ui.Smooth) })
 				time.Sleep(2 * time.Second)
 				shot("p-follows", a.win)
-				mygo.RunOnMain(mygo.App.Quit)
-				return
-			}
+			mygo.RunOnMain(mygo.App.Quit)
+			return
+		}
+		if os.Getenv("NM_SCENE") == "library" {
+			// The three pages added beside the playlists: what is kept on
+			// disk, the feed of who is followed, and the albums just out.
+			time.Sleep(3 * time.Second)
+			step(0, func() { a.open(route{page: pageDownloads}) })
+			time.Sleep(3 * time.Second)
+			shot("l-downloads", a.win)
+			step(0, func() { a.open(route{page: pageFeed}) })
 			time.Sleep(5 * time.Second)
-			mygo.RunOnMain(func() {
+			shot("l-feed", a.win)
+			step(0, func() { a.open(route{page: pageNewAlbums}) })
+			time.Sleep(5 * time.Second)
+			shot("l-newalbums", a.win)
+			mygo.RunOnMain(mygo.App.Quit)
+			return
+		}
+		time.Sleep(5 * time.Second)
+		mygo.RunOnMain(func() {
 				x, y, w, h := windowFrame(a.notch.win.NativeHandle())
 				println("notch frame", int(x), int(y), int(w), int(h))
 			})

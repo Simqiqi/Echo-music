@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -186,6 +187,64 @@ func (c *Cache) songs() []cachedSong {
 func (c *Cache) remove(path string) {
 	os.Remove(path)
 	os.Remove(strings.TrimSuffix(path, filepath.Ext(path)) + ".json")
+}
+
+// Remove drops the song at path, and its sidecar, from the disk.
+func (c *Cache) Remove(path string) {
+	c.remove(path)
+}
+
+// DownloadEntry is a song kept on disk, as the downloads page lists it.
+type DownloadEntry struct {
+	ID     int64           // the song's NetEase id
+	Level  string          // the stream level held
+	Path   string          // where the audio file is
+	Size   int64           // its bytes
+	Used   time.Time       // when it was last played or fetched
+	Stream netease.Stream // what its sidecar metadata says it is
+}
+
+// Entries lists the songs kept, with the song id parsed from each file's
+// name and the stream read from its sidecar. They come newest-used first.
+func (c *Cache) Entries() []DownloadEntry {
+	if c == nil {
+		return nil
+	}
+	entries, _ := os.ReadDir(c.dir)
+	var out []DownloadEntry
+	for _, e := range entries {
+		ext := filepath.Ext(e.Name())
+		if ext != ".mp3" && ext != ".flac" {
+			continue
+		}
+		base := strings.TrimSuffix(e.Name(), ext) // "<id>-<level>"
+		dash := strings.IndexByte(base, '-')
+		if dash < 1 {
+			continue
+		}
+		id, err := strconv.ParseInt(base[:dash], 10, 64)
+		if err != nil {
+			continue
+		}
+		level := base[dash+1:]
+		if !slices.Contains(netease.Levels, level) {
+			continue
+		}
+		info, err := e.Info()
+		if err != nil {
+			continue
+		}
+		ent := DownloadEntry{ID: id, Level: level, Path: filepath.Join(c.dir, e.Name()), Size: info.Size(), Used: info.ModTime()}
+		if b, err := os.ReadFile(filepath.Join(c.dir, base+".json")); err == nil {
+			var st netease.Stream
+			if json.Unmarshal(b, &st) == nil {
+				ent.Stream = st
+			}
+		}
+		out = append(out, ent)
+	}
+	slices.SortFunc(out, func(a, b DownloadEntry) int { return b.Used.Compare(a.Used) })
+	return out
 }
 
 // prune drops the songs played longest ago until the rest fit the limit,

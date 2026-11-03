@@ -190,6 +190,12 @@ func (a *app) load(r route) {
 	case pageFM:
 		// The FM's card wears another landscape each time it opens.
 		a.sky.pick(a, a.post)
+	case pageDownloads:
+		a.loadDownloads()
+	case pageFeed:
+		a.loadFeed(true)
+	case pageNewAlbums:
+		a.loadNewAlbums()
 	}
 }
 
@@ -252,8 +258,11 @@ func (a *app) sidebar(c *ui.Context) {
 				a.navItem(c, iconRadio, "私人 FM", route{page: pageFM}, 3)
 				a.navItem(c, iconWeather, "天气电台", route{page: pageWeather}, 4)
 				a.navItem(c, iconCharts, "排行榜", route{page: pageCharts}, 5)
-				a.navItem(c, iconPodcast, "播客", route{page: pagePodcasts}, 6)
-				if a.searched.query != "" {
+			a.navItem(c, iconPodcast, "播客", route{page: pagePodcasts}, 6)
+			a.navItem(c, iconDownloads, "下载管理", route{page: pageDownloads}, 7)
+			a.navItem(c, iconFeed, "关注动态", route{page: pageFeed}, 8)
+			a.navItem(c, iconNewAlbums, "新碟速递", route{page: pageNewAlbums}, 9)
+			if a.searched.query != "" {
 					a.navItem(c, iconSearch, "搜索结果", a.searched, 7)
 				}
 				a.myPlaylists(c, "我的歌单", a.mine, true, &a.mineCollapsed)
@@ -618,6 +627,12 @@ func (a *app) navName() string {
 		return "播客"
 	case pagePodcast:
 		return "播客节目"
+	case pageDownloads:
+		return "下载管理"
+	case pageFeed:
+		return "关注动态"
+	case pageNewAlbums:
+		return "新碟速递"
 	case pageSearch:
 		return "搜索结果"
 	case pagePlaylist:
@@ -711,6 +726,12 @@ func (a *app) pageOf(c *ui.Context) {
 		a.podcastPage(c)
 	case pagePodcasts:
 		a.podcastsPage(c)
+	case pageDownloads:
+		a.downloadsPage(c)
+	case pageFeed:
+		a.feedPage(c)
+	case pageNewAlbums:
+		a.newAlbumsPage(c)
 	}
 }
 

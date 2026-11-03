@@ -27,6 +27,9 @@ const (
 	pagePodcasts
 	pageWeekly
 	pageWeather
+	pageDownloads
+	pageFeed
+	pageNewAlbums
 )
 
 type route struct {
@@ -158,6 +161,14 @@ type app struct {
 	pulse                 pulseState              // the bass of the song playing, for the record to beat to
 	miniSpec              miniSpectrumState       // the little spectrum of the bar, as it falls
 	weekly                *weeklyState            // the week's listening, as the app hears it
+
+	// The three pages beside the playlists: what the listener kept on disk,
+	// the feed of who they follow, and the albums just out.
+	downloads   downloadsState
+	feed        []netease.Event
+	feedState   paged
+	feedLast    int64
+	newAlbums   newAlbumsState
 	weekSky               weekSweep               // the light that crosses the week's poster
 
 	wx       *wxState     // the sky outside, and the music it asks for
