@@ -184,19 +184,6 @@ func (a *app) settingsBody(c *ui.Context, p palette, liquid bool) {
 				a.changed()
 			}
 		})
-		if a.dj.voice != nil {
-			row("DJ 讲解", "私人 FM 在每首歌开始时用女声介绍它、推荐理由与创作背景，像电台 DJ 在你耳边串讲", func() {
-				on := s.DJ
-				if ui.Switch(c.Key("dj"), &on).Label("DJ 讲解").Changed() {
-					s.DJ = on
-					if !on {
-						a.djCancel()
-					}
-					a.changed()
-					a.djArm()
-				}
-			})
-		}
 		row("均衡器", "按预设调整音色的走向，对每一首歌都生效", func() {
 			labels := make([]string, len(player.EQPresets))
 			chosen := labels[0]

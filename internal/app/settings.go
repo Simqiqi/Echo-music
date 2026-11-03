@@ -99,11 +99,6 @@ type settings struct {
 	// Captions writes down episodes as they play, for their captions,
 	// once the listener has downloaded the model.
 	Captions bool `json:"captions"`
-	// DJ lets a voice speak between the personal FM's songs, saying what
-	// comes next, why it was picked, and where it is from, as a radio
-	// host would: the listener turns it off when they want the music
-	// alone.
-	DJ bool `json:"dj"`
 	// CacheMB is how many megabytes the songs kept on disk may take; 0
 	// keeps none.
 	CacheMB int `json:"cacheMB"`
@@ -114,7 +109,7 @@ type settings struct {
 }
 
 func defaultSettings() settings {
-	return settings{NotchActivity: true, Quality: "exhigh", Appearance: "system", Volume: 0.8, Normalize: true, AppIcon: "dock-and-menubar", CacheMB: 2048, Captions: true, DJ: true}
+	return settings{NotchActivity: true, Quality: "exhigh", Appearance: "system", Volume: 0.8, Normalize: true, AppIcon: "dock-and-menubar", CacheMB: 2048, Captions: true}
 }
 
 // transitions reports whether the smart transitions are on: they are,

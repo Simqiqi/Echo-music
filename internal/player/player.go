@@ -574,12 +574,6 @@ func (p *Player) SetVolume(v float64) {
 	p.applyGain()
 }
 
-// Duck lowers how much of the music is heard, to level from 1 (all of it)
-// to 0 (none), over d: the app lets a voice be heard over the song.
-func (p *Player) Duck(level float64, d time.Duration) {
-	p.fade.setDuck(min(max(level, 0), 1), d)
-}
-
 // applyGain sets the volume of what plays: the listener's, which the ear
 // hears in powers, and the track's gain, if normalizing.
 func (p *Player) applyGain() {
