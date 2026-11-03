@@ -278,3 +278,31 @@ func TestProgramCommentsLive(t *testing.T) {
 		t.Errorf("no answer of %d: %v", ids[1], liked)
 	}
 }
+
+// The feed of who the listener follows comes a page at a time, with the
+// posters' names and what they said; the new albums come with covers,
+// artists and dates.
+func TestFollowedEventsAndNewAlbumsLive(t *testing.T) {
+	path := os.Getenv("NM_SESSION")
+	if os.Getenv("LIVE") == "" || path == "" {
+		t.Skip()
+	}
+	useSession(t, path)
+	events, last, _, err := FollowedEvents(12, 0)
+	if err != nil || len(events) == 0 || last == 0 {
+		t.Fatalf("%d events, last %d, %v", len(events), last, err)
+	}
+	if events[0].User.Nickname == "" || events[0].Content.Msg == "" {
+		t.Fatalf("first event %+v", events[0])
+	}
+	t.Logf("feed: %d events, first %s: %.40q", len(events), events[0].User.Nickname, events[0].Content.Msg)
+
+	albums, err := NewAlbums(12)
+	if err != nil || len(albums) == 0 {
+		t.Fatalf("%d albums, %v", len(albums), err)
+	}
+	if albums[0].ID == 0 || albums[0].Name == "" || albums[0].PicURL == "" || albums[0].ArtistName == "" || albums[0].PublishTime == 0 {
+		t.Fatalf("first album %+v", albums[0])
+	}
+	t.Logf("albums: %d, first %q by %s on %s", len(albums), albums[0].Name, albums[0].ArtistName, albums[0].Published().Format("2006-01-02"))
+}

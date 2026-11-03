@@ -1,6 +1,7 @@
 package netease
 
 import (
+	"fmt"
 	"net/url"
 	"strconv"
 	"time"
@@ -14,11 +15,16 @@ import (
 // Unix milliseconds of the last event taken before, or 0 for the newest; it
 // returns the time to go on from and whether there are more.
 func FollowedEvents(limit, lastTime int64) (events []Event, last int64, more bool, err error) {
+	if lastTime <= 0 {
+		// The feed speaks -1 for its head; 0 would be an answer from
+		// before any event, and would come back empty.
+		lastTime = -1
+	}
 	var res struct {
 		Events []struct {
 			Event
 			JSON string `json:"json"`
-		} `json:"events"`
+		} `json:"event"`
 		LastTime int64 `json:"lasttime"`
 		More     bool  `json:"more"`
 	}
@@ -26,7 +32,7 @@ func FollowedEvents(limit, lastTime int64) (events []Event, last int64, more boo
 		"pagesize": {strconv.FormatInt(limit, 10)},
 		"lasttime": {strconv.FormatInt(lastTime, 10)},
 	}
-	if err := get("/api/event", q, &res); err != nil {
+	if err := get("/api/event/get", q, &res); err != nil {
 		return nil, 0, false, err
 	}
 	for _, e := range res.Events {
@@ -48,9 +54,12 @@ type NewAlbum struct {
 // Published returns when the album came out.
 func (a NewAlbum) Published() time.Time { return time.UnixMilli(a.PublishTime) }
 
-// NewAlbums returns up to limit of the albums most recently released.
+// NewAlbums returns up to limit of the albums most recently released, from
+// every region. The web page's own listing is asked through the eapi, the
+// only way NetEase answers this outside its site.
 func NewAlbums(limit int) ([]NewAlbum, error) {
 	var res struct {
+		Code   int `json:"code"`
 		Albums []struct {
 			ID          int64  `json:"id"`
 			Name        string `json:"name"`
@@ -64,8 +73,12 @@ func NewAlbums(limit int) ([]NewAlbum, error) {
 			} `json:"artists"`
 		} `json:"albums"`
 	}
-	if err := get("/api/album/newest", url.Values{"limit": {strconv.Itoa(limit)}}, &res); err != nil {
+	data := map[string]any{"area": "ALL", "limit": limit, "offset": 0, "total": true}
+	if err := eapiPost("/api/album/new", data, &res); err != nil {
 		return nil, err
+	}
+	if res.Code != 200 {
+		return nil, fmt.Errorf("netease: /api/album/new: code %d", res.Code)
 	}
 	out := make([]NewAlbum, 0, len(res.Albums))
 	for _, a := range res.Albums {

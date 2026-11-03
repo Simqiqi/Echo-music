@@ -65,6 +65,7 @@ func (a *app) newAlbumsPage(c *ui.Context) {
 					a.centered(c, a.newAlbums.err, a.loadNewAlbums)
 					return
 				}
+				a.centered(c, "正在加载…", nil)
 				return
 			}
 			if len(a.newAlbums.albums) == 0 {

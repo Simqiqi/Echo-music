@@ -19,9 +19,10 @@ func (a *app) feedPage(c *ui.Context) {
 
 			if !a.feedState.loaded && len(a.feed) == 0 {
 				if a.feedState.err != "" {
-					a.centered(c, a.feedState.err, func() { a.loadFeed(false) })
+					a.centered(c, a.feedState.err, func() { a.loadFeed(true) })
 					return
 				}
+				a.centered(c, "正在加载…", nil)
 				return
 			}
 			if len(a.feed) == 0 {
