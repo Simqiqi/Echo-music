@@ -19,7 +19,8 @@ func PersonalFM(mode string) ([]Track, error) {
 	var res struct {
 		Code int `json:"code"`
 		Data []struct {
-			ID int64 `json:"id"`
+			ID     int64  `json:"id"`
+			Reason string `json:"reason"`
 		} `json:"data"`
 	}
 	data := map[string]any{"mode": mode, "limit": 3}
@@ -32,10 +33,25 @@ func PersonalFM(mode string) ([]Track, error) {
 	// The radio names its songs' fields as the older APIs do: their
 	// details say them, with what the listener may play.
 	ids := make([]int64, len(res.Data))
+	reasons := make(map[int64]string, len(res.Data))
 	for i, d := range res.Data {
 		ids[i] = d.ID
+		if d.Reason != "" {
+			reasons[d.ID] = d.Reason
+		}
 	}
-	return SongDetails(ids)
+	tracks, err := SongDetails(ids)
+	if err != nil {
+		return nil, err
+	}
+	// The radio says why it picked each, which the details do not: the
+	// host between songs says it too.
+	for i := range tracks {
+		if r := reasons[tracks[i].ID]; r != "" {
+			tracks[i].Reason = r
+		}
+	}
+	return tracks, nil
 }
 
 // FMTrash tells the personal FM the listener does not like a song, which

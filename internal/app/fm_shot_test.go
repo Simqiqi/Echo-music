@@ -6,12 +6,15 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/egoist/mygo/audio"
 	"github.com/egoist/mygo/ui"
 	"netease-music-mygo/internal/lyrics"
 
+	"netease-music-mygo/internal/dj"
 	"netease-music-mygo/internal/netease"
 )
 
@@ -26,6 +29,9 @@ func TestFMFrame(t *testing.T) {
 	a := newTestApp()
 	a.settings = defaultSettings()
 	a.profile = &netease.Profile{UserID: 1, Nickname: "听众"}
+	// The host between songs, so its switch shows on the page.
+	a.dj.voice = dj.New(t.TempDir())
+	a.dj.clips = map[int64]*djClip{}
 	tracks := []netease.Track{
 		{ID: 1, Name: "晴天", Artists: []netease.Artist{{Name: "周杰伦"}}, Album: netease.Album{Name: "叶惠美", PicURL: "pic1"}},
 		{ID: 2, Name: "七里香", Artists: []netease.Artist{{Name: "周杰伦"}}, Album: netease.Album{Name: "七里香", PicURL: "pic2"}},
@@ -61,19 +67,26 @@ func TestFMFrame(t *testing.T) {
 	}
 	tt := ui.NewTester(a.view, 1100, h)
 	tt.SetDark(os.Getenv("NM_DARK") != "")
-	tt.Advance(1600 * time.Millisecond)
-	tt.Frame()
+	os.MkdirAll(dir, 0o755)
+	render := func(name string) {
+		tt.Advance(400 * time.Millisecond)
+		tt.Frame()
+		f, err := os.Create(filepath.Join(dir, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer f.Close()
+		if err := png.Encode(f, tt.Image()); err != nil {
+			t.Fatal(err)
+		}
+	}
 	name := "fm.png"
 	if os.Getenv("NM_DARK") != "" {
 		name = "fm-dark.png"
 	}
-	os.MkdirAll(dir, 0o755)
-	f, err := os.Create(filepath.Join(dir, name))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer f.Close()
-	if err := png.Encode(f, tt.Image()); err != nil {
-		t.Fatal(err)
-	}
+	render(name)
+	// The host speaking, so the card shows what it says between songs.
+	a.dj.player = audio.NewSound(22050, 1, make([]float32, 22050)).NewPlayer()
+	a.dj.next = &tracks[3]
+	render(strings.TrimSuffix(name, ".png") + "-dj.png")
 }

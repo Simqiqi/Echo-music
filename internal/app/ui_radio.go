@@ -128,6 +128,7 @@ func (a *app) exitRadio() {
 		return
 	}
 	a.pl.EndRadio()
+	a.djCancel()
 	a.fmSeed = ""
 	label := radioLabel(name)
 	if name != heartRadio {
@@ -285,8 +286,17 @@ func (a *app) fmPage(c *ui.Context) {
 				a.fmMode = i
 			}
 		}
-		ui.Row(c).AlignItems(ui.End).Children(func() {
+		ui.Row(c).Gap(10).AlignItems(ui.End).Children(func() {
 			ui.Box(c).Grow(1).Children(func() { a.heading(c, "私人 FM", "无尽推荐") })
+			// The host between songs: the page's own switch, lit while
+			// the voice speaks.
+			if a.dj.voice != nil {
+				ui.Box(c).Margin(0, 0, 22, 0).Children(func() {
+					if a.djToggleButton(c, a.pal).Clicked() {
+						a.djToggle()
+					}
+				})
+			}
 			mode := a.fmMode
 			ui.Box(c).Margin(0, 0, 22, 0).Children(func() {
 				labels := make([]string, len(fmModes))
@@ -405,7 +415,9 @@ func (a *app) fmCard(c *ui.Context) {
 				default:
 					a.artistLinks(c, tr, white.Alpha(0.7), white, true).FontSize(14).SingleLine()
 				}
-				if reason := a.fmReason(); reason != "" {
+				if a.djSpeaking() {
+					a.djLive(c)
+				} else if reason := a.fmReason(); reason != "" {
 					ui.Row(c).Margin(2, 0, 4, 0).Gap(6).AlignItems(ui.Center).Children(func() {
 						ui.Box(c).Size(5, 5).Radius(999).Background(white.Alpha(0.55)).Shrink(0)
 						ui.Text(c, reason).FontSize(12.5).TextColor(white.Alpha(0.62)).SingleLine()

@@ -50,6 +50,12 @@ type fader struct {
 	start time.Time
 	dur   time.Duration
 	gen   int // counts fades, to stop the goroutine of one overtaken
+
+	// duck is how much of the music is heard beside a voice speaking
+	// over it: 1, but when ducked. Its zero means 1, for a fader not
+	// given one yet.
+	duck    float64
+	duckGen int
 }
 
 // level returns the level at now, easing in and out.
@@ -63,8 +69,52 @@ func (f *fader) level(now time.Time) float64 {
 
 func (f *fader) apply(now time.Time) {
 	if f.out != nil {
-		f.out.SetVolume(f.gain * f.level(now))
+		duck := f.duck
+		if duck <= 0 {
+			duck = 1
+		}
+		f.out.SetVolume(f.gain * f.level(now) * duck)
 	}
+}
+
+// setDuck ramps how much of the music is heard to to, over d, without
+// touching the fade the music is in.
+func (f *fader) setDuck(to float64, d time.Duration) {
+	f.mu.Lock()
+	from := f.duck
+	if from <= 0 {
+		from = 1
+	}
+	f.duckGen++
+	gen := f.duckGen
+	if d <= 0 {
+		f.duck = to
+		f.apply(time.Now())
+		f.mu.Unlock()
+		return
+	}
+	start := time.Now()
+	f.mu.Unlock()
+	go func() {
+		tick := time.NewTicker(10 * time.Millisecond)
+		defer tick.Stop()
+		for {
+			f.mu.Lock()
+			if f.duckGen != gen {
+				f.mu.Unlock()
+				return
+			}
+			t := min(1, time.Since(start).Seconds()/d.Seconds())
+			f.duck = from + (to-from)*t
+			f.apply(time.Now())
+			done := t >= 1
+			f.mu.Unlock()
+			if done {
+				return
+			}
+			<-tick.C
+		}
+	}()
 }
 
 // attach makes out the player faded, at level.

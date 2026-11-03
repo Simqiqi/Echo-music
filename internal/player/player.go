@@ -40,6 +40,11 @@ type Player struct {
 	// Changed, if set, hears that what plays, where it is or whether it
 	// plays changed.
 	Changed func()
+	// Interlude, if set, is asked when a track plays to its end, before
+	// the next one loads, with the track next in line: true keeps the
+	// queue where it is, while the app says something between the songs,
+	// and the app calls Resume when it is done.
+	Interlude func(next *netease.Track) bool
 
 	queue   []netease.Track
 	order   []int // the queue's indices in play order: shuffled or not
@@ -54,7 +59,11 @@ type Player struct {
 	feed     func(got func([]netease.Track))
 	radioGen int  // counts radios, to drop what an old one gives
 	feeding  bool // the feed is asked
-	awaiting bool // at the queue's end, for what the feed gives
+	// awaiting says the queue is at its end, for what the feed gives.
+	awaiting bool
+	// held says the app kept the queue where it is at a natural end, to
+	// say something between the songs: Resume goes on from there.
+	held bool
 
 	track   *netease.Track
 	out     *audio.Player
@@ -150,6 +159,18 @@ func (p *Player) ended() {
 		p.out.Seek(0)
 		p.out.Play()
 		return
+	}
+	// The app may keep the queue here a moment, to say something between
+	// the songs: Resume goes on from there.
+	if p.Interlude != nil && !p.held {
+		var next *netease.Track
+		if p.at+1 < len(p.order) {
+			next = &p.queue[p.order[p.at+1]]
+		}
+		if p.Interlude(next) {
+			p.held = true
+			return
+		}
 	}
 	if p.at+1 >= len(p.order) && p.feed != nil {
 		p.awaitFeed()
@@ -422,6 +443,30 @@ func (p *Player) Prev() {
 	p.load(at)
 }
 
+// Resume goes on from a natural end that a Hold kept the queue at.
+func (p *Player) Resume() {
+	if !p.held {
+		return
+	}
+	p.held = false
+	if !p.playing {
+		p.sync()
+		return
+	}
+	switch {
+	case p.at+1 < len(p.order):
+		p.load(p.at + 1)
+	case p.feed != nil:
+		p.stop()
+		p.awaitFeed()
+	case p.repeat == RepeatOff:
+		p.playing = false
+		p.sync()
+	default:
+		p.load(0)
+	}
+}
+
 // Jump plays the queue's track i.
 func (p *Player) Jump(i int) {
 	for k, v := range p.order {
@@ -573,6 +618,12 @@ func (p *Player) SetVolume(v float64) {
 	p.applyGain()
 }
 
+// Duck lowers how much of the music is heard, to level from 1 (all of it)
+// to 0 (none), over d: the app lets a voice be heard over the song.
+func (p *Player) Duck(level float64, d time.Duration) {
+	p.fade.setDuck(min(max(level, 0), 1), d)
+}
+
 // applyGain sets the volume of what plays: the listener's, which the ear
 // hears in powers, and the track's gain, if normalizing.
 func (p *Player) applyGain() {
@@ -636,6 +687,7 @@ func (p *Player) stop() {
 	}
 	p.out, p.stream, p.info = nil, nil, nil
 	p.seeking = false
+	p.held = false
 	p.fade.attach(nil, 1)
 }
 

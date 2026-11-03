@@ -163,6 +163,7 @@ type app struct {
 	wx       *wxState     // the sky outside, and the music it asks for
 	quiet    quietState   // the quiet parts of the song playing, for its hot comments
 	captions captionState // the episode playing's captions, and the model that writes them
+	dj       djState      // the voice between the FM's songs
 	sig      playerSig
 	quitting bool
 
@@ -258,7 +259,12 @@ func Run() error {
 		a.pl.Changed = func() {
 			a.keepSession()
 			a.syncCaptions()
+			a.djChanged()
 		}
+		// Between the FM's songs, the app may let a host speak: see
+		// ui_dj.go.
+		a.pl.Interlude = a.djInterlude
+		a.initDJ()
 		a.weekly = newWeekly()
 		// The weather is read from what was kept before the window
 		// stands; asking the sky waits until there is a window to post

@@ -44,6 +44,7 @@ var (
 	iconUser      = strokeIcon(`<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>`)
 	iconPodcast   = strokeIcon(`<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><path d="M12 18v4"/>`)
 	iconHeadset   = strokeIcon(`<path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/>`)
+	iconMic       = strokeIcon(`<rect x="9" y="2" width="6" height="11" rx="3"/><path d="M19 10.5v.5a7 7 0 0 1-14 0v-.5"/><path d="M12 18v4"/><path d="M8.5 22h7"/>`)
 )
 
 var (
