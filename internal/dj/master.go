@@ -26,6 +26,17 @@ func master(rate int, s []float32) {
 	fade(s, int(fs*0.014))
 }
 
+// masterNatural masters what the speech service's neural voice made:
+// the voice arrives finished, so it is only brought to a steady level
+// and eased at the ends so it never clicks.
+func masterNatural(rate int, s []float32) {
+	if len(s) == 0 || rate <= 0 {
+		return
+	}
+	normalize(s, 0.89)
+	fade(s, rate*14/1000)
+}
+
 // normalize brings the loudest sample to peak.
 func normalize(s []float32, peak float64) {
 	var top float64

@@ -15,21 +15,24 @@ import (
 	"netease-music-mygo/internal/netease"
 )
 
-// The DJ between songs: in the personal FM, the app lowers the music a
-// little as the last seconds of a track play, and lets a warm Mandarin
-// voice say what comes next, why it was picked, and where it is from,
-// before the next song begins. The voice is made on the device, from the
-// track's own facts, and kept, so that a line is made once.
+// The DJ of the personal FM, in the manner of a private radio: as a
+// song begins, the app lowers the music a little and lets a warm
+// Mandarin voice say what this one is, why it was picked, and where it
+// is from, over the song's own first bars. The line was written and
+// spoken while the last song played, so it is ready the moment the song
+// is. The voice comes from the speech service when the network has it,
+// and from the device when it does not, and what it says is kept, so
+// that a line is made once.
 
 const (
 	// djMax is how much the host says, in runes: long enough for a
-	// reason and a little background, short enough not to hold the next
-	// song back for long.
+	// reason and a little background, short enough to be over before the
+	// song's voice comes in.
 	djMax = 52
 	// djDuck is how much of the music is heard while the voice speaks.
-	djDuck = 0.22
-	// djRetry is how long the app waits for the next track, or its line,
-	// to be ready before looking again.
+	djDuck = 0.28
+	// djRetry is how long the app waits to look again for a line not yet
+	// made.
 	djRetry = 2 * time.Second
 )
 
@@ -41,18 +44,15 @@ type djClip struct {
 	err   error
 }
 
-// djState is the voice between songs, and what it is saying.
+// djState is the voice over the songs, and what it is saying.
 type djState struct {
-	voice  *dj.Voice
-	clips  map[int64]*djClip // by the track introduced
+	voice *dj.Voice
+	clips map[int64]*djClip // by the track it speaks of
 
 	timer    *time.Timer
 	gen      int // counts schedules, to drop those overtaken
 	player   *audio.Player
 	track    int64 // the track the voice speaks over
-	at       int64 // the track it introduces
-	next     *netease.Track
-	held     bool // the queue waits for the voice
 	said     int64
 	pausedBy bool // the voice is paused with the music
 }
@@ -121,35 +121,44 @@ func (a *app) djFacts(tr *netease.Track) dj.Facts {
 	return f
 }
 
-// djPrefetch writes and makes what the host will say about the next
-// track, while the one playing has minutes to go.
+// djPrefetch writes and makes the lines the host will need: the one for
+// the track playing, when it has none yet, and the one for the track
+// next in line, so that it is ready the moment its song begins.
 func (a *app) djPrefetch() {
 	if !a.djActive() {
 		return
 	}
-	next := a.djNext()
-	if next == nil {
-		return
+	if tr := a.pl.Current(); tr != nil {
+		if _, ok := a.dj.clips[tr.ID]; !ok {
+			a.djMake(tr)
+		}
 	}
-	if _, ok := a.dj.clips[next.ID]; ok {
-		return
+	if next := a.djNext(); next != nil {
+		if _, ok := a.dj.clips[next.ID]; !ok {
+			a.djMake(next)
+		}
 	}
+}
+
+// djMake writes and speaks one line, off the main thread: the track's
+// facts, a script from them, and the voice that says it.
+func (a *app) djMake(tr *netease.Track) {
 	clip := &djClip{}
-	a.dj.clips[next.ID] = clip
-	f := a.djFacts(next)
-	tr := *next
+	a.dj.clips[tr.ID] = clip
+	f := a.djFacts(tr)
+	cp := *tr
 	go func() {
 		// Where the track comes from, as its album says: the year, and a
 		// word of what the album is about.
-		if tr.Album.ID != 0 {
-			if al, err := netease.AlbumDetail(tr.Album.ID); err == nil {
+		if cp.Album.ID != 0 {
+			if al, err := netease.AlbumDetail(cp.Album.ID); err == nil {
 				if al.PublishTime > 0 {
 					f.Year = time.UnixMilli(al.PublishTime).Year()
 				}
 				f.Note = al.Description
 			}
 		}
-		r := rand.New(rand.NewPCG(uint64(tr.ID), uint64(time.Now().UnixNano())))
+		r := rand.New(rand.NewPCG(uint64(cp.ID), uint64(time.Now().UnixNano())))
 		text := dj.Script(f, r, djMax)
 		if text == "" {
 			a.post(func() {
@@ -160,22 +169,17 @@ func (a *app) djPrefetch() {
 		snd, err := a.dj.voice.Say(text)
 		a.post(func() {
 			clip.text, clip.sound, clip.err, clip.ready = text, snd, err, true
-			// Now that the line is ready, it can be timed.
-			a.djSchedule()
+			// A line for the song playing can still catch its first bars.
+			a.djArm()
 		})
 	}()
 }
 
-// djLead is how long before the song ends the voice begins: it speaks
-// over the song's own fade, and goes on into the gap, so that the next
-// song is not held back for the whole line.
-func djLead(d time.Duration) time.Duration {
-	return min(900*time.Millisecond+d/4, 2600*time.Millisecond)
-}
-
-// djSchedule times the host's line for the track playing: it begins a
-// little before the end, so that it crosses the gap.
-func (a *app) djSchedule() {
+// djArm arms the host for the song playing: when its line is ready, the
+// voice opens the song, over its first bars. A line still being made
+// gets another look in a moment; one that arrives late can still catch
+// the song's first half.
+func (a *app) djArm() {
 	a.dj.gen++
 	gen := a.dj.gen
 	if a.dj.timer != nil {
@@ -189,68 +193,43 @@ func (a *app) djSchedule() {
 	if tr == nil || a.dj.said == tr.ID {
 		return
 	}
-	next := a.djNext()
-	if next == nil {
+	clip := a.dj.clips[tr.ID]
+	if clip == nil || !clip.ready {
 		a.djLater(gen)
 		return
 	}
-	clip := a.dj.clips[next.ID]
-	switch {
-	case clip == nil, !clip.ready:
-		// Not made yet: look again in a moment.
-		a.djLater(gen)
-		return
-	case clip.sound == nil:
-		// It failed: nothing to say, and no use asking again.
-		return
+	if clip.sound == nil {
+		return // it failed: nothing to say, and no use asking again
 	}
-	left := a.pl.Duration() - a.pl.Position()
-	if left <= 0 {
-		return
+	if left := a.pl.Duration() - a.pl.Position(); left > 0 &&
+		clip.sound.Duration() > left-time.Second {
+		return // the song is nearly over; the next one will have its own
 	}
-	delay := left - djLead(clip.sound.Duration())
-	if delay < 0 {
-		delay = 0
-	}
-	id := tr.ID
-	a.dj.timer = time.AfterFunc(delay, func() {
-		a.post(func() {
-			if gen != a.dj.gen {
-				return
-			}
-			cur := a.pl.Current()
-			if cur == nil || cur.ID != id || !a.pl.Playing() {
-				return
-			}
-			a.djStart(id, next, clip)
-		})
-	})
+	a.djStart(tr.ID, clip)
 }
 
-// djLater looks again in a moment, for a next track or its line not yet
-// ready.
+// djLater looks again in a moment, for a line still being made.
 func (a *app) djLater(gen int) {
 	a.dj.timer = time.AfterFunc(djRetry, func() {
 		a.post(func() {
 			if gen == a.dj.gen {
-				a.djSchedule()
+				a.djArm()
 			}
 		})
 	})
 }
 
-// djStart lets the host speak over the end of the track playing.
-func (a *app) djStart(track int64, next *netease.Track, clip *djClip) {
+// djStart lets the host speak over the song's first bars.
+func (a *app) djStart(track int64, clip *djClip) {
 	if a.dj.player != nil {
 		return
 	}
-	a.dj.track, a.dj.at, a.dj.next = track, next.ID, next
-	a.dj.said, a.dj.held, a.dj.pausedBy = track, false, false
+	a.dj.track, a.dj.said, a.dj.pausedBy = track, track, false
 	p := clip.sound.Play()
 	p.SetSpeed(a.dj.voice.Speed())
 	p.SetVolume(a.volume * a.volume)
 	a.dj.player = p
-	a.pl.Duck(djDuck, 360*time.Millisecond)
+	a.pl.Duck(djDuck, 420*time.Millisecond)
 	p.OnEnd(func() {
 		a.post(func() {
 			if a.dj.player != p {
@@ -262,7 +241,7 @@ func (a *app) djStart(track int64, next *netease.Track, clip *djClip) {
 	a.redraw()
 }
 
-// djFinish ends the host's line, and lets the music go on.
+// djFinish ends the host's line, and lets the music come back up.
 func (a *app) djFinish() {
 	p := a.dj.player
 	a.dj.player, a.dj.pausedBy = nil, false
@@ -270,12 +249,6 @@ func (a *app) djFinish() {
 		p.Close()
 	}
 	a.pl.Duck(1, 520*time.Millisecond)
-	held := a.dj.held
-	a.dj.held = false
-	if held {
-		a.pl.Resume()
-	}
-	a.djSchedule()
 	a.redraw()
 }
 
@@ -286,36 +259,19 @@ func (a *app) djCancel() {
 		a.dj.timer.Stop()
 		a.dj.timer = nil
 	}
-	if a.dj.player == nil && !a.dj.held {
+	if a.dj.player == nil {
 		return
 	}
 	p := a.dj.player
-	a.dj.player, a.dj.held, a.dj.pausedBy = nil, false, false
-	if p != nil {
-		p.Close()
-	}
+	a.dj.player, a.dj.pausedBy = nil, false
+	p.Close()
 	a.pl.Duck(1, 280*time.Millisecond)
 	a.redraw()
 }
 
-// djInterlude keeps the queue where it is when a track ends while the
-// host still speaks: the next song waits for the voice. A voice for
-// another track than the one next in line says nothing more.
-func (a *app) djInterlude(next *netease.Track) bool {
-	if next == nil || a.dj.player == nil {
-		return false
-	}
-	if a.dj.at != next.ID {
-		a.djCancel()
-		return false
-	}
-	a.dj.held = true
-	return true
-}
-
-// djChanged follows the player: it makes the next line, times it, lets
-// the voice pause and resume with the music, and stops it when the
-// listener goes elsewhere.
+// djChanged follows the player: it stops the voice when the song
+// changes, lets it pause and resume with the music, and arms it for the
+// song that is playing now.
 func (a *app) djChanged() {
 	if a.pl == nil {
 		return
@@ -324,24 +280,24 @@ func (a *app) djChanged() {
 		cur := a.pl.Current()
 		if cur == nil || cur.ID != a.dj.track {
 			a.djCancel()
-			return
+		} else {
+			switch {
+			case !a.pl.Playing() && !a.dj.pausedBy && a.dj.player.Playing():
+				a.dj.player.Pause()
+				a.dj.pausedBy = true
+			case a.pl.Playing() && a.dj.pausedBy:
+				a.dj.player.Play()
+				a.dj.pausedBy = false
+			}
+			a.dj.player.SetVolume(a.volume * a.volume)
 		}
-		switch {
-		case !a.pl.Playing() && !a.dj.pausedBy && a.dj.player.Playing():
-			a.dj.player.Pause()
-			a.dj.pausedBy = true
-		case a.pl.Playing() && a.dj.pausedBy:
-			a.dj.player.Play()
-			a.dj.pausedBy = false
-		}
-		a.dj.player.SetVolume(a.volume * a.volume)
 	}
 	a.djPrefetch()
-	a.djSchedule()
+	a.djArm()
 }
 
 // djSpeaking reports whether the host speaks now.
-func (a *app) djSpeaking() bool { return a.dj.player != nil && a.dj.next != nil }
+func (a *app) djSpeaking() bool { return a.dj.player != nil }
 
 // djToggle turns the host on or off, as the FM page's button does.
 func (a *app) djToggle() {
@@ -350,7 +306,7 @@ func (a *app) djToggle() {
 	if !a.settings.DJ {
 		a.djCancel()
 	}
-	a.djSchedule()
+	a.djArm()
 	a.redraw()
 }
 
@@ -392,12 +348,15 @@ func (a *app) djToggleButton(c *ui.Context, p palette) ui.Element {
 }
 
 // djLive is what the FM card shows while the host speaks: a microphone,
-// a few bars moving with the voice, and the song it introduces.
+// a few bars moving with the voice, and the song it speaks of.
 func (a *app) djLive(c *ui.Context) {
 	if !a.djSpeaking() {
 		return
 	}
-	title := a.dj.next.Name
+	title := ""
+	if tr := a.pl.Current(); tr != nil {
+		title = tr.Name
+	}
 	ui.Row(c).Margin(2, 0, 4, 0).Gap(8).AlignItems(ui.Center).Children(func() {
 		ui.Icon(c, iconMic).Size(13, 13).TextColor(white.Alpha(0.92))
 		ui.Text(c, "DJ 讲解中").FontSize(12.5).FontWeight(700).TextColor(white.Alpha(0.94)).SingleLine()
@@ -412,6 +371,6 @@ func (a *app) djLive(c *ui.Context) {
 			}
 			dr.AnimationFrameRate(30)
 		})
-		ui.Text(c, "接下来《"+title+"》").FontSize(12.5).TextColor(white.Alpha(0.62)).SingleLine()
+		ui.Text(c, "正在介绍《"+title+"》").FontSize(12.5).TextColor(white.Alpha(0.62)).SingleLine()
 	})
 }

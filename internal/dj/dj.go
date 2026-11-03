@@ -1,10 +1,11 @@
 // Package dj is the voice between songs: it writes what a radio host
 // would say about a track, why the personal FM picked it, where it comes
-// from, and how it sounds, and speaks it in a warm Mandarin voice made on
-// the device by the system's own synthesizer.
+// from, and how it sounds, and speaks it in a warm Mandarin voice as the
+// song begins.
 //
-// Nothing leaves the device: the voice is the one macOS already has, and
-// what it says is kept on disk, so a line is made once.
+// The voice is the speech service's natural one when the network has it,
+// and the system's own synthesizer when it does not; what is said is
+// kept on disk, so a line is made once.
 package dj
 
 import (
@@ -17,6 +18,7 @@ import (
 	"math/rand/v2"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"unicode/utf8"
@@ -223,13 +225,12 @@ func pick(r *rand.Rand, xs ...string) string {
 	return xs[r.IntN(len(xs))]
 }
 
-// A Voice speaks text with the system's voice, and keeps what it said: on
-// disk, so a line is made once, and in memory, so it plays at once.
+// A Voice speaks text, and keeps what it said: on disk, so a line is
+// made once, and in memory, so it plays at once. It asks the speech
+// service for its natural voice first, and falls back to the system's
+// own synthesizer when the network has none.
 type Voice struct {
-	dir   string
-	rate  int
-	pitch int
-	speed float64
+	dir string
 
 	mu   sync.Mutex
 	said map[string]*audio.Sound
@@ -240,17 +241,13 @@ type Voice struct {
 // when dir is "".
 func New(dir string) *Voice {
 	return &Voice{
-		dir:   dir,
-		rate:  178,  // a touch quicker than the default: unhurried, not slow
-		pitch: 40,   // below the voice's own, for a deeper, warmer cast
-		speed: 0.96, // played a hair slower, which lowers it a little more
-		said:  map[string]*audio.Sound{},
+		dir:  dir,
+		said: map[string]*audio.Sound{},
 	}
 }
 
-// Speed is how fast the voice plays its clips, a little under one, which
-// takes the edge off and lets it sit lower.
-func (v *Voice) Speed() float64 { return v.speed }
+// Speed is how fast the voice plays its clips: one, the natural pace.
+func (v *Voice) Speed() float64 { return 1 }
 
 // Say returns text as a sound, made once and kept.
 func (v *Voice) Say(text string) (*audio.Sound, error) {
@@ -261,16 +258,14 @@ func (v *Voice) Say(text string) (*audio.Sound, error) {
 	if s := v.remember(text); s != nil {
 		return s, nil
 	}
-	if !available() {
-		return nil, ErrUnavailable
-	}
-	path := ""
+	// The shelf keeps what past sessions said, whichever voice said it.
 	if v.dir != "" {
-		path = filepath.Join(v.dir, v.key(text)+".wav")
-		if b, err := os.ReadFile(path); err == nil {
-			if s, err := audio.DecodeSound(b); err == nil {
-				v.keep(text, s)
-				return s, nil
+		for _, engine := range []string{"edge", "say"} {
+			if b, err := os.ReadFile(filepath.Join(v.dir, v.key(engine, text)+".wav")); err == nil {
+				if s, err := audio.DecodeSound(b); err == nil {
+					v.keep(text, s)
+					return s, nil
+				}
 			}
 		}
 	}
@@ -280,16 +275,13 @@ func (v *Voice) Say(text string) (*audio.Sound, error) {
 	if s := v.remember(text); s != nil {
 		return s, nil
 	}
-	raw, err := synthesize(text, v.rate, v.pitch)
-	if err != nil {
-		return nil, err
-	}
-	rate, samples, err := mastered(raw)
+	rate, samples, engine, err := v.make(text)
 	if err != nil {
 		return nil, err
 	}
 	s := audio.NewSound(rate, 1, samples)
-	if path != "" {
+	if v.dir != "" {
+		path := filepath.Join(v.dir, v.key(engine, text)+".wav")
 		if b, err := encodeWAV(rate, samples); err == nil {
 			if os.MkdirAll(v.dir, 0o700) == nil {
 				tmp := path + ".tmp"
@@ -303,8 +295,41 @@ func (v *Voice) Say(text string) (*audio.Sound, error) {
 	return s, nil
 }
 
-func (v *Voice) key(text string) string {
-	h := sha1.Sum([]byte(fmt.Sprintf("%s|%d|%d|%s", voiceName(), v.rate, v.pitch, text)))
+// make turns text into mono samples: the service's voice when it
+// answers, the system's own when it does not.
+func (v *Voice) make(text string) (rate int, samples []float32, engine string, err error) {
+	if raw, e := edgeSynthesize(text); e == nil {
+		if r, s, e := decodeMP3(raw); e == nil {
+			masterNatural(r, s)
+			return r, s, "edge", nil
+		}
+	}
+	if !available() {
+		return 0, nil, "", ErrUnavailable
+	}
+	raw, e := synthesize(text, sayRate, sayPitch)
+	if e != nil {
+		return 0, nil, "", e
+	}
+	r, s, e := mastered(raw)
+	if e != nil {
+		return 0, nil, "", e
+	}
+	return r, s, "say", nil
+}
+
+// The two voices' settings, which name what a cache file holds.
+const (
+	sayRate  = 178
+	sayPitch = 40
+)
+
+func (v *Voice) key(engine, text string) string {
+	params := edgeVoice + "|" + edgePitch + "|" + edgeRate
+	if engine != "edge" {
+		params = voiceName() + "|" + strconv.Itoa(sayRate) + "|" + strconv.Itoa(sayPitch)
+	}
+	h := sha1.Sum([]byte(engine + "|" + params + "|" + text))
 	return hex.EncodeToString(h[:])
 }
 

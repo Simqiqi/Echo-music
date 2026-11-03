@@ -185,7 +185,7 @@ func (a *app) settingsBody(c *ui.Context, p palette, liquid bool) {
 			}
 		})
 		if a.dj.voice != nil {
-			row("DJ 讲解", "私人 FM 在歌曲间隙用女声介绍推荐理由、创作背景与曲风，像电台 DJ 在你耳边串讲", func() {
+			row("DJ 讲解", "私人 FM 在每首歌开始时用女声介绍它、推荐理由与创作背景，像电台 DJ 在你耳边串讲", func() {
 				on := s.DJ
 				if ui.Switch(c.Key("dj"), &on).Label("DJ 讲解").Changed() {
 					s.DJ = on
@@ -193,7 +193,7 @@ func (a *app) settingsBody(c *ui.Context, p palette, liquid bool) {
 						a.djCancel()
 					}
 					a.changed()
-					a.djSchedule()
+					a.djArm()
 				}
 			})
 		}

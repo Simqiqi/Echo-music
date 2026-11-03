@@ -9,33 +9,65 @@ import (
 	"netease-music-mygo/internal/netease"
 )
 
-// The host speaks over the end of a track, and the queue waits for it: a
-// voice for the track next in line holds it, one for another does not,
-// and a cancel lets it go at once.
-func TestDJInterlude(t *testing.T) {
+// The host opens the song playing: when its line is ready, the voice
+// starts; while the music rests it keeps quiet; and a cancel stops the
+// voice at once.
+func TestDJArm(t *testing.T) {
 	a := newTestApp()
 	a.dj.clips = map[int64]*djClip{}
-	a.pl.Cue([]netease.Track{{ID: 1, Name: "一"}, {ID: 2, Name: "二"}})
-	next := &netease.Track{ID: 2, Name: "二"}
-	if a.djInterlude(next) {
-		t.Fatal("held with no voice")
-	}
 	a.dj.voice = dj.New(t.TempDir())
-	a.dj.at, a.dj.next = 2, next
-	a.dj.player = audio.NewSound(8000, 1, nil).NewPlayer()
-	if !a.djInterlude(next) {
-		t.Fatal("did not hold for the voice")
+	a.settings.DJ = true
+	a.pl.AttachRadio("fm:推荐", nil)
+	a.pl.Cue([]netease.Track{{ID: 1, Name: "一", Duration: 240000}})
+	// The queue rests: nothing speaks.
+	clip := &djClip{ready: true, sound: audio.NewSound(22050, 1, make([]float32, 22050))}
+	a.dj.clips[1] = clip
+	a.djArm()
+	if a.dj.player != nil {
+		t.Fatal("spoke while the music was not playing")
 	}
-	if !a.dj.held {
-		t.Fatal("the hold was not marked")
+	// Playing, it speaks, and the music ducks under it.
+	a.pl.Hold(0)
+	a.djArm()
+	if a.dj.player == nil {
+		t.Fatal("did not speak for the song playing")
 	}
-	if a.djInterlude(&netease.Track{ID: 3, Name: "三"}) {
-		t.Fatal("held for another track")
+	if a.dj.track != 1 || a.dj.said != 1 {
+		t.Fatalf("spoke of the wrong track: %d", a.dj.track)
 	}
 	a.djCancel()
-	if a.dj.player != nil || a.dj.held {
-		t.Fatal("the cancel left a voice or a hold")
+	if a.dj.player != nil {
+		t.Fatal("the cancel left a voice")
 	}
+	// A line that failed says nothing, and is not asked again.
+	a.dj.clips[1] = &djClip{ready: true, err: dj.ErrNothing}
+	a.dj.said = 0
+	a.djArm()
+	if a.dj.player != nil {
+		t.Fatal("spoke with no sound")
+	}
+}
+
+// A song whose line is not ready yet does not speak, and the next look
+// is scheduled. The line is written for the song playing too, so that it
+// can catch the song's first bars.
+func TestDJArmWaitsForTheLine(t *testing.T) {
+	a := newTestApp()
+	a.dj.clips = map[int64]*djClip{}
+	a.dj.voice = dj.New(t.TempDir())
+	a.settings.DJ = true
+	a.pl.AttachRadio("fm:推荐", nil)
+	a.pl.Cue([]netease.Track{{ID: 1, Name: "一", Duration: 240000}})
+	a.pl.Hold(0)
+	a.djArm()
+	if a.dj.player != nil {
+		t.Fatal("spoke before the line was made")
+	}
+	if a.dj.timer == nil {
+		t.Fatal("did not plan another look")
+	}
+	a.dj.gen++
+	a.dj.timer.Stop()
 }
 
 // The host speaks only when the listener asked for it and there is a

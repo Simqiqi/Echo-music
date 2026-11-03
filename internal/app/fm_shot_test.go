@@ -85,8 +85,8 @@ func TestFMFrame(t *testing.T) {
 		name = "fm-dark.png"
 	}
 	render(name)
-	// The host speaking, so the card shows what it says between songs.
+	// The host speaking, so the card shows what it says over the song.
 	a.dj.player = audio.NewSound(22050, 1, make([]float32, 22050)).NewPlayer()
-	a.dj.next = &tracks[3]
+	a.dj.track = tracks[3].ID
 	render(strings.TrimSuffix(name, ".png") + "-dj.png")
 }

@@ -4,76 +4,7 @@ import (
 	"math"
 	"testing"
 	"time"
-
-	"netease-music-mygo/internal/netease"
 )
-
-// An interlude keeps the queue at a natural end, and Resume goes on from
-// there: to the next track, or to a stop at the queue's end.
-func TestInterludeHoldsAndResumes(t *testing.T) {
-	ch, p := posted()
-	defer p.out.Close()
-	p.Cue([]netease.Track{{ID: 1, Name: "一", Duration: 600000}, {ID: 2, Name: "二", Duration: 600000}})
-	held := false
-	p.Interlude = func(next *netease.Track) bool {
-		if next != nil && next.ID == 2 {
-			held = true
-			return true
-		}
-		return false
-	}
-	p.ended()
-	if !held || !p.held {
-		t.Fatal("did not hold at the natural end")
-	}
-	if p.at != 0 || p.Current().ID != 1 {
-		t.Fatalf("moved on while held: at %d", p.at)
-	}
-	p.Resume()
-	if p.held {
-		t.Fatal("still held")
-	}
-	if p.at != 1 || p.Current().ID != 2 {
-		t.Fatalf("did not resume to the next track: at %d", p.at)
-	}
-	// What was posted of the load runs, and nothing is left behind.
-	for i := 0; i < 4; i++ {
-		select {
-		case fn := <-ch:
-			fn()
-		case <-time.After(200 * time.Millisecond):
-		}
-	}
-}
-
-// No interlude, the next track loads at once, as before.
-func TestInterludeLetsTheQueueGo(t *testing.T) {
-	_, p := posted()
-	defer p.out.Close()
-	p.Cue([]netease.Track{{ID: 1, Name: "一", Duration: 600000}, {ID: 2, Name: "二", Duration: 600000}})
-	p.Interlude = func(*netease.Track) bool { return false }
-	p.ended()
-	if p.at != 1 || p.Current().ID != 2 {
-		t.Fatalf("did not go on: at %d", p.at)
-	}
-}
-
-// Held at the queue's end, with nothing after and no repeat, Resume
-// stops.
-func TestInterludeEndsTheQueue(t *testing.T) {
-	_, p := posted()
-	defer p.out.Close()
-	p.Cue([]netease.Track{{ID: 1, Name: "一", Duration: 600000}})
-	p.Interlude = func(*netease.Track) bool { return true }
-	p.ended()
-	if !p.held {
-		t.Fatal("did not hold")
-	}
-	p.Resume()
-	if p.playing {
-		t.Fatal("played on past the end")
-	}
-}
 
 // Ducking lowers what is heard, and letting go brings it back.
 func TestDuck(t *testing.T) {

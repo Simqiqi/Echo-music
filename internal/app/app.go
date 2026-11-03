@@ -261,9 +261,6 @@ func Run() error {
 			a.syncCaptions()
 			a.djChanged()
 		}
-		// Between the FM's songs, the app may let a host speak: see
-		// ui_dj.go.
-		a.pl.Interlude = a.djInterlude
 		a.initDJ()
 		a.weekly = newWeekly()
 		// The weather is read from what was kept before the window
