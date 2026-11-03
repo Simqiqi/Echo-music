@@ -1,8 +1,8 @@
 package app
 
 import (
-	"netease-music-mygo/internal/netease"
-	"netease-music-mygo/internal/player"
+	"github.com/simqiqi/simqiqi-music/internal/netease"
+	"github.com/simqiqi/simqiqi-music/internal/player"
 )
 
 func newTestApp() *app {

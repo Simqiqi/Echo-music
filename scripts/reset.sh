@@ -13,7 +13,7 @@
 set -euo pipefail
 
 name="Echo云音乐"
-id="dev.egoist.cloudmusic"
+id="com.simqiqi.echo"
 release=0 keep_login=0 songs=0
 for arg in "$@"; do
 	case "$arg" in

@@ -6,7 +6,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
-	"netease-music-mygo/internal/netease"
+	"github.com/simqiqi/simqiqi-music/internal/netease"
 )
 
 // The count on the comments' tab holds the last song's while the next

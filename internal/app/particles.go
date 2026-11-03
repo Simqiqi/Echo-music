@@ -8,9 +8,9 @@ import (
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/shader"
 
-	"netease-music-mygo/internal/lyrics"
-	"netease-music-mygo/internal/netease"
-	"netease-music-mygo/internal/player"
+	"github.com/simqiqi/simqiqi-music/internal/lyrics"
+	"github.com/simqiqi/simqiqi-music/internal/netease"
+	"github.com/simqiqi/simqiqi-music/internal/player"
 )
 
 // The particle record is the cover of the song playing shattered into

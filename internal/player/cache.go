@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"netease-music-mygo/internal/netease"
+	"github.com/simqiqi/simqiqi-music/internal/netease"
 )
 
 // Cache keeps the songs played on disk, so that they play again at once,
@@ -196,11 +196,11 @@ func (c *Cache) Remove(path string) {
 
 // DownloadEntry is a song kept on disk, as the downloads page lists it.
 type DownloadEntry struct {
-	ID     int64           // the song's NetEase id
-	Level  string          // the stream level held
-	Path   string          // where the audio file is
-	Size   int64           // its bytes
-	Used   time.Time       // when it was last played or fetched
+	ID     int64          // the song's NetEase id
+	Level  string         // the stream level held
+	Path   string         // where the audio file is
+	Size   int64          // its bytes
+	Used   time.Time      // when it was last played or fetched
 	Stream netease.Stream // what its sidecar metadata says it is
 }
 

@@ -1,4 +1,4 @@
-module netease-music-mygo
+module github.com/simqiqi/simqiqi-music
 
 go 1.27.3
 

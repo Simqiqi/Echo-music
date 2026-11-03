@@ -10,7 +10,8 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
-	"netease-music-mygo/internal/netease"
+	"github.com/simqiqi/simqiqi-music/internal/fx"
+	"github.com/simqiqi/simqiqi-music/internal/netease"
 )
 
 func TestBackdropStyle(t *testing.T) {
@@ -45,7 +46,7 @@ func starSky(t *testing.T, w, h int, tint ui.Color, drift, bass float32) *image.
 	t.Helper()
 	view := func(c *ui.Context) {
 		ui.Box(c).Absolute().Top(0).Left(0).Right(0).Bottom(0).Draw(func(p *ui.Painter, r ui.Rect) {
-			drawStars(p, r, tint, drift, bass)
+			fx.DrawStars(p, r, tint, drift, bass)
 		})
 	}
 	tt := ui.NewTester(view, w, h)

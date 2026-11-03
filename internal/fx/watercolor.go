@@ -1,4 +1,4 @@
-package app
+package fx
 
 import (
 	"sync"
@@ -131,24 +131,24 @@ func Fragment(dst vec4, pos vec2) vec4 {
 
 var waterShader = sync.OnceValue(func() *shader.Shader { return shader.MustCompile(waterSource) })
 
-// waterInks returns the paper and the three inks of a cover of tint: the
+// WaterInks returns the paper and the three inks of a cover of tint: the
 // paper near black, and each ink its own hue a step from the cover's, so
 // that they argue a little where they meet.
-func waterInks(tint ui.Color) (paper, w1, w2, w3 ui.Color) {
-	h, s, _ := hsv(float64(tint.R)/255, float64(tint.G)/255, float64(tint.B)/255)
+func WaterInks(tint ui.Color) (paper, w1, w2, w3 ui.Color) {
+	h, s, _ := HSV(float64(tint.R)/255, float64(tint.G)/255, float64(tint.B)/255)
 	if s > 0.12 {
 		s = min(max(s*1.3, 0.55), 0.9)
 	}
-	return hsvColor(h, s*0.3, 0.052),
-		hsvColor(h, s*0.8, 0.46),
-		hsvColor(float64(wrapHue(float32(h)+36)), s*0.72, 0.36),
-		hsvColor(float64(wrapHue(float32(h)-28)), s*0.85, 0.62)
+	return HSVColor(h, s*0.3, 0.052),
+		HSVColor(h, s*0.8, 0.46),
+		HSVColor(float64(WrapHue(float32(h)+36)), s*0.72, 0.36),
+		HSVColor(float64(WrapHue(float32(h)-28)), s*0.85, 0.62)
 }
 
-// drawWatercolor paints the washes of tint in r at drift seconds: wet, and
+// DrawWatercolor paints the washes of tint in r at drift seconds: wet, and
 // running, opening wider and dropping faster as bass does.
-func drawWatercolor(p *ui.Painter, r ui.Rect, tint ui.Color, drift, bass float32) {
-	paper, w1, w2, w3 := waterInks(tint)
+func DrawWatercolor(p *ui.Painter, r ui.Rect, tint ui.Color, drift, bass float32) {
+	paper, w1, w2, w3 := WaterInks(tint)
 	waterShader().Draw(p, r, shader.Options{Uniforms: map[string]any{
 		"Time": drift, "Bass": min(bass, 1),
 		"Paper": paper, "W1": w1, "W2": w2, "W3": w3,

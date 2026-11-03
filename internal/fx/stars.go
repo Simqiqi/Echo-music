@@ -1,4 +1,4 @@
-package app
+package fx
 
 import (
 	"sync"
@@ -112,23 +112,23 @@ func Fragment(dst vec4, pos vec2) vec4 {
 
 var starShader = sync.OnceValue(func() *shader.Shader { return shader.MustCompile(starSource) })
 
-// drawStars paints the star field of tint in r at drift seconds, lit by
+// DrawStars paints the star field of tint in r at drift seconds, lit by
 // bass.
-func drawStars(p *ui.Painter, r ui.Rect, tint ui.Color, drift, bass float32) {
-	deep, glow := starColors(tint)
+func DrawStars(p *ui.Painter, r ui.Rect, tint ui.Color, drift, bass float32) {
+	deep, glow := StarColors(tint)
 	starShader().Draw(p, r, shader.Options{Uniforms: map[string]any{
 		"Time": drift, "Bass": min(bass, 1), "Deep": deep, "Glow": glow,
 	}})
 }
 
-// starColors returns the night behind the stars and the color of the
+// StarColors returns the night behind the stars and the color of the
 // nebula in it for a cover of tint: its hue, very dark, and the same,
 // dim, whatever the cover, so that white reads over it. A gray cover
 // stays gray.
-func starColors(tint ui.Color) (deep, glow ui.Color) {
-	h, s, _ := hsv(float64(tint.R)/255, float64(tint.G)/255, float64(tint.B)/255)
+func StarColors(tint ui.Color) (deep, glow ui.Color) {
+	h, s, _ := HSV(float64(tint.R)/255, float64(tint.G)/255, float64(tint.B)/255)
 	if s > 0.12 {
 		s = min(max(s*1.2, 0.4), 0.75)
 	}
-	return hsvColor(h, s*0.55, 0.075), hsvColor(h, s*0.72, 0.36)
+	return HSVColor(h, s*0.55, 0.075), HSVColor(h, s*0.72, 0.36)
 }

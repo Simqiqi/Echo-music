@@ -6,7 +6,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
-	"netease-music-mygo/internal/lyrics"
+	"github.com/simqiqi/simqiqi-music/internal/lyrics"
 )
 
 // lyricPeek shows the line being sung and the one after it, at the foot of

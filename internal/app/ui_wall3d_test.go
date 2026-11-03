@@ -10,7 +10,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
-	"netease-music-mygo/internal/netease"
+	"github.com/simqiqi/simqiqi-music/internal/netease"
 )
 
 // wall3App is an app showing the wall turning in depth, of a queue of n

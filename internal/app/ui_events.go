@@ -7,7 +7,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
-	"netease-music-mygo/internal/netease"
+	"github.com/simqiqi/simqiqi-music/internal/netease"
 )
 
 // artistEvents lists what an artist posted, a page at a time.

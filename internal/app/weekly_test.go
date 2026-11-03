@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"netease-music-mygo/internal/netease"
-	"netease-music-mygo/internal/player"
+	"github.com/simqiqi/simqiqi-music/internal/netease"
+	"github.com/simqiqi/simqiqi-music/internal/player"
 )
 
 // The week's report gathers the days up: minutes and songs from the Monday

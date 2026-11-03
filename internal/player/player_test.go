@@ -9,7 +9,7 @@ import (
 
 	"github.com/egoist/mygo/audio"
 
-	"netease-music-mygo/internal/netease"
+	"github.com/simqiqi/simqiqi-music/internal/netease"
 )
 
 func TestPlayEmptyQueue(t *testing.T) {

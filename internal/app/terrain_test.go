@@ -9,7 +9,8 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
-	"netease-music-mygo/internal/netease"
+	"github.com/simqiqi/simqiqi-music/internal/fx"
+	"github.com/simqiqi/simqiqi-music/internal/netease"
 )
 
 // scenePaint paints a window w by h with draw, and returns what it holds.
@@ -30,7 +31,7 @@ func TestTerrainPaints(t *testing.T) {
 	bass := [8]float32{0.95, 0.65, 0.8, 0.4, 0.55, 0.3, 0.6, 0.25}
 	treble := [8]float32{0.15, 0.3, 0.35, 0.45, 0.6, 0.75, 0.9, 0.95}
 	sky := scenePaint(t, 600, 400, func(p *ui.Painter, r ui.Rect) {
-		drawTerrain(p, r, tint, 3.2, bass, 0.6)
+		fx.DrawTerrain(p, r, tint, 3.2, bass, 0.6)
 	})
 	if dir := os.Getenv("NM_SHOTS"); dir != "" {
 		saveFrame(t, dir, "terrain.png", sky)
@@ -45,7 +46,7 @@ func TestTerrainPaints(t *testing.T) {
 	}
 	// Bass at the left, treble at the right: the two spectra stand apart.
 	other := scenePaint(t, 600, 400, func(p *ui.Painter, r ui.Rect) {
-		drawTerrain(p, r, tint, 3.2, treble, 0.6)
+		fx.DrawTerrain(p, r, tint, 3.2, treble, 0.6)
 	})
 	same := 0
 	for x := 0; x < 600; x += 7 {
@@ -76,7 +77,7 @@ func TestRipplePaints(t *testing.T) {
 	bmp := ui.NewBitmap(cover)
 	defer bmp.ReleasePixels()
 	img := scenePaint(t, 600, 400, func(p *ui.Painter, r ui.Rect) {
-		drawRipple(p, r, bmp, ui.RGB(52, 84, 176), 4.4, 0.5)
+		fx.DrawRipple(p, r, bmp, ui.RGB(52, 84, 176), 4.4, 0.5)
 	})
 	if dir := os.Getenv("NM_SHOTS"); dir != "" {
 		saveFrame(t, dir, "ripple.png", img)
@@ -140,17 +141,17 @@ func TestVinylPaints(t *testing.T) {
 	cover := ui.Rect{X: 160, Y: 200, W: 320, H: 320}
 	for _, at := range []float32{0, 2.6} {
 		img := scenePaint(t, 1200, 800, func(p *ui.Painter, r ui.Rect) {
-			drawVinyl(p, r, r.W, cover, ui.RGB(52, 84, 176), at)
+			fx.DrawVinyl(p, r, r.W, cover, ui.RGB(52, 84, 176), at)
 		})
 		if dir := os.Getenv("NM_SHOTS"); dir != "" {
 			saveFrame(t, dir, "vinyl-"+strconv.Itoa(int(at*10))+".png", img)
 		}
 	}
 	a := scenePaint(t, 1200, 800, func(p *ui.Painter, r ui.Rect) {
-		drawVinyl(p, r, r.W, cover, ui.RGB(52, 84, 176), 0)
+		fx.DrawVinyl(p, r, r.W, cover, ui.RGB(52, 84, 176), 0)
 	})
 	b := scenePaint(t, 1200, 800, func(p *ui.Painter, r ui.Rect) {
-		drawVinyl(p, r, r.W, cover, ui.RGB(52, 84, 176), 2.6)
+		fx.DrawVinyl(p, r, r.W, cover, ui.RGB(52, 84, 176), 2.6)
 	})
 	// The disc turns: the grooves of one frame are not the other's.
 	same := 0
@@ -170,7 +171,7 @@ func TestVinylPaints(t *testing.T) {
 // flat: the paper has light and shade of its own.
 func TestWaterPaints(t *testing.T) {
 	img := scenePaint(t, 1200, 800, func(p *ui.Painter, r ui.Rect) {
-		drawWatercolor(p, r, ui.RGB(52, 84, 176), 5, 0.4)
+		fx.DrawWatercolor(p, r, ui.RGB(52, 84, 176), 5, 0.4)
 	})
 	if dir := os.Getenv("NM_SHOTS"); dir != "" {
 		saveFrame(t, dir, "water.png", img)
@@ -244,7 +245,7 @@ func TestWaterMoves(t *testing.T) {
 	tint := ui.RGB(52, 84, 176)
 	paint := func(at float32) image.Image {
 		return scenePaint(t, 480, 300, func(p *ui.Painter, r ui.Rect) {
-			drawWatercolor(p, r, tint, at, 0.3)
+			fx.DrawWatercolor(p, r, tint, at, 0.3)
 		})
 	}
 	a, b := paint(0), paint(4)

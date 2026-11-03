@@ -6,8 +6,8 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
-	"netease-music-mygo/internal/lyrics"
-	"netease-music-mygo/internal/netease"
+	"github.com/simqiqi/simqiqi-music/internal/lyrics"
+	"github.com/simqiqi/simqiqi-music/internal/netease"
 )
 
 // peekApp is an app with a track cued and lyrics set, as the sidebar's

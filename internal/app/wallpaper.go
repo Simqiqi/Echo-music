@@ -123,15 +123,6 @@ func shortestArc(a, b float32) float32 {
 	return d
 }
 
-// wrapHue brings a hue back into the wheel, 0 to 360.
-func wrapHue(h float32) float32 {
-	h = float32(math.Mod(float64(h), 360))
-	if h < 0 {
-		h += 360
-	}
-	return h
-}
-
 // ground lays the page's ground: the color of the moment, fading from one
 // song's tint to the next, under the wallpaper drawn at the start. The
 // wallpaper is painted again and again, a handful of times a second, for

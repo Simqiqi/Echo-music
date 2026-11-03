@@ -8,7 +8,7 @@ import (
 	"github.com/egoist/mygo/plugins/glass"
 	"github.com/egoist/mygo/ui"
 
-	"netease-music-mygo/internal/player"
+	"github.com/simqiqi/simqiqi-music/internal/player"
 )
 
 // openSettings shows the settings over the page instead of a window of

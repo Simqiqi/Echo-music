@@ -1,5 +1,13 @@
 # 更新日志
 
+## 0.3.0
+
+- 换了身份：应用标识从上游的 `dev.egoist.cloudmusic` 改为 `com.simqiqi.echo`，模块路径从 `netease-music-mygo` 改为 `github.com/simqiqi/simqiqi-music`，仓库里不再有上游的应用名与模块名
+- 钥匙串里的登录会自己迁过来：首次启动读不到自己的会话时，去旧标识下取一次、搬到新标识，不用重新扫码（系统可能问一次钥匙串权限）
+- 代码结构重排：着色器特效（星空、地形、涟漪、黑胶、水彩）与配色换算搬进新的 `internal/fx` 包，界面层只负责调用；`weekly.go` 拆成数据层 `weekly_model.go` 与页面 `weekly_page.go`，`weather.go` 拆成取数的 `weather_sky.go` 与状态机 `weather_state.go`
+- README 重写：按现在的项目介绍功能与代码布局；上游署名、AGPL-3.0 许可与修改声明保留
+- 下载页、发布脚本与语音库仓库地址改指向本仓库；移除了上游的自建统计脚本
+
 ## 0.2.14
 
 - 修好了 **关注动态**：它问的 `/api/event` 在网易云并不存在（一直回 404），改走 `/api/event/get` 这个真正的关注流接口，并读它回的 `event` 字段；翻页也从 0 改成 -1 起头（0 会被当成「早于所有动态」，于是空白）

@@ -1,4 +1,4 @@
-package app
+package fx
 
 import (
 	"sync"
@@ -97,10 +97,10 @@ func Fragment(dst vec4, pos vec2) vec4 {
 
 var vinylShader = sync.OnceValue(func() *shader.Shader { return shader.MustCompile(vinylSource) })
 
-// drawVinyl paints the record of r at drift seconds, its disc standing
+// DrawVinyl paints the record of r at drift seconds, its disc standing
 // out from behind cover, a box of the window W across.
-func drawVinyl(p *ui.Painter, r ui.Rect, W float32, cover ui.Rect, tint ui.Color, drift float32) {
-	deep, glow := nightColors(tint)
+func DrawVinyl(p *ui.Painter, r ui.Rect, W float32, cover ui.Rect, tint ui.Color, drift float32) {
+	deep, glow := NightColors(tint)
 	// How many of the canvas's pixels a DIP of the window is, and the
 	// cover's box in them: the disc a little larger than the cover, set
 	// off to the right of it, as a record stands behind its sleeve.

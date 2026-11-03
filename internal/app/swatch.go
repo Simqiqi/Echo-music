@@ -5,6 +5,8 @@ import (
 	"math"
 
 	"github.com/egoist/mygo/ui"
+
+	"github.com/simqiqi/simqiqi-music/internal/fx"
 )
 
 // The picker shows each backdrop as a little picture of it rather than a
@@ -149,7 +151,7 @@ func swatchFog(s *sheet, tint ui.Color) {
 // its light low in the sky, and the stars over it, the near ones bright and
 // broad, the far ones a grain of light.
 func swatchStars(s *sheet, tint ui.Color) {
-	deep, glow := starColors(tint)
+	deep, glow := fx.StarColors(tint)
 	for y := 0; y < s.h; y++ {
 		v := (float64(y) + 0.5) / float64(s.h)
 		for x := 0; x < s.w; x++ {
@@ -191,7 +193,7 @@ func swatchStars(s *sheet, tint ui.Color) {
 // swatchTerrain is the three ridges: each skyline the cover's color, the
 // hills below it filled into the night, the nearest one boldest.
 func swatchTerrain(s *sheet, tint ui.Color) {
-	deep, glow := nightColors(tint)
+	deep, glow := fx.NightColors(tint)
 	ridges := [3]struct {
 		base, amp, fill, seed float64
 		line                  ui.Color
@@ -262,7 +264,7 @@ func spectrumAt(x float64) float64 {
 // the light of the cover across it, and rings running out from where
 // something fell in.
 func swatchRipple(s *sheet, tint ui.Color) {
-	deep, glow := nightColors(tint)
+	deep, glow := fx.NightColors(tint)
 	for y := 0; y < s.h; y++ {
 		v := (float64(y) + 0.5) / float64(s.h)
 		for x := 0; x < s.w; x++ {
@@ -312,7 +314,7 @@ func swatchRipple(s *sheet, tint ui.Color) {
 // fine as they are, the light of the room laid across it and the label of
 // the cover's color at its heart.
 func swatchVinyl(s *sheet, tint ui.Color) {
-	deep, glow := nightColors(tint)
+	deep, glow := fx.NightColors(tint)
 	cx, cy := 0.5*float64(s.w), 0.52*float64(s.h)
 	rad := 0.375 * float64(s.w)
 	// The label, the color of the cover, a little lit.
@@ -371,7 +373,7 @@ func swatchVinyl(s *sheet, tint ui.Color) {
 // each with its own edge dried darker than its middle, the grain of the
 // paper showing through.
 func swatchWater(s *sheet, tint ui.Color) {
-	paper, w1, w2, w3 := waterInks(tint)
+	paper, w1, w2, w3 := fx.WaterInks(tint)
 	for y := 0; y < s.h; y++ {
 		for x := 0; x < s.w; x++ {
 			s.set(x, y, paper)

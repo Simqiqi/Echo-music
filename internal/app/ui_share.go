@@ -9,8 +9,8 @@ import (
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 
-	"netease-music-mygo/internal/lyrics"
-	"netease-music-mygo/internal/netease"
+	"github.com/simqiqi/simqiqi-music/internal/lyrics"
+	"github.com/simqiqi/simqiqi-music/internal/netease"
 )
 
 // The size of a shared lyric card, in points: three by four, drawn at two

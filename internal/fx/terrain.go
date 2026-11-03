@@ -1,12 +1,10 @@
-package app
+package fx
 
 import (
 	"sync"
 
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/shader"
-
-	"netease-music-mygo/internal/player"
 )
 
 // The terrain is Now Playing's background as a range of hills at night:
@@ -123,21 +121,10 @@ func Fragment(dst vec4, pos vec2) vec4 {
 
 var terrainShader = sync.OnceValue(func() *shader.Shader { return shader.MustCompile(terrainSource) })
 
-// terrainBands deals the player's bands out over the eight the shader
-// holds, from the bass at the left to the treble at the right.
-func terrainBands(st *barState) [8]float32 {
-	var out [8]float32
-	for i := range out {
-		from, to := i*player.Bands/len(out), (i+1)*player.Bands/len(out)
-		out[i] = st.group(from, max(from+1, to))
-	}
-	return out
-}
-
-// drawTerrain paints the hills of tint in r at drift seconds, as high as
+// DrawTerrain paints the hills of tint in r at drift seconds, as high as
 // bands say and as bright as bass does.
-func drawTerrain(p *ui.Painter, r ui.Rect, tint ui.Color, drift float32, bands [8]float32, bass float32) {
-	deep, glow := nightColors(tint)
+func DrawTerrain(p *ui.Painter, r ui.Rect, tint ui.Color, drift float32, bands [8]float32, bass float32) {
+	deep, glow := NightColors(tint)
 	terrainShader().Draw(p, r, shader.Options{Uniforms: map[string]any{
 		"Time": drift, "Bass": min(bass, 1), "Deep": deep, "Glow": glow,
 		"S0": bands[0], "S1": bands[1], "S2": bands[2], "S3": bands[3],
@@ -145,13 +132,13 @@ func drawTerrain(p *ui.Painter, r ui.Rect, tint ui.Color, drift float32, bands [
 	}})
 }
 
-// nightColors returns the dark behind a night scene and its light, for
+// NightColors returns the dark behind a night scene and its light, for
 // a cover of tint: its hue, deeper than a night sky and brighter than a
 // lamp, so that white reads over both. A gray cover stays gray.
-func nightColors(tint ui.Color) (deep, glow ui.Color) {
-	h, s, _ := hsv(float64(tint.R)/255, float64(tint.G/255)/255, float64(tint.B)/255)
+func NightColors(tint ui.Color) (deep, glow ui.Color) {
+	h, s, _ := HSV(float64(tint.R)/255, float64(tint.G/255)/255, float64(tint.B)/255)
 	if s > 0.12 {
 		s = min(max(s*1.35, 0.55), 0.9)
 	}
-	return hsvColor(h, s*0.75, 0.13), hsvColor(h, s*0.85, 0.78)
+	return HSVColor(h, s*0.75, 0.13), HSVColor(h, s*0.85, 0.78)
 }

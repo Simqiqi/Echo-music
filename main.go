@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	"netease-music-mygo/internal/app"
+	"github.com/simqiqi/simqiqi-music/internal/app"
 )
 
 func main() {

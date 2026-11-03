@@ -8,7 +8,8 @@ import (
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/shader"
 
-	"netease-music-mygo/internal/player"
+	"github.com/simqiqi/simqiqi-music/internal/fx"
+	"github.com/simqiqi/simqiqi-music/internal/player"
 )
 
 // The backdrop of Now Playing paints the cover's colors behind it, as
@@ -165,21 +166,21 @@ func (a *app) backdrop(c *ui.Context, art *artwork, tint ui.Color) {
 				case "fog":
 					drawFog(cp, box, tint, float32(bd.drift), bass)
 				case "stars":
-					drawStars(cp, box, tint, float32(bd.drift), bass)
+					fx.DrawStars(cp, box, tint, float32(bd.drift), bass)
 				case "terrain":
-					drawTerrain(cp, box, tint, float32(bd.drift), terrainBands(&bd.level), bass)
+					fx.DrawTerrain(cp, box, tint, float32(bd.drift), terrainBands(&bd.level), bass)
 				case "ripple":
 					// The cover itself, blurred, under the water: without
 					// one loaded, the gradient stands in for it.
 					if art != nil && art.backdrop != nil {
-						drawRipple(cp, box, art.backdrop, tint, float32(bd.drift), bass)
+						fx.DrawRipple(cp, box, art.backdrop, tint, float32(bd.drift), bass)
 					} else {
 						drawBackdrop(cp, box, art, tint)
 					}
 				case "vinyl":
-					drawVinyl(cp, box, r.W, a.npCoverAt, tint, float32(bd.drift))
+					fx.DrawVinyl(cp, box, r.W, a.npCoverAt, tint, float32(bd.drift))
 				case "water":
-					drawWatercolor(cp, box, tint, float32(bd.drift), bass)
+					fx.DrawWatercolor(cp, box, tint, float32(bd.drift), bass)
 				default:
 					drawBackdrop(cp, box, art, tint)
 				}
@@ -277,27 +278,15 @@ func fogColors(tint ui.Color) (deep, fog ui.Color) {
 	return hsvColor(h, s, 0.3), hsvColor(h, s*0.6, 0.72)
 }
 
-// hsvColor is the color of hue h (degrees), saturation s and value v.
-func hsvColor(h, s, v float64) ui.Color {
-	c := v * s
-	x := c * (1 - math.Abs(math.Mod(h/60, 2)-1))
-	var r, g, b float64
-	switch {
-	case h < 60:
-		r, g = c, x
-	case h < 120:
-		r, g = x, c
-	case h < 180:
-		g, b = c, x
-	case h < 240:
-		g, b = x, c
-	case h < 300:
-		r, b = x, c
-	default:
-		r, b = c, x
+// terrainBands deals the player's bands out over the eight the terrain
+// holds, from the bass at the left to the treble at the right.
+func terrainBands(st *barState) [8]float32 {
+	var out [8]float32
+	for i := range out {
+		from, to := i*player.Bands/len(out), (i+1)*player.Bands/len(out)
+		out[i] = st.group(from, max(from+1, to))
 	}
-	m := v - c
-	return ui.RGB(uint8((r+m)*255+0.5), uint8((g+m)*255+0.5), uint8((b+m)*255+0.5))
+	return out
 }
 
 // backdropOver paints the backdrop again over band, a strip of win, the

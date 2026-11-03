@@ -33,13 +33,36 @@ func sessionFile() (string, error) {
 
 func readSession() ([]byte, error) {
 	if !mygo.IsDev() {
-		return mygo.Secrets.Get(sessionSecret)
+		b, err := mygo.Secrets.Get(sessionSecret)
+		if err == nil || !errors.Is(err, mygo.ErrSecretNotFound) {
+			return b, err
+		}
+		return adoptOldSession()
 	}
 	path, err := sessionFile()
 	if err != nil {
 		return nil, err
 	}
 	return os.ReadFile(path)
+}
+
+// The app was called dev.egoist.cloudmusic before it was Echo云音乐's own,
+// and the keychain files a secret under that identifier: the login of an
+// earlier version sits there, unread by this one. It is taken over the
+// first time the app asks and finds none of its own, so that an update
+// does not send the listener back to the QR code.
+const previousID = "dev.egoist.cloudmusic"
+
+func adoptOldSession() ([]byte, error) {
+	old := mygo.Secrets.Service(previousID)
+	b, err := old.Get(sessionSecret)
+	if err != nil {
+		return nil, err
+	}
+	if err := mygo.Secrets.Set(sessionSecret, b); err == nil {
+		_ = old.Delete(sessionSecret)
+	}
+	return b, nil
 }
 
 func writeSession(b []byte) error {
@@ -59,6 +82,9 @@ func writeSession(b []byte) error {
 func deleteSession() {
 	if !mygo.IsDev() {
 		mygo.Secrets.Delete(sessionSecret)
+		// A login taken over from the earlier name goes too, or signing
+		// out would leave it there to be adopted again.
+		mygo.Secrets.Service(previousID).Delete(sessionSecret)
 		return
 	}
 	if path, err := sessionFile(); err == nil {

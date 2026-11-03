@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/egoist/mygo/ui"
-	"netease-music-mygo/internal/lyrics"
+	"github.com/simqiqi/simqiqi-music/internal/lyrics"
 
-	"netease-music-mygo/internal/netease"
+	"github.com/simqiqi/simqiqi-music/internal/netease"
 )
 
 // Radios play on without end: the personal FM, in one of its modes, as

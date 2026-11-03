@@ -7,8 +7,8 @@ import (
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 
-	"netease-music-mygo/internal/netease"
-	"netease-music-mygo/internal/player"
+	"github.com/simqiqi/simqiqi-music/internal/netease"
+	"github.com/simqiqi/simqiqi-music/internal/player"
 )
 
 type pageKind int
@@ -164,12 +164,12 @@ type app struct {
 
 	// The three pages beside the playlists: what the listener kept on disk,
 	// the feed of who they follow, and the albums just out.
-	downloads   downloadsState
-	feed        []netease.Event
-	feedState   paged
-	feedLast    int64
-	newAlbums   newAlbumsState
-	weekSky               weekSweep               // the light that crosses the week's poster
+	downloads downloadsState
+	feed      []netease.Event
+	feedState paged
+	feedLast  int64
+	newAlbums newAlbumsState
+	weekSky   weekSweep // the light that crosses the week's poster
 
 	wx       *wxState     // the sky outside, and the music it asks for
 	quiet    quietState   // the quiet parts of the song playing, for its hot comments

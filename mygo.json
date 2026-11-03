@@ -1,8 +1,8 @@
 {
   "name": "Echo云音乐",
-  "identifier": "dev.egoist.cloudmusic",
-  "slug": "mygo-cloudmusic",
-  "version": "0.2.14",
+  "identifier": "com.simqiqi.echo",
+  "slug": "echo-cloudmusic",
+  "version": "0.3.0",
   "out": "build",
   "updates": {
     "publicKey": "WzJsOGNIuf6mcEqo5ff8jub+NoQQOEk4JXreLPYjgyQ=",

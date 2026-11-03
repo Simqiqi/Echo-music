@@ -1,4 +1,4 @@
-package app
+package fx
 
 import (
 	"sync"
@@ -91,10 +91,10 @@ func Fragment(dst vec4, pos vec2) vec4 {
 
 var rippleShader = sync.OnceValue(func() *shader.Shader { return shader.MustCompile(rippleSource) })
 
-// drawRipple paints the water of r at drift seconds over art, the cover
+// DrawRipple paints the water of r at drift seconds over art, the cover
 // blurred, and lit by bass.
-func drawRipple(p *ui.Painter, r ui.Rect, art *ui.Bitmap, tint ui.Color, drift, bass float32) {
-	deep, glow := nightColors(tint)
+func DrawRipple(p *ui.Painter, r ui.Rect, art *ui.Bitmap, tint ui.Color, drift, bass float32) {
+	deep, glow := NightColors(tint)
 	rippleShader().Draw(p, r, shader.Options{
 		Uniforms: map[string]any{"Time": drift, "Bass": min(bass, 1), "Deep": deep, "Glow": glow},
 		Images:   [4]*ui.Bitmap{art},
