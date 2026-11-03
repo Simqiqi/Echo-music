@@ -58,18 +58,9 @@ go tool mygo build   # 打包到 build/
 go test ./...        # 运行测试
 ```
 
-## 与上游同步
+## 演进方向
 
-本项目是 [mygo-cloudmusic](https://github.com/egoist/mygo-cloudmusic) 的分支，模块路径改成了本仓库自己的，所以合并上游时 `import` 行会整片冲突：
-
-```bash
-git remote add upstream https://github.com/egoist/mygo-cloudmusic.git
-git fetch upstream
-git merge upstream/main
-# 冲突里把上游的 netease-music-mygo/... 换回 github.com/simqiqi/simqiqi-music/...
-```
-
-界面与功能的改动集中在 `internal/app/`，特效在 `internal/fx/`，播放器的扩展在 `internal/player/`（`eq.go`、`transition.go`）。
+本仓库自 2026 年 11 月起独立演进，不再合并原项目的提交。界面与功能的改动集中在 `internal/app/`，特效在 `internal/fx/`，播放器的扩展在 `internal/player/`（`eq.go`、`transition.go`）。
 
 ## 来源与修改声明
 
@@ -77,7 +68,7 @@ git merge upstream/main
 
 ## 致谢
 
-- [mygo-cloudmusic](https://github.com/egoist/mygo-cloudmusic)：本项目的上游，客户端主体功能由其实现
+- [mygo-cloudmusic](https://github.com/egoist/mygo-cloudmusic)：本项目的起点，客户端主体功能由其实现
 - [MyGo](https://github.com/egoist/mygo)：原生 UI 与应用框架
 - [NeteaseCloudMusicApi](https://github.com/Binaryify/NeteaseCloudMusicApi)：eapi 加密与登录流程的参考
 - [folia-major](https://github.com/chthollyphile/folia-major)：歌词动画效果的参考
