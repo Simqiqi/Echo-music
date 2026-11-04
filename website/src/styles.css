@@ -1320,6 +1320,14 @@ main {
 .command-copy:hover {
   background: light-dark(rgb(0 0 0 / 0.08), rgb(255 255 255 / 0.12));
 }
+.download-mirror {
+  margin-top: 18px;
+  line-height: 1.7;
+}
+.download-mirror a {
+  color: var(--ink-2);
+  text-underline-offset: 3px;
+}
 .download-more {
   margin-top: 28px;
 }

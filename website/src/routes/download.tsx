@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/solid-router'
 import { For, Show, createSignal, onMount } from 'solid-js'
 import { Layout } from '../components/Layout'
 import { GitHubMark, Icon } from '../components/Icon'
-import { release, repo, site } from '../site'
+import { fast, release, repo, site } from '../site'
 
 export const Route = createFileRoute('/download')({
   head: () => ({ meta: [{ title: `下载 · ${site.name}` }] }),
@@ -52,8 +52,8 @@ const platforms: { os: OS; name: string; note: string; builds: Build[] }[] = [
   },
 ]
 
-const installSh = `curl -fsSL ${repo}/releases/latest/download/install.sh | sh`
-const installPs = `irm ${repo}/releases/latest/download/install.ps1 | iex`
+const installSh = `curl -fsSL ${fast(repo)}/releases/latest/download/install.sh | sh`
+const installPs = `irm ${fast(repo)}/releases/latest/download/install.ps1 | iex`
 
 // A build's asset; a build the release has none of links to the release.
 const asset = (b: Build) => release.assets.find((a) => b.match(a.name))
@@ -112,7 +112,7 @@ function Download() {
                       <a
                         class="build"
                         classList={{ primary: b.primary }}
-                        href={asset(b)?.browser_download_url ?? `${repo}/releases/tag/${release.tag_name}`}
+                        href={fast(asset(b)?.browser_download_url ?? `${repo}/releases/tag/${release.tag_name}`)}
                       >
                         <Icon name="download" size={16} />
                         <span class="build-label">{b.label}</span>
@@ -126,6 +126,11 @@ function Download() {
             )}
           </For>
         </div>
+
+        <p class="fine download-mirror">
+          下载经公共加速转一次 GitHub 的发行文件，国内通常能跑满带宽；若加速失效，可在
+          <a href={`${repo}/releases`}>发行页</a>取原始文件。
+        </p>
 
         <div class="install">
           <h2>用一行命令安装</h2>
