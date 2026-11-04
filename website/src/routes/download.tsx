@@ -1,8 +1,8 @@
 import { createFileRoute } from '@tanstack/solid-router'
 import { For, Show, createSignal, onMount } from 'solid-js'
 import { Layout } from '../components/Layout'
-import { GitHubMark, Icon } from '../components/Icon'
-import { fast, release, repo, site } from '../site'
+import { Icon } from '../components/Icon'
+import { origin, release, site } from '../site'
 
 export const Route = createFileRoute('/download')({
   head: () => ({ meta: [{ title: `下载 · ${site.name}` }] }),
@@ -52,12 +52,19 @@ const platforms: { os: OS; name: string; note: string; builds: Build[] }[] = [
   },
 ]
 
-const installSh = `curl -fsSL ${fast(repo)}/releases/latest/download/install.sh | sh`
-const installPs = `irm ${fast(repo)}/releases/latest/download/install.ps1 | iex`
+const installSh = `curl -fsSL ${origin}/install.sh | sh`
+const installPs = `irm ${origin}/install.ps1 | iex`
 const unquarantine = `xattr -dr com.apple.quarantine "/Applications/${site.name}.app"`
 
 // A build's asset; a build the release has none of links to the release.
 const asset = (b: Build) => release.assets.find((a) => b.match(a.name))
+
+// The file's own address on this site: the Worker resolves it to the release
+// it really lives in, so the page never names the host behind it.
+const link = (b: Build) => {
+  const a = asset(b)
+  return a ? `/dl/${release.tag_name}/${encodeURIComponent(a.name)}` : '/download'
+}
 
 function detectOS(): OS | undefined {
   const ua = navigator.userAgent
@@ -113,7 +120,7 @@ function Download() {
                       <a
                         class="build"
                         classList={{ primary: b.primary }}
-                        href={fast(asset(b)?.browser_download_url ?? `${repo}/releases/tag/${release.tag_name}`)}
+                        href={link(b)}
                       >
                         <Icon name="download" size={16} />
                         <span class="build-label">{b.label}</span>
@@ -129,8 +136,7 @@ function Download() {
         </div>
 
         <p class="fine download-mirror">
-          下载经公共加速转一次 GitHub 的发行文件，国内通常能跑满带宽；若加速失效，可在
-          <a href={`${repo}/releases`}>发行页</a>取原始文件。
+          链接都走本站自己的地址，文件由就近的加速节点分发，国内通常能跑满带宽。
         </p>
 
         <section class="gatekeeper" aria-labelledby="gatekeeper-title">
@@ -177,8 +183,7 @@ function Download() {
         </div>
 
         <p class="fine download-more">
-          <GitHubMark size={14} />
-          <a href={`${repo}/releases`}>所有版本与更新说明</a>
+          装好之后会自动更新，不用再回来下载一次。
         </p>
       </section>
     </Layout>

@@ -1,8 +1,7 @@
 import { Link } from '@tanstack/solid-router'
 import { createSignal, onCleanup, onMount, type JSX } from 'solid-js'
-import { GitHubMark } from './Icon'
 import { ThemeSwitch } from '../theme'
-import { repo, site } from '../site'
+import { site } from '../site'
 
 export function Layout(props: { children: JSX.Element }) {
   return (
@@ -32,9 +31,6 @@ function Header() {
         </Link>
         <div class="nav-end">
           <ThemeSwitch class="nav-theme" />
-          <a class="icon-link" href={repo} aria-label="GitHub 上的源代码">
-            <GitHubMark size={19} />
-          </a>
         </div>
       </div>
     </header>
@@ -46,11 +42,8 @@ function Footer() {
     <footer class="footer">
       <div class="footer-inner">
         <span>
-          {site.name} · 以 <a href={`${repo}/blob/main/LICENSE`}>AGPL-3.0</a> 开源 · 与网易云音乐官方无关
+          {site.name} · 第三方客户端 · 与网易云音乐官方无关
         </span>
-        <a class="icon-link" href={repo} aria-label="GitHub 上的源代码">
-          <GitHubMark size={17} />
-        </a>
       </div>
     </footer>
   )

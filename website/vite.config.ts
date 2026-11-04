@@ -16,7 +16,9 @@ async function latestRelease() {
   return {
     tag_name: r.tag_name,
     published_at: r.published_at,
-    assets: r.assets.map((a: any) => ({ name: a.name, size: a.size, browser_download_url: a.browser_download_url })),
+    // Only what the page shows: the file's name and size. Where the release
+    // lives is the Worker's business, so it never reaches the browser.
+    assets: r.assets.map((a: any) => ({ name: a.name, size: a.size })),
   }
 }
 
@@ -30,8 +32,10 @@ export default defineConfig(async () => ({
         enabled: true,
         crawlLinks: true,
         failOnError: true,
-        // Links to a section of a page are that page.
-        filter: ({ path }) => !path.includes('#'),
+        // Links to a section of a page are that page; download addresses are
+        // answered by the Worker, not by a file, so they aren't pages either.
+        filter: ({ path }) =>
+          !path.includes('#') && !path.startsWith('/dl/') && !path.startsWith('/install.'),
       },
       // Cloudflare serves 404.html for paths that have no file.
       pages: [{ path: '/404', prerender: { autoSubfolderIndex: false } }],

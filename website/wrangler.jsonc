@@ -2,11 +2,18 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "echo-cloudmusic",
   "compatibility_date": "2026-10-01",
-  // Static assets only: no Worker script runs.
+  // The Worker (worker/index.ts) is what the domain points at: it answers the
+  // download addresses itself and hands every other request to the static
+  // files below, so both live under one address.
+  "main": "worker/index.ts",
   "assets": {
+    "binding": "ASSETS",
     "directory": "./dist/client",
     "not_found_handling": "404-page"
   },
+  // Download addresses have no file behind them, so the Worker has to see
+  // every request rather than only the ones the assets miss.
+  "run_worker_first": true,
   // A Worker's own workers.dev address is blocked in mainland China, so the
   // site is served from a custom domain in the same Cloudflare account:
   // wrangler adds the DNS record and the certificate itself once the zone is

@@ -1,16 +1,10 @@
-export const repo = 'https://github.com/Simqiqi/simqiqi-music'
+// Where the site lives. Download links are handed out from this address and
+// never from the host the releases are stored on: the Worker behind it (see
+// worker/index.ts) answers /dl/* and /install.* with the real file location,
+// so nothing upstream shows up in the page or in the browser's status bar.
+export const origin = 'https://simqiqiecho.dpdns.org'
 
-// GitHub 的发行文件在国内常常连不上或只有几十 KB/s：下载链接先过一道
-// 公共加速，原始地址仍原样留着，加速失效时可以从发行页手动取。更新清单
-// 里带的也是这条前缀，所以应用内更新走的是同一条路（见 .github/workflows/
-// feed.yml）。
-export const mirror = 'https://gh-proxy.com/'
-
-// fast puts a GitHub URL through the accelerator; anything else is left as
-// it is.
-export const fast = (url: string) => (url.startsWith('https://github.com/') ? mirror + url : url)
-
-export type Asset = { name: string; size: number; browser_download_url: string }
+export type Asset = { name: string; size: number }
 export type Release = { tag_name: string; published_at: string; assets: Asset[] }
 
 declare const __RELEASE__: Release

@@ -1,13 +1,12 @@
 import { Link, createFileRoute } from '@tanstack/solid-router'
-import { For, Show, createSignal, onCleanup, onMount, type JSX } from 'solid-js'
+import { For, createSignal, onCleanup, onMount, type JSX } from 'solid-js'
 import { Layout } from '../components/Layout'
 import { AppWindow } from '../components/AppWindow'
 import { Stage } from '../components/Stage'
 import { LyricStage } from '../components/LyricStage'
 import { Icon, type IconName } from '../components/Icon'
-import { ThemeSwitch } from '../theme'
+import { ThemeSwitch, flipTone } from '../theme'
 import { mygo, release, site } from '../site'
-import { playing, toggle } from '../player'
 
 export const Route = createFileRoute('/')({
   component: Home,
@@ -73,7 +72,7 @@ function Hero() {
       <div class="lp-hero-inner">
         <p class="lp-eyebrow">
           <i class="lp-dot" aria-hidden="true" />
-          开源 · 原生 · 没有 WebView
+          原生 · 轻量 · 没有 WebView
         </p>
         <h1 class="lp-title">
           <span class="lp-line">
@@ -92,28 +91,13 @@ function Hero() {
             <Icon name="download" size={17} />
             下载
           </Link>
-          <button class="btn btn-ghost lp-btn" type="button" onClick={toggle}>
-            <Show
-              when={playing()}
-              fallback={
-                <>
-                  <Icon name="wave" size={17} />
-                  听一秒
-                </>
-              }
-            >
-              <span class="lp-eq" aria-hidden="true">
-                <i />
-                <i />
-                <i />
-                <i />
-              </span>
-              正在播放
-            </Show>
+          <button class="btn btn-ghost lp-btn" type="button" onClick={(e) => flipTone(e)}>
+            <Icon name="sparkle" size={17} />
+            换个主题
           </button>
         </div>
         <p class="lp-fine">
-          版本 {version} · 免费 · 以 AGPL-3.0 开源 · 与网易云音乐官方无关
+          版本 {version} · 免费 · 与网易云音乐官方无关
         </p>
       </div>
       <div class="lp-scroll" aria-hidden="true">
