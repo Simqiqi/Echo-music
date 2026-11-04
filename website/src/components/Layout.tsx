@@ -1,6 +1,5 @@
 import { Link } from '@tanstack/solid-router'
 import { createSignal, onCleanup, onMount, type JSX } from 'solid-js'
-import { AppIcon } from './AppIcon'
 import { GitHubMark } from './Icon'
 import { ThemeSwitch } from '../theme'
 import { repo, site } from '../site'
@@ -28,7 +27,7 @@ function Header() {
     <header class="nav" classList={{ scrolled: scrolled() }}>
       <div class="nav-inner">
         <Link to="/" class="brand" aria-label={site.name}>
-          <AppIcon size={28} />
+          <img src="/icon.png" width={28} height={28} alt="" />
           <span>{site.name}</span>
         </Link>
         <div class="nav-end">
