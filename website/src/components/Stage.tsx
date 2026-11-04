@@ -1,15 +1,14 @@
 import { onCleanup, onMount } from 'solid-js'
-import { analyser } from '../player'
 
 const BARS = 84
 const DUST = 46
 
 type Mote = { x: number; y: number; r: number; speed: number; phase: number }
 
-// The hero's backdrop: a spectrum that reads the real song, dust that drifts
-// with the pointer, and a soft lamp that follows it. Everything is drawn on
-// one canvas so it stays cheap; the loop sleeps when the tab or hero is out
-// of sight.
+// The hero's backdrop: a ribbon of bars that breathes on its own, dust that
+// drifts with the pointer, and a soft lamp that follows it. Everything is
+// drawn on one canvas so it stays cheap; the loop sleeps when the tab or the
+// hero is out of sight.
 export function Stage() {
   let canvas!: HTMLCanvasElement
 
@@ -150,30 +149,12 @@ export function Stage() {
       }
       ctx.globalAlpha = 1
 
-      // The song, if it is playing.
-      const node = analyser()
-      let live = false
-      if (node) {
-        const data = new Uint8Array(node.frequencyBinCount)
-        node.getByteFrequencyData(data)
-        // The low bins carry almost all of the energy; spread the readable
-        // part of the spectrum across the bars.
-        const usable = Math.floor(data.length * 0.34)
-        for (let i = 0; i < BARS; i++) {
-          const from = Math.floor((i / BARS) ** 1.5 * usable)
-          const to = Math.max(from + 1, Math.floor(((i + 1) / BARS) ** 1.5 * usable))
-          let sum = 0
-          for (let j = from; j < to; j++) sum += data[j]
-          const avg = sum / (to - from) / 255
-          if (avg > 0.02) live = true
-          levels[i] += (Math.pow(avg, 1.35) - levels[i]) * 0.24
-        }
-      }
-      if (!live) {
-        for (let i = 0; i < BARS; i++) {
-          const idle = 0.05 + 0.035 * Math.sin(now * 0.0011 + i * 0.42) + 0.018 * Math.sin(now * 0.0007 - i * 0.9)
-          levels[i] += (Math.max(0.02, idle) - levels[i]) * 0.06
-        }
+      // The ribbon breathes on its own: two slow waves of different lengths,
+      // so the bars never fall into a visible loop.
+      for (let i = 0; i < BARS; i++) {
+        const idle =
+          0.05 + 0.035 * Math.sin(now * 0.0011 + i * 0.42) + 0.018 * Math.sin(now * 0.0007 - i * 0.9)
+        levels[i] += (Math.max(0.02, idle) - levels[i]) * 0.06
       }
 
       // Bars: anchored at the hero's floor, mirrored about the centre.

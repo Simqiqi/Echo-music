@@ -1,7 +1,6 @@
 import { Link, createFileRoute } from '@tanstack/solid-router'
 import { For, createSignal, onCleanup, onMount, type JSX } from 'solid-js'
 import { Layout } from '../components/Layout'
-import { AppWindow } from '../components/AppWindow'
 import { Stage } from '../components/Stage'
 import { LyricStage } from '../components/LyricStage'
 import { Icon, type IconName } from '../components/Icon'
@@ -161,13 +160,13 @@ function Desk() {
   return (
     <section id="demo" class="lp-desk" data-reveal>
       <div class="lp-desk-head">
-        <p class="eyebrow">不是效果图</p>
+        <p class="eyebrow">真机截图</p>
         <h2 class="display">
           <span>下面这一屏，</span>
           <span>就是它本身。</span>
         </h2>
         <p class="lede">
-          用 HTML 照着重画了一遍：播放键、进度条、喜欢都能真的点。封面是光，歌是真的在放。
+          截自正在运行的那一份：登录、推荐、播放器都在，连正在播的那首歌都是真的。
         </p>
       </div>
       <div
@@ -178,9 +177,17 @@ function Desk() {
         style={{ '--rx': '0deg', '--ry': '0deg' }}
       >
         <div class="lp-desk-glow" aria-hidden="true" />
-        <AppWindow />
+        <img
+          class="lp-shot"
+          src="/app.png"
+          width={1680}
+          height={1160}
+          alt="Echo云音乐的真机截图：为你推荐首页，正在播放李荣浩的《不将就》"
+          loading="lazy"
+          decoding="async"
+        />
       </div>
-      <p class="lp-desk-hint">试着拖动进度条，或者点一颗心</p>
+      <p class="lp-desk-hint">光标移过去，它会轻轻迎向你</p>
     </section>
   )
 }

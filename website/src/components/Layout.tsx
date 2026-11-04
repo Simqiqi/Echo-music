@@ -1,9 +1,14 @@
 import { Link } from '@tanstack/solid-router'
 import { createSignal, onCleanup, onMount, type JSX } from 'solid-js'
+import { Icon } from './Icon'
 import { ThemeSwitch } from '../theme'
+import { audible, listen, tap } from '../music'
 import { site } from '../site'
 
 export function Layout(props: { children: JSX.Element }) {
+  // The clip starts with the page, and gives way to anything else that plays
+  // on the site.
+  onMount(() => listen())
   return (
     <>
       <Header />
@@ -31,6 +36,17 @@ function Header() {
         </Link>
         <div class="nav-end">
           <ThemeSwitch class="nav-theme" />
+          <button
+            type="button"
+            class="nav-music"
+            classList={{ off: !audible() }}
+            aria-pressed={audible()}
+            aria-label={audible() ? '关掉背景音乐' : '放背景音乐'}
+            title={audible() ? '关掉背景音乐' : '放背景音乐'}
+            onClick={tap}
+          >
+            <Icon name={audible() ? 'volume' : 'mute'} size={17} />
+          </button>
         </div>
       </div>
     </header>
@@ -41,9 +57,7 @@ function Footer() {
   return (
     <footer class="footer">
       <div class="footer-inner">
-        <span>
-          {site.name} · 第三方客户端 · 与网易云音乐官方无关
-        </span>
+        <span>{site.name} · 第三方客户端 · 与网易云音乐官方无关</span>
       </div>
     </footer>
   )
