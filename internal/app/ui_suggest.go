@@ -93,17 +93,49 @@ func suggestionList(res netease.Suggestions) []suggestion {
 // before.
 func (a *app) searchField(c *ui.Context) {
 	p := a.pal
-	field := ui.Row(c).Height(32).PaddingX(10).Gap(7).Radius(9).AlignItems(ui.Center).Margin(0, 0, 14, 0)
-	if c.Focused(a.searchBox) {
-		field.Background(p.bg).Shadow(0, 0, 0, 3, p.accent.Alpha(0.25)).Border(1, p.accent.Alpha(0.6))
-	} else {
-		field.Background(p.hover).Border(1, p.hairline)
+	focused := c.Focused(a.searchBox)
+	// A little frosted capsule rather than an outlined box: a wash of
+	// white (or of light, in the dark), a hairline of its own, a glint
+	// along the top edge and a shadow under it. Under the pointer it
+	// brightens; taking the focus rings it softly in the accent instead
+	// of drawing a hard halo around it.
+	fill, edge := ui.RGBA(255, 255, 255, 0.58), ui.RGBA(255, 255, 255, 0.72)
+	glint := ui.RGBA(255, 255, 255, 0.38)
+	if p.dark {
+		fill, edge, glint = ui.RGBA(255, 255, 255, 0.085), ui.RGBA(255, 255, 255, 0.12), ui.RGBA(255, 255, 255, 0.10)
+	}
+	if focused {
+		if p.dark {
+			fill = ui.RGBA(255, 255, 255, 0.14)
+		} else {
+			fill = ui.RGBA(255, 255, 255, 0.86)
+		}
+		edge = p.accent.Alpha(0.55)
+	}
+	field := ui.Row(c).Height(36).PaddingX(11).Gap(8).Radius(12).AlignItems(ui.Center).
+		Margin(0, 0, 14, 0)
+	if field.Hovered() && !focused {
+		if p.dark {
+			fill = ui.RGBA(255, 255, 255, 0.11)
+		} else {
+			fill = ui.RGBA(255, 255, 255, 0.72)
+		}
+	}
+	field.Background(field.AnimateColor("bg", fill, ui.Animation{Duration: 160 * time.Millisecond})).
+		Border(0.75, edge).Shadow(0, 2, 8, -3, p.cardShade).
+		InsetShadow(0, 1, 0, 0, glint)
+	if focused {
+		field.Shadow(0, 0, 0, 2, p.accent.Alpha(0.18))
 	}
 	field.Children(func() {
-		ui.Icon(c, iconSearch).Size(14, 14).TextColor(p.muted)
+		seek := p.muted
+		if focused {
+			seek = p.accent
+		}
+		ui.Icon(c, iconSearch).Size(15, 15).TextColor(seek)
 		cb := ui.ComboboxBase(c.Key("search"), &a.query)
 		in := cb.Input.Bind(&a.searchBox).Grow(1).MinWidth(0).
-			Placeholder("搜索歌曲、歌手、播客").FontSize(13).Label("搜索")
+			Placeholder("搜索歌曲、歌手、播客").FontSize(12.5).Label("搜索")
 		q := strings.TrimSpace(a.query)
 		s := &a.suggestions
 		switch {
@@ -117,10 +149,11 @@ func (a *app) searchField(c *ui.Context) {
 			cb.SetOpen(false)
 		}
 		cb.Popup(func(panel ui.Element) {
+			pop := popoverColors(p.dark)
 			panel.AttachTo(field, ui.AnchorBottomStart, ui.AnchorTopStart).
-				Width(360).Padding(6).Margin(8, 0, 0, 0).Radius(12).
-				Background(p.bg).Border(1, p.hairline).
-				Shadow(0, 8, 24, -4, ui.RGBA(0, 0, 0, 0.2))
+				Width(360).Padding(6).Margin(8, 0, 0, 0).Radius(14).
+				Background(pop.fill).Border(0.75, pop.edge).
+				Shadow(0, 14, 36, -10, ui.RGBA(0, 0, 0, 0.22))
 			option := func(key, label string) ui.Element {
 				row := cb.Item(key).MinHeight(36).Padding(6, 10).Gap(10).Radius(7).AlignItems(ui.Center).Label(label)
 				if row.Highlighted() {

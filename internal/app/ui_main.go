@@ -63,40 +63,76 @@ func (a *app) view(c *ui.Context) {
 			// Liquid Glass: the page's ground fills the whole window, and
 			// the sidebar floats on it as a pane of glass, a step above
 			// the page, so the color of what plays has something to bend
-			// and frost.
+			// and frost. The player runs the whole width of the foot, so
+			// the sidebar stops above it and leaves that much of its
+			// column clear.
 			bg := a.homeTinted(&p)
 			liquid := a.settings.glassOn()
-			if liquid {
-				a.ground(page, bg)
-			}
+			a.ground(page, bg)
 			side := ui.Column(c).Width(sidebarWidth)
+			foot := float32(playerBarHeight)
+			if !liquid {
+				foot += 8
+			}
 			switch {
 			case liquid:
-				side.Padding(sidebarInset, sidebarInset, sidebarInset, sidebarInset)
+				side.Padding(sidebarInset, sidebarInset, foot, sidebarInset)
 			case !c.Vibrancy():
-				side.Background(p.sidebar)
+				side.Padding(0, 0, foot, 0).Background(p.sidebar)
+			default:
+				side.Padding(0, 0, foot, 0)
 			}
 			side.Children(func() {
 				pill := ui.Column(c).Fill()
 				if liquid {
-					pill.Radius(sidebarRadius).Material(glass.Glass{Clarity: a.glassClarity(0.5)})
+					// A breath of the pane's own tone keeps the rim from
+					// reading as a drawn line, and a soft shadow lets it
+					// float over the page as glass does.
+					tint := ui.RGBA(255, 255, 255, 0.10)
+					if p.dark {
+						tint = ui.RGBA(16, 16, 20, 0.10)
+					}
+					pill.Radius(sidebarRadius).
+						Material(glass.Glass{Clarity: a.glassClarity(0.5), Tint: tint}).
+						Shadow(0, 10, 30, -12, ui.RGBA(0, 0, 0, 0.12))
 				}
-				pill.Children(func() { a.sidebar(c) })
+				pill.Children(func() {
+					if liquid {
+						// Light from above, laid over the glass before its
+						// contents: the rim fades into a sheen instead of
+						// a hard outline around the whole sidebar.
+						ui.Box(c.Key("side-sheen")).Absolute().Top(0).Left(0).Right(0).Bottom(0).
+							Radius(sidebarRadius).PassThrough().
+							Draw(func(dr *ui.Painter, r ui.Rect) {
+								top := ui.RGBA(255, 255, 255, 0.16)
+								if a.pal.dark {
+									top = ui.RGBA(255, 255, 255, 0.055)
+								}
+								dr.FillGradient(r, ui.LinearGradient{Angle: 90, Stops: []ui.GradientStop{
+									{Color: top, At: 0},
+									{Color: top.Alpha(0.04), At: 0.32},
+									{Color: ui.Transparent, At: 0.7},
+								}}, sidebarRadius)
+							})
+					}
+					a.sidebar(c)
+				})
 			})
 			// Keyed, so that a popover of the sidebar opening or closing
 			// keeps what the page and its bars hold, their edges' fades.
 			main := ui.Box(c.Key("main")).Grow(1)
 			if !liquid {
 				main.BorderWidth(0, 0, 0, 1).BorderColor(p.hairline)
-				a.ground(main, bg)
 			}
 			main.Children(func() {
 				a.content(c)
-				// The bars float over the page, which scrolls under them:
-				// positioned, they paint over it.
+				// The top capsule floats over the page, which scrolls
+				// under it: positioned, it paints over it.
 				a.pageTop(c)
-				a.playerBar(c)
 			})
+			// The player is a pane of the page, not of its content: it
+			// reaches from one side of the window to the other.
+			a.playerBar(c)
 		})
 		a.nowPlayingLayer(c, npOpen, npSettled)
 	})
@@ -321,15 +357,13 @@ func (a *app) navItem(c *ui.Context, icon *ui.SVG, label string, r route, index 
 	bg := ui.Transparent
 	switch {
 	case selected:
-		bg = a.songAccent.Alpha(0.10)
+		bg = a.songAccent.Alpha(0.13)
 	case b.Hovered():
 		bg = p.hover
 	}
 	b.Background(b.AnimateColor("bg", bg, ui.Animation{Duration: 160 * time.Millisecond}))
-	if selected {
-		// The pill carries a thin ink line at its edge.
-		b.Border(1, ui.RGB(28, 28, 30))
-	}
+	// Chosen items wear only this wash and the accent bar at their left:
+	// a hard ink outline cuts the glass pane in two.
 	color := p.text
 	if selected {
 		color = a.songAccent

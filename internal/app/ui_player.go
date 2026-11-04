@@ -342,6 +342,60 @@ func (a *app) transport(c *ui.Context, color, dim, on ui.Color, size float32) {
 	})
 }
 
+// qualityButton is the player bar's picker of stream quality: a small pill
+// that names the level the next song will play at and opens the levels to
+// choose from. It sits beside the volume, where the ear reaches for it,
+// rather than in the settings.
+func (a *app) qualityButton(c *ui.Context) {
+	p := a.pal
+	label, short := qualityLabel(a.settings.Quality)
+	chosen := label
+	sel := ui.SelectBase(c.Key("quality"), &chosen)
+	tr := sel.Trigger.Height(28).PaddingX(8).Gap(5).Radius(9).AlignItems(ui.Center).
+		FocusRing(false).Label("音质：" + label)
+	bg := ui.Transparent
+	if tr.Hovered() || sel.Open() {
+		bg = p.hover
+	}
+	tr.Background(tr.AnimateColor("bg", bg, ui.Animation{Duration: 120 * time.Millisecond}))
+	chevron := ui.Pose{}
+	if sel.Open() {
+		chevron.Rotate = 180
+	}
+	tr.Children(func() {
+		ui.Icon(c, iconQuality).Size(14, 14).TextColor(p.muted)
+		ui.Text(c, short).FontSize(11.5).FontWeight(600).TextColor(p.text).SingleLine()
+		ui.Icon(c, iconDown).Size(11, 11).TextColor(p.faint).AnimatePose(chevron, ui.Snappy)
+	})
+	sel.Popup(func(panel ui.Element) {
+		pop := popoverColors(p.dark)
+		panel.MinWidth(216).Padding(6).Radius(13).Background(pop.fill).Border(1, pop.edge).
+			Shadow(0, 18, 44, -10, ui.RGBA(0, 0, 0, 0.32)).
+			Transition(ui.ElementTransition{Animation: &ui.Snappy, Enter: &ui.Motion{Scale: 0.97, Y: -4}, Exit: &ui.Motion{Opacity: 0}})
+		for _, q := range qualityLevels {
+			it := sel.Item(q.label).Padding(8, 10).Radius(9).Gap(8).AlignItems(ui.Center).Label(q.label)
+			if it.Highlighted() {
+				it.Background(p.hover)
+			}
+			it.Children(func() {
+				ui.Text(c, q.label).FontSize(12.5).Grow(1).SingleLine()
+				if q.label == label {
+					ui.Icon(c, iconCheck).Size(13, 13).TextColor(p.accent)
+				}
+			})
+		}
+		ui.Text(c, "下一首歌曲开始生效").FontSize(11).TextColor(p.faint).Padding(5, 10, 2, 10)
+	})
+	if tr.Changed() {
+		for _, q := range qualityLevels {
+			if q.label == chosen {
+				a.settings.Quality = q.level
+			}
+		}
+		a.changed()
+	}
+}
+
 // playerBar runs along the foot of the content: what plays, its controls
 // and its progress, and the volume.
 func (a *app) playerBar(c *ui.Context) {
@@ -362,9 +416,9 @@ func (a *app) playerBar(c *ui.Context) {
 		// A still plate where the bar rests: the pointer over it lifts the
 		// bar, and stays over it as the bar moves, rather than blinking at
 		// its very edge.
-		hot = ui.Box(c.Key("bottom-hot")).Absolute().Left(12).Right(12).Bottom(8).Height(glassBarHeight).
+		hot = ui.Box(c.Key("bottom-hot")).Absolute().Left(sidebarInset).Right(sidebarInset).Bottom(8).Height(glassBarHeight).
 			Background(ui.RGBA(0, 0, 0, 0.002))
-		shell = ui.Box(c.Key("bottom-edge")).Absolute().Left(12).Right(12).Bottom(8).Height(glassBarHeight).Radius(22).
+		shell = ui.Box(c.Key("bottom-edge")).Absolute().Left(sidebarInset).Right(sidebarInset).Bottom(8).Height(glassBarHeight).Radius(22).
 			Material(glass.Glass{})
 	} else {
 		edge := ui.Box(c.Key("bottom-edge")).Absolute().Left(0).Right(0).Bottom(0).Height(playerBarHeight).
@@ -374,10 +428,10 @@ func (a *app) playerBar(c *ui.Context) {
 	// The controls keep the middle, between sides that share what is left:
 	// narrower, the middle gives up to 140 DIPs, and what plays keeps room
 	// for its cover, some of its title and its heart.
-	const controls = 4*32 + 2*4 // lyrics, the mini player, the moon and the speaker
+	const controls = 4*32 + 78 + 2*4 // four buttons and the quality pill
 	bar := ui.Row(c).Absolute().PaddingX(20).Gap(20).AlignItems(ui.Center)
 	if liquid {
-		bar.Left(12).Right(12).Bottom(8).Height(glassBarHeight).PaddingX(16)
+		bar.Left(sidebarInset).Right(sidebarInset).Bottom(8).Height(glassBarHeight).PaddingX(16)
 	} else {
 		bar.Left(0).Right(0).Bottom(0).Height(playerBarHeight)
 	}
@@ -467,6 +521,7 @@ func (a *app) playerBar(c *ui.Context) {
 			}
 			a.sleepButton(c, p.text.Alpha(0.75), p.accent)
 			a.volumeButton(c, p.text.Alpha(0.75))
+			a.qualityButton(c)
 		})
 	})
 	if liquid {

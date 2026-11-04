@@ -327,13 +327,25 @@ func (s settings) applyAppearance() {
 	}
 }
 
-// qualityLevel is the stream level NetEase names a quality by.
-var qualityLevels = []struct{ level, label string }{
-	{"standard", "标准（128k）"},
-	{"higher", "较高（192k）"},
-	{"exhigh", "极高（320k）"},
-	{"lossless", "无损（FLAC）"},
-	{"hires", "Hi-Res"},
+// qualityLevel is the stream level NetEase names a quality by: its full
+// label for the picker, and a short one for the button in the player bar.
+var qualityLevels = []struct{ level, label, short string }{
+	{"standard", "标准（128k）", "标准"},
+	{"higher", "较高（192k）", "较高"},
+	{"exhigh", "极高（320k）", "极高"},
+	{"lossless", "无损（FLAC）", "无损"},
+	{"hires", "Hi-Res", "Hi-Res"},
+}
+
+// qualityLabel is the full and short names of a level, or the highest
+// ordinary one where the level kept is one the app no longer offers.
+func qualityLabel(level string) (label, short string) {
+	for _, q := range qualityLevels {
+		if q.level == level {
+			return q.label, q.short
+		}
+	}
+	return qualityLevels[2].label, qualityLevels[2].short
 }
 
 // cacheLimits are the sizes the song cache may take, in megabytes.

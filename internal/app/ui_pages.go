@@ -106,25 +106,18 @@ func (a *app) chartsPage(c *ui.Context) {
 		defer a.endMark(c)
 		a.heading(c, "排行榜", "每日更新")
 		if loading {
-			s := a.pageShimmer(c)
-			a.chartCardsSkeleton(c, s)
-			a.section(c, "全部榜单")
-			a.playlistCardsSkeleton(c, s, a.columns(c, 150)*2, 150, true)
+			a.chartsSkeleton(c, a.pageShimmer(c))
 			return
 		}
-		official := a.charts[:min(4, len(a.charts))]
-		cols := min(4, max(2, a.columns(c, 260)))
-		ui.Grid(c).Columns(cols).Gap(20).Children(func() {
-			for i := range official {
-				a.chartCard(c.Key(official[i].ID), &official[i])
-			}
-		})
-		if len(a.charts) > 4 {
+		// The first chart runs wide as the page's one banner, its cover
+		// showing through; the rest sit below as cards washed in their
+		// own covers' colors, each with the three songs at its top.
+		a.chartHero(c, &a.charts[0])
+		if rest := a.charts[1:]; len(rest) > 0 {
 			a.section(c, "全部榜单")
-			rest := a.charts[4:]
-			ui.Grid(c).Columns(a.columns(c, 150)).GapX(20).GapY(28).Children(func() {
+			ui.Grid(c).Columns(a.columns(c, 330)).GapX(20).GapY(14).Children(func() {
 				for i := range rest {
-					a.playlistCard(c.Key(rest[i].ID), &rest[i])
+					a.chartTile(c.Key(rest[i].ID), &rest[i])
 				}
 			})
 		}
@@ -474,32 +467,80 @@ func (a *app) coverPlayButton(c *ui.Context, shown bool, play func()) {
 	}
 }
 
-// chartCard shows a chart with its top three songs beside its cover.
-func (a *app) chartCard(c *ui.Context, pl *netease.Playlist) {
-	p := a.pal
-	card := ui.ButtonBase(c).Gap(14).Padding(12).Radius(14).AlignItems(ui.Center).FocusRing(false).Label(pl.Name)
+// chartHero leads the charts page: the day's first chart run wide across
+// it, its cover showing through from the right and the three songs at its
+// top beside the name. The button under it plays the chart; the rest of
+// the banner opens it.
+func (a *app) chartHero(c *ui.Context, pl *netease.Playlist) {
+	const radius, height = 20, 224
+	base := ui.Hex("#17181c")
+	card := ui.ButtonBase(c).Height(height).Radius(radius).Clip().FocusRing(false).Label(pl.Name).Background(base)
 	hovered := card.Hovered()
-	bg := p.hover
+	pose := ui.Pose{}
 	if hovered {
-		bg = p.press
+		pose.Scale = 1.004
 	}
-	card.Background(card.AnimateColor("bg", bg, ui.Animation{Duration: 140 * time.Millisecond}))
+	card.AnimatePose(pose, ui.Snappy)
+	bmp := bitmap(a.art.get(netease.Sized(pl.Cover(), 900), false))
+	w, _ := c.Size()
+	wide := w-sidebarWidth > 700
 	card.Children(func() {
-		ui.Box(c).Size(84, 84).Radius(9).Shadow(0, 3, 10, -2, p.cardShade).Children(func() {
-			a.coverArt(c, pl.Cover(), pl.Name, 200, 9)
+		ui.Box(c).Absolute().Top(0).Left(0).Right(0).Bottom(0).PassThrough().Draw(func(p *ui.Painter, r ui.Rect) {
+			if bmp != nil {
+				p.Image(bmp, r, ui.Cover)
+			}
+			// The words keep their ground at the left; the cover comes
+			// clear by the right, with a last dark breath along the foot.
+			p.FillGradient(r, ui.LinearGradient{Angle: 90, Stops: []ui.GradientStop{
+				{At: 0, Color: base.Alpha(0.96)},
+				{At: 0.34, Color: base.Alpha(0.9)},
+				{At: 0.64, Color: base.Alpha(0.52)},
+				{At: 1, Color: base.Alpha(0.2)},
+			}}, radius)
+			p.FillGradient(r, ui.LinearGradient{Angle: 180, Stops: []ui.GradientStop{
+				{At: 0, Color: ui.RGBA(0, 0, 0, 0)},
+				{At: 1, Color: ui.RGBA(0, 0, 0, 0.42)},
+			}}, radius)
 		})
-		ui.Column(c).Grow(1).Shrink(1).MinWidth(0).Gap(5).Children(func() {
-			ui.Row(c).Gap(6).AlignItems(ui.Baseline).Children(func() {
-				ui.Text(c, pl.Name).FontSize(14).FontWeight(700).SingleLine()
-				ui.Text(c, pl.UpdateFreq).FontSize(11).TextColor(p.faint).SingleLine()
+		ui.Row(c).Absolute().Top(0).Left(0).Right(0).Bottom(0).Padding(22).Gap(26).AlignItems(ui.Center).Children(func() {
+			ui.Column(c).Grow(1).Shrink(1).MinWidth(0).Gap(6).Children(func() {
+				ui.Row(c).Gap(7).AlignItems(ui.Center).Children(func() {
+					ui.Icon(c, iconCharts).Size(12, 12).TextColor(white.Alpha(0.7))
+					label := pl.UpdateFreq
+					if label == "" {
+						label = "每日更新"
+					}
+					ui.Text(c, label).FontSize(11).FontWeight(700).LetterSpacing(0.8).TextColor(white.Alpha(0.7))
+				})
+				ui.Text(c, pl.Name).FontSize(26).FontWeight(800).LetterSpacing(-0.5).TextColor(white).SingleLine()
+				ui.Column(c).Gap(3).Margin(4, 0, 2, 0).Children(func() {
+					for i, line := range pl.Preview {
+						ui.Row(c).Gap(9).AlignItems(ui.Center).Children(func() {
+							ui.Textf(c, "%d", i+1).FontSize(11).FontWeight(700).Width(12).FontFeatures("tnum").TextColor(white.Alpha(0.66))
+							ui.Text(c, line.First).FontSize(12.5).FontWeight(600).TextColor(white.Alpha(0.95)).SingleLine().Shrink(1).MinWidth(0)
+							ui.Text(c, line.Second).FontSize(12).TextColor(white.Alpha(0.58)).SingleLine().Shrink(1).MinWidth(0)
+						})
+					}
+				})
+				ui.Row(c).Gap(12).AlignItems(ui.Center).Margin(6, 0, 0, 0).Children(func() {
+					if pillButton(c.Key("play"), iconPlay, "播放", white, base).Clicked() {
+						a.loadPlaylist(pl.ID, true)
+					}
+					var meta []string
+					if pl.TrackCount > 0 {
+						meta = append(meta, fmt.Sprintf("%d 首", pl.TrackCount))
+					}
+					if pl.PlayCount > 0 {
+						meta = append(meta, plays(pl.PlayCount)+" 次播放")
+					}
+					if len(meta) > 0 {
+						ui.Text(c, strings.Join(meta, " · ")).FontSize(11.5).FontWeight(600).TextColor(white.Alpha(0.62))
+					}
+				})
 			})
-			for i, line := range pl.Preview {
-				ui.Row(c).Gap(7).Children(func() {
-					ui.Textf(c, "%d", i+1).FontSize(12).FontWeight(700).Width(10).FontFeatures("tnum").TextColor(p.muted)
-					ui.RichText(c,
-						ui.Span{Text: line.First, Weight: 500},
-						ui.Span{Text: "  " + line.Second, Color: p.muted},
-					).FontSize(12).SingleLine().Shrink(1).MinWidth(0)
+			if wide {
+				ui.Box(c).Size(148, 148).Shrink(0).Radius(14).Shadow(0, 18, 44, -10, ui.RGBA(0, 0, 0, 0.5)).Children(func() {
+					a.coverArt(c, pl.Cover(), pl.Name, 500, 14)
 				})
 			}
 		})
@@ -507,6 +548,74 @@ func (a *app) chartCard(c *ui.Context, pl *netease.Playlist) {
 	if card.Clicked() {
 		a.open(route{page: pagePlaylist, id: pl.ID})
 	}
+}
+
+// chartTile is one of the other charts: its cover on the left, its name,
+// and the three songs at its top, on a wash of the cover's own color. The
+// pointer lifts it, and a button on the cover plays it.
+func (a *app) chartTile(c *ui.Context, pl *netease.Playlist) {
+	p := a.pal
+	card := ui.ButtonBase(c).Padding(13).Radius(16).Gap(13).AlignItems(ui.Center).FocusRing(false).Label(pl.Name)
+	hovered := card.Hovered()
+	tint := chartWash(a.avatarTint(pl.Cover(), pl.Name))
+	fill := tint.Alpha(0.1)
+	if p.dark {
+		fill = tint.Alpha(0.16)
+	}
+	if hovered {
+		fill = tint.Alpha(0.18)
+		if p.dark {
+			fill = tint.Alpha(0.26)
+		}
+	}
+	card.Background(card.AnimateColor("bg", fill, ui.Animation{Duration: 140 * time.Millisecond})).Border(1, p.hairline)
+	pose := ui.Pose{}
+	if hovered {
+		pose.Y = -2
+		card.Shadow(0, 10, 26, -12, p.cardShade)
+	}
+	card.AnimatePose(pose, ui.Snappy)
+	card.Children(func() {
+		ui.Box(c).Size(86, 86).Shrink(0).Radius(12).Shadow(0, 3, 10, -3, p.cardShade).Children(func() {
+			a.coverArt(c, pl.Cover(), pl.Name, 300, 12)
+			a.coverPlayButton(c, hovered, func() { a.loadPlaylist(pl.ID, true) })
+		})
+		ui.Column(c).Grow(1).Shrink(1).MinWidth(0).Gap(2).Children(func() {
+			ui.Text(c, pl.Name).FontSize(14.5).FontWeight(700).SingleLine()
+			meta := pl.UpdateFreq
+			if pl.TrackCount > 0 {
+				if meta != "" {
+					meta += " · "
+				}
+				meta += fmt.Sprintf("%d 首", pl.TrackCount)
+			}
+			if meta != "" {
+				ui.Text(c, meta).FontSize(11).TextColor(p.faint).SingleLine()
+			}
+			ui.Column(c).Gap(3).Margin(5, 0, 0, 0).Children(func() {
+				for i, line := range pl.Preview {
+					ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
+						ui.Textf(c, "%d", i+1).FontSize(11).FontWeight(700).Width(11).FontFeatures("tnum").TextColor(p.accent.Alpha(0.85))
+						ui.Text(c, line.First).FontSize(12).FontWeight(500).SingleLine().Shrink(1).MinWidth(0)
+						ui.Text(c, line.Second).FontSize(11).TextColor(p.muted).SingleLine().Shrink(1).MinWidth(0)
+					})
+				}
+			})
+		})
+	})
+	if card.Clicked() {
+		a.open(route{page: pagePlaylist, id: pl.ID})
+	}
+}
+
+// chartWash softens a cover's color for the card behind a chart: a cover
+// that is nearly black would give a wash nobody sees, so it is lifted.
+func chartWash(c ui.Color) ui.Color {
+	l := 0.299*float32(c.R)/255 + 0.587*float32(c.G)/255 + 0.114*float32(c.B)/255
+	if l < 0.22 {
+		return c.Mix(white, 0.55)
+	}
+	return c
 }
 
 func (a *app) playlistPage(c *ui.Context) {

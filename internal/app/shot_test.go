@@ -178,6 +178,149 @@ func TestDailyShot(t *testing.T) {
 	}
 }
 
+// TestChartsShot draws the charts page: the banner the first chart wears
+// and the cards under it, light and dark, for the layout.
+func TestChartsShot(t *testing.T) {
+	dir := os.Getenv("NM_SHOTS")
+	if dir == "" {
+		t.Skip()
+	}
+	a := newTestApp()
+	a.settings = defaultSettings()
+	a.profile = &netease.Profile{UserID: 1, Nickname: "听众"}
+	cover := func(hue int) image.Image {
+		img := image.NewRGBA(image.Rect(0, 0, 400, 400))
+		for y := range 400 {
+			for x := range 400 {
+				r := uint8(60 + 150*x/400)
+				g := uint8(40 + hue)
+				b := uint8(200 - hue - 80*y/400)
+				i := img.PixOffset(x, y)
+				img.Pix[i], img.Pix[i+1], img.Pix[i+2], img.Pix[i+3] = r, g, b, 255
+			}
+		}
+		return img
+	}
+	names := []string{"飙升榜", "新歌榜", "原创榜", "热歌榜", "说唱榜", "国风榜", "ACG 榜"}
+	a.charts = nil
+	for i, name := range names {
+		pic := fmt.Sprintf("chart%d", i)
+		pl := netease.Playlist{
+			ID: int64(100 + i), Name: name, UpdateFreq: "每天更新", TrackCount: 100,
+			PlayCount: 1200000 + float64(i)*9e5, CoverURL: pic,
+			Preview: []netease.ChartLine{
+				{First: "夏天的风", Second: "温岚"},
+				{First: "以爱为营", Second: "希林娜依·高"},
+				{First: "若是月亮还没来", Second: "王宇宙Leto、乔浚丞"},
+			},
+		}
+		a.charts = append(a.charts, pl)
+		bmp := ui.NewBitmap(cover(i * 40))
+		for _, px := range []int{300, 500, 600, 900} {
+			a.art.art[netease.Sized(pic, px)] = &artwork{bmp: bmp, used: a.art.now()}
+		}
+	}
+	a.route = route{page: pageCharts}
+	os.MkdirAll(dir, 0o755)
+	write := func(name string, dark bool) {
+		tt := ui.NewTester(a.view, 1200, 900)
+		tt.SetDark(dark)
+		tt.Frame()
+		tt.Advance(time.Second)
+		for range 3 {
+			tt.Frame()
+		}
+		f, err := os.Create(filepath.Join(dir, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer f.Close()
+		if err := png.Encode(f, tt.Image()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("charts.png", false)
+	write("charts-dark.png", true)
+}
+
+// TestPodcastsShot draws the podcasts tab: the banner the day's pick
+// wears, the subscriptions round, and the picks' cards, light and dark.
+func TestPodcastsShot(t *testing.T) {
+	dir := os.Getenv("NM_SHOTS")
+	if dir == "" {
+		t.Skip()
+	}
+	a := newTestApp()
+	a.settings = defaultSettings()
+	a.profile = &netease.Profile{UserID: 1, Nickname: "听众"}
+	cover := func(hue int) image.Image {
+		img := image.NewRGBA(image.Rect(0, 0, 400, 400))
+		for y := range 400 {
+			for x := range 400 {
+				r := uint8(60 + 150*x/400)
+				g := uint8(40 + hue)
+				b := uint8(200 - hue - 80*y/400)
+				i := img.PixOffset(x, y)
+				img.Pix[i], img.Pix[i+1], img.Pix[i+2], img.Pix[i+3] = r, g, b, 255
+			}
+		}
+		return img
+	}
+	pod := func(i int, name, line string) netease.Podcast {
+		pic := fmt.Sprintf("pod%d", i)
+		p := netease.Podcast{
+			ID: int64(300 + i), Name: name, PicURL: pic, Category: "脱口秀",
+			DJ:           netease.User{UserID: int64(10 + i), Nickname: "主播甲"},
+			ProgramCount: 120 + i, SubCount: 50000 + int64(i)*7000,
+			RcmdText: line,
+		}
+		bmp := ui.NewBitmap(cover(i * 36))
+		for _, px := range []int{160, 300, 500, 600, 900} {
+			a.art.art[netease.Sized(pic, px)] = &artwork{bmp: bmp, used: a.art.now()}
+		}
+		return p
+	}
+	a.podcastTab.subs = []netease.Podcast{
+		pod(0, "凹凸电波", "每周更新的晚安电台"),
+		pod(1, " Random Georgia", "陪我走过的三年"),
+		pod(2, "故事收音机", "睡前一段故事"),
+		pod(3, "跑步电台", "配速与歌单"),
+		pod(4, "深夜谈天", "和朋友聊到天亮"),
+	}
+	a.podcastTab.picks = []netease.Podcast{
+		pod(5, "岩中花述", "鲁豫与她的朋友们的深谈"),
+		pod(6, "半拿铁 | 商业沉浮录", "每期一个商业故事，咖啡与公司与人生"),
+		pod(7, "无人知晓", "孟岩与朋友们的投资与生活"),
+		pod(8, "得意忘形", "一次关于自我认识的谈话节目"),
+		pod(9, "枫言枫语", "关注技术与创作的播客"),
+	}
+	for i := range 8 {
+		a.podcastTab.hot = append(a.podcastTab.hot, pod(10+i, fmt.Sprintf("热门播客 %d", i+1), "本月最热"))
+	}
+	a.podcastTab.hotPage = paged{loaded: true}
+	a.route = route{page: pagePodcasts}
+	os.MkdirAll(dir, 0o755)
+	write := func(name string, dark bool) {
+		tt := ui.NewTester(a.view, 1200, 900)
+		tt.SetDark(dark)
+		tt.Frame()
+		tt.Advance(time.Second)
+		for range 3 {
+			tt.Frame()
+		}
+		f, err := os.Create(filepath.Join(dir, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer f.Close()
+		if err := png.Encode(f, tt.Image()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("podcasts.png", false)
+	write("podcasts-dark.png", true)
+}
+
 // fillHome gives a test app a home page's worth of things to show.
 func fillHome(t *testing.T, a *app) {
 	t.Helper()

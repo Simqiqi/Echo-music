@@ -360,8 +360,9 @@ func TestPodcastsTabLoads(t *testing.T) {
 	}
 }
 
-// A podcast's card in the tab opens its page; the button on its cover plays
-// its newest episode instead, and leaves the tab open.
+// The listener's subscriptions are round dials in the tab: the dial's
+// center plays its newest episode and leaves the tab open; the name under
+// it opens the page.
 func TestPodcastCard(t *testing.T) {
 	a := catalogApp()
 	a.open(route{page: pagePodcasts})
@@ -371,18 +372,16 @@ func TestPodcastCard(t *testing.T) {
 	if !ok {
 		t.Fatal("no card")
 	}
-	// The button shows under the pointer, in the corner of the square
-	// cover.
-	x, y := r.X+r.W-29, r.Y+r.W-29
-	tt.Move(x, y)
+	cx := r.X + r.W/2
+	tt.Move(cx, r.Y+42)
 	tt.Advance(time.Second)
 	tt.Frame()
-	tt.ClickAt(x, y)
+	tt.ClickAt(cx, r.Y+42)
 	tt.Frame()
 	if cur := a.pl.Current(); cur == nil || cur.ProgramID != 40 || a.route.page != pagePodcasts {
 		t.Fatalf("playing %+v on %+v", cur, a.route)
 	}
-	tt.ClickAt(r.X+r.W/2, r.Y+r.W/2)
+	tt.ClickAt(cx, r.Y+r.H-9)
 	tt.Frame()
 	if a.route != (route{page: pagePodcast, id: 5}) {
 		t.Fatalf("opened %+v", a.route)

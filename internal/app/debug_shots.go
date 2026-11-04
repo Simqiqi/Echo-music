@@ -144,6 +144,29 @@ func init() {
 				mygo.RunOnMain(mygo.App.Quit)
 				return
 			}
+			if os.Getenv("NM_SCENE") == "charts" {
+				// The charts page once the charts are in hand, its top on
+				// the screen, for the banner and the cards: the screen is
+				// grabbed from outside.
+				for range 80 {
+					var n int
+					mygo.RunOnMain(func() { n = len(a.charts) })
+					if n > 0 {
+						break
+					}
+					time.Sleep(250 * time.Millisecond)
+				}
+				time.Sleep(2 * time.Second)
+				step(0, func() {
+					a.win.SetAlwaysOnTop(true)
+					a.open(route{page: pageCharts})
+				})
+				time.Sleep(4 * time.Second)
+				step(0, func() { a.pageScroll.ScrollTo(0, 0, ui.Smooth) })
+				time.Sleep(6 * time.Second)
+				mygo.RunOnMain(mygo.App.Quit)
+				return
+			}
 			if os.Getenv("NM_SCENE") == "dev" {
 				time.Sleep(3 * time.Second)
 				step(0, func() { a.openSettings() })

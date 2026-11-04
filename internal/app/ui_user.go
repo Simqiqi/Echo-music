@@ -155,8 +155,7 @@ func (a *app) userWash(tint ui.Color, radius float32) func(*ui.Painter, ui.Rect)
 // userPhoto is a user's picture, ringed where it sits on their own color:
 // the rim keeps the photo and the wash behind it from reading as one
 // shape, whatever the photo is colored.
-func (a *app) userPhoto(c *ui.Context, url string, ringed bool) {
-	size := float32(artistPhotoSize)
+func (a *app) userPhoto(c *ui.Context, url string, ringed bool, size float32) {
 	p := a.pal
 	if !ringed {
 		ui.Box(c).Size(size, size).Radius(size/2).Shadow(0, 18, 40, -10, p.cardShade).Children(func() {
@@ -191,7 +190,6 @@ func publicPlaylists(lists []netease.Playlist, uid int64) []netease.Playlist {
 }
 
 func (a *app) userPage(c *ui.Context) {
-	p := a.pal
 	id := a.route.id
 	d := a.users[id]
 	if d.user == nil {
@@ -211,26 +209,7 @@ func (a *app) userPage(c *ui.Context) {
 	onGlass := a.settings.glassOn()
 	tint := a.avatarTint(u.AvatarURL, u.Nickname)
 	a.scrollPage(c, func() {
-		// Liquid Glass: who they are sits on a pane of it, from the
-		// photo out across the name and the counts, lit along its rim,
-		// rather than loose on the page. The pane carries a wash of the
-		// photo's own color, from the photo out to the right.
-		head := ui.Row(c.Key("user-head")).Gap(28).AlignItems(ui.End)
-		if onGlass {
-			head.Padding(20, 22).Radius(28).Clip().Material(glass.Glass{Clarity: a.glassClarity(0.4)})
-			head.Draw(a.userWash(tint, 28))
-		}
-		head.Children(func() {
-			a.userPhoto(c, u.AvatarURL, onGlass)
-			ui.Column(c).Grow(1).Shrink(1).MinWidth(0).Gap(8).Children(func() {
-				ui.Text(c, "用户").FontSize(12).FontWeight(600).TextColor(p.accent)
-				ui.Text(c, u.Nickname).FontSize(30).FontWeight(800).LetterSpacing(-0.6).MaxLines(2).LineHeight(1.2)
-				ui.Text(c, fmt.Sprintf("%s 关注 · %s 粉丝", count(u.Follows), count(u.Followeds))).FontSize(13).TextColor(p.muted)
-				if u.Signature != "" {
-					ui.Text(c, u.Signature).FontSize(12.5).TextColor(p.muted).MaxLines(2).LineHeight(1.45).Margin(2, 0, 0, 0)
-				}
-			})
-		})
+		a.userHero(c, u, d, own, onGlass, tint)
 		a.section(c, "创建的歌单")
 		switch {
 		case d.loading > 0:
@@ -244,29 +223,141 @@ func (a *app) userPage(c *ui.Context) {
 				}
 			})
 		}
-		if own && d.podcastsShown {
-			a.section(c, "订阅的播客")
-			if len(d.podcasts) == 0 {
-				a.empty(c, "还没有订阅播客")
-			}
-			ui.Grid(c).Columns(a.columns(c, 340)).GapX(8).GapY(4).Margin(0, -12).Children(func() {
-				for i := range d.podcasts {
-					a.podcastRow(c.Key(d.podcasts[i].ID), &d.podcasts[i])
-				}
-			})
-		}
-		if own && d.artistsShown {
-			a.section(c, "关注的歌手")
-			if len(d.artists) == 0 {
-				a.empty(c, "还没有关注歌手")
-			}
-			ui.Grid(c).Columns(a.columns(c, 132)).GapX(20).GapY(28).Children(func() {
-				for i := range d.artists {
-					a.artistCard(c.Key(d.artists[i].ID), &d.artists[i])
-				}
-			})
+		if own {
+			a.userShelf(c, d)
 		}
 	})
+}
+
+// userHero is the card at the head of a user's page: their picture on a
+// wash of its own color, their name and signature, and three counts set
+// apart as a row of their own — who they follow, who follows them, and
+// the playlists they made. Without the glass it is a quiet plate of the
+// sidebar's tone, so the same shape reads in either appearance.
+func (a *app) userHero(c *ui.Context, u *netease.User, d *userData, own, onGlass bool, tint ui.Color) {
+	p := a.pal
+	head := ui.Row(c.Key("user-head")).Gap(30).Padding(26, 30).AlignItems(ui.Center).Radius(28).Clip()
+	if onGlass {
+		head.Material(glass.Glass{Clarity: a.glassClarity(0.4)})
+		head.Draw(a.userWash(tint, 28))
+	} else {
+		head.Background(p.sidebar).Border(1, p.hairline).Shadow(0, 16, 44, -20, p.cardShade)
+	}
+	head.Children(func() {
+		a.userPhoto(c, u.AvatarURL, onGlass, 152)
+		ui.Column(c).Grow(1).Shrink(1).MinWidth(0).Gap(9).Children(func() {
+			cap := "用户"
+			if own {
+				cap = "我的主页"
+			}
+			ui.Row(c).Gap(7).AlignItems(ui.Center).Children(func() {
+				ui.Box(c).Width(3).Height(12).Radius(1.5).Background(p.accent)
+				ui.Text(c, cap).FontSize(11.5).FontWeight(700).LetterSpacing(0.8).TextColor(p.accent)
+			})
+			ui.Text(c, u.Nickname).FontSize(32).FontWeight(800).LetterSpacing(-0.8).MaxLines(2).LineHeight(1.18)
+			if u.Signature != "" {
+				ui.Text(c, u.Signature).FontSize(12.5).TextColor(p.muted).MaxLines(2).LineHeight(1.5)
+			}
+			ui.Row(c).Margin(10, 0, 0, 0).Gap(0).AlignItems(ui.Center).Children(func() {
+				for i, s := range []struct{ n, label string }{
+					{count(u.Follows), "关注"},
+					{count(u.Followeds), "粉丝"},
+					{count(len(d.playlists)), "歌单"},
+				} {
+					if i > 0 {
+						ui.Box(c).Width(1).Height(28).Margin(0, 20).Background(p.hairline)
+					}
+					ui.Column(c).Gap(2).Children(func() {
+						ui.Text(c, s.n).FontSize(18).FontWeight(700).FontFeatures("tnum")
+						ui.Text(c, s.label).FontSize(11).TextColor(p.muted)
+					})
+				}
+			})
+		})
+	})
+}
+
+// userShelf lays the two personal lists out in cards of their own: side by
+// side where the page is wide, one above the other where it is not. Every
+// row still opens the artist or podcast it names, and the empty lists
+// still say so.
+func (a *app) userShelf(c *ui.Context, d *userData) {
+	if !d.artistsShown && !d.podcastsShown {
+		return
+	}
+	a.section(c, "关注与订阅")
+	w, _ := c.Size()
+	inner := w - sidebarWidth - 2*(pagePad-12)
+	wide := inner >= 760 && d.artistsShown && d.podcastsShown
+	cols := a.columns(c, 132)
+	if wide {
+		cols = max(2, int((inner/2-36)/96))
+	}
+	build := func() {
+		fill := func(el ui.Element) {
+			if wide {
+				el.Grow(1).Basis(0).MinWidth(0)
+			}
+		}
+		if d.artistsShown {
+			fill(a.shelfCard(c, "关注的歌手", iconUser, len(d.artists), func() {
+				if len(d.artists) == 0 {
+					a.empty(c, "还没有关注歌手")
+					return
+				}
+				ui.Grid(c).Columns(cols).GapX(12).GapY(18).Children(func() {
+					for i := range d.artists {
+						a.artistCard(c.Key(d.artists[i].ID), &d.artists[i])
+					}
+				})
+			}))
+		}
+		if d.podcastsShown {
+			fill(a.shelfCard(c, "订阅的播客", iconPodcast, len(d.podcasts), func() {
+				if len(d.podcasts) == 0 {
+					a.empty(c, "还没有订阅播客")
+					return
+				}
+				ui.Column(c).Children(func() {
+					for i := range d.podcasts {
+						a.podcastRow(c.Key(d.podcasts[i].ID), &d.podcasts[i])
+					}
+				})
+			}))
+		}
+	}
+	if wide {
+		ui.Row(c).Gap(16).AlignItems(ui.Stretch).Children(build)
+	} else {
+		ui.Column(c).Gap(16).Children(build)
+	}
+}
+
+// shelfCard is one of the two personal lists: a quiet pane with its name
+// and count in a head of its own, holding the rows beneath.
+func (a *app) shelfCard(c *ui.Context, title string, icon *ui.SVG, n int, body func()) ui.Element {
+	p := a.pal
+	card := ui.Column(c).Padding(16, 18, 18, 18).Radius(20)
+	if a.settings.glassOn() {
+		fill := ui.RGBA(255, 255, 255, 0.32)
+		edge := ui.RGBA(255, 255, 255, 0.45)
+		if p.dark {
+			fill, edge = ui.RGBA(255, 255, 255, 0.055), ui.RGBA(255, 255, 255, 0.10)
+		}
+		card.Background(fill).Border(1, edge)
+	} else {
+		card.Background(p.sidebar).Border(1, p.hairline)
+	}
+	card.Children(func() {
+		ui.Row(c).Gap(8).AlignItems(ui.Center).Margin(0, 0, 12, 0).Children(func() {
+			ui.Icon(c, icon).Size(15, 15).TextColor(p.accent)
+			ui.Text(c, title).FontSize(14.5).FontWeight(700)
+			ui.Text(c, fmt.Sprint(n)).FontSize(11).FontWeight(600).TextColor(p.muted).
+				Padding(2, 8).Radius(999).Background(p.hover)
+		})
+		body()
+	})
+	return card
 }
 
 // userRow is a user in a list, opening their page.

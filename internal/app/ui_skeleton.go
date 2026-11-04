@@ -124,6 +124,55 @@ func (a *app) chartCardsSkeleton(c *ui.Context, s shimmer) {
 	})
 }
 
+// chartsSkeleton is the charts page while it loads: the banner's band,
+// then the tiles under it.
+func (a *app) chartsSkeleton(c *ui.Context, s shimmer) {
+	s.bone(c, 20).Height(224)
+	a.section(c, "全部榜单")
+	ui.Grid(c).Columns(a.columns(c, 330)).GapX(20).GapY(14).Children(func() {
+		for i := range 6 {
+			ui.Row(c.Key(i)).Padding(13).Radius(16).Gap(13).AlignItems(ui.Center).Background(a.pal.hover).Children(func() {
+				s.bone(c, 12).Size(86, 86)
+				ui.Column(c).Grow(1).Shrink(1).MinWidth(0).Gap(4).Children(func() {
+					s.text(c, 14, 1.3).WidthPercent(54)
+					s.text(c, 11, 1.3).WidthPercent(34)
+					for j := range 3 {
+						s.text(c, 12, 1.3).WidthPercent(boneWidth(i*3 + j))
+					}
+				})
+			})
+		}
+	})
+}
+
+// podcastsSkeleton is the podcasts page while it loads: the banner's
+// band, round dials for the subscriptions, and the picks' cards.
+func (a *app) podcastsSkeleton(c *ui.Context, s shimmer) {
+	s.bone(c, 20).Height(224)
+	a.section(c, "我的订阅")
+	ui.Grid(c).Columns(a.columns(c, 104)).GapX(20).GapY(18).Children(func() {
+		for i := range 6 {
+			ui.Column(c.Key(i)).Gap(8).AlignItems(ui.Center).Children(func() {
+				s.bone(c, 999).Size(84, 84)
+				s.text(c, 12, 1.3).WidthPercent(72)
+			})
+		}
+	})
+	a.section(c, "精选播客")
+	ui.Grid(c).Columns(a.columns(c, 330)).GapX(20).GapY(14).Children(func() {
+		for i := range 4 {
+			ui.Row(c.Key(i)).Padding(13).Radius(16).Gap(13).AlignItems(ui.Center).Background(a.pal.hover).Children(func() {
+				s.bone(c, 14).Size(92, 92)
+				ui.Column(c).Grow(1).Shrink(1).MinWidth(0).Gap(5).Children(func() {
+					s.text(c, 14, 1.3).WidthPercent(52)
+					s.text(c, 11, 1.3).WidthPercent(36)
+					s.text(c, 12, 1.4).WidthPercent(88)
+				})
+			})
+		}
+	})
+}
+
 // playlistCardsSkeleton is n of playlistCard's cards, in columns at least
 // min DIPs wide, with a line for how often they update if freq.
 func (a *app) playlistCardsSkeleton(c *ui.Context, s shimmer, n int, min float32, freq bool) {

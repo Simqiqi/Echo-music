@@ -419,51 +419,217 @@ func (a *app) podcastsPage(c *ui.Context) {
 		a.startMark(c)
 		defer a.endMark(c)
 		a.heading(c, "播客", "")
-		cols := a.columns(c, 150)
 		if !t.hotPage.loaded {
-			s := a.pageShimmer(c)
-			a.section(c, "精选播客").Margin(0, 0, 14, 0)
-			a.playlistCardsSkeleton(c, s, cols, 150, true)
-			a.section(c, "热门播客")
-			a.playlistCardsSkeleton(c, s, cols*2, 150, true)
+			a.podcastsSkeleton(c, a.pageShimmer(c))
 			return
 		}
-		// The first list starts right under the heading.
+		// One pick leads the page on its own cover; the subscriptions sit
+		// round beneath it, the other picks as cards washed in their
+		// covers' colors, and the popular ones as rows.
+		hero, picks, hot := (*netease.Podcast)(nil), t.picks, t.hot
+		switch {
+		case len(t.picks) > 0:
+			hero, picks = &t.picks[0], t.picks[1:]
+		case len(t.hot) > 0:
+			hero, hot = &t.hot[0], t.hot[1:]
+		}
+		if hero != nil {
+			a.podcastHero(c, hero)
+		}
 		first := true
-		list := func(title string, pods []netease.Podcast) {
-			if len(pods) == 0 {
-				return
-			}
+		sec := func(title string) {
 			if s := a.section(c, title); first {
 				s.Margin(0, 0, 14, 0)
 			}
 			first = false
-			ui.Grid(c.Key(title)).Columns(cols).GapX(20).GapY(28).Children(func() {
-				for i := range pods {
-					a.podcastCard(c.Key(pods[i].ID), &pods[i])
+		}
+		if len(t.subs) > 0 {
+			sec("我的订阅")
+			ui.Grid(c).Columns(a.columns(c, 104)).GapX(20).GapY(18).Children(func() {
+				for i := range t.subs {
+					a.subCard(c.Key(t.subs[i].ID), &t.subs[i])
 				}
 			})
 		}
-		list("我的订阅", t.subs)
-		list("精选播客", t.picks)
-		list("热门播客", t.hot)
+		if len(picks) > 0 {
+			sec("精选播客")
+			ui.Grid(c).Columns(a.columns(c, 330)).GapX(20).GapY(14).Children(func() {
+				for i := range picks {
+					a.podcastTile(c.Key(picks[i].ID), &picks[i])
+				}
+			})
+		}
+		if len(hot) > 0 {
+			sec("热门播客")
+			ui.Grid(c).Columns(a.columns(c, 340)).GapX(20).GapY(4).Children(func() {
+				for i := range hot {
+					a.podcastRow(c.Key(hot[i].ID), &hot[i])
+				}
+			})
+		}
 		a.pageFoot(c, &t.hotPage, a.loadHotPodcasts)
 	})
 }
 
-// podcastCard is a podcast's cover over its name and, for those the
-// listener subscribes to, its newest episode; for the others, why to
-// listen.
-func (a *app) podcastCard(c *ui.Context, pod *netease.Podcast) {
-	sub := pod.LastProgram
-	if sub == "" {
-		sub = pod.RcmdText
+// podcastHero leads the podcasts page: one pick run wide across it, its
+// cover showing through from the right and a line on why to listen beside
+// the name. The button under it plays it; the rest of the banner opens it.
+func (a *app) podcastHero(c *ui.Context, pod *netease.Podcast) {
+	const radius, height = 20, 224
+	base := ui.Hex("#17181c")
+	card := ui.ButtonBase(c).Height(height).Radius(radius).Clip().FocusRing(false).Label(pod.Name).Background(base)
+	hovered := card.Hovered()
+	pose := ui.Pose{}
+	if hovered {
+		pose.Scale = 1.004
 	}
-	if sub == "" {
-		sub = pod.DJ.Nickname
+	card.AnimatePose(pose, ui.Snappy)
+	bmp := bitmap(a.art.get(netease.Sized(pod.PicURL, 900), false))
+	w, _ := c.Size()
+	wide := w-sidebarWidth > 700
+	card.Children(func() {
+		ui.Box(c).Absolute().Top(0).Left(0).Right(0).Bottom(0).PassThrough().Draw(func(p *ui.Painter, r ui.Rect) {
+			if bmp != nil {
+				p.Image(bmp, r, ui.Cover)
+			}
+			// The words keep their ground at the left; the cover comes
+			// clear by the right, with a last dark breath along the foot.
+			p.FillGradient(r, ui.LinearGradient{Angle: 90, Stops: []ui.GradientStop{
+				{At: 0, Color: base.Alpha(0.96)},
+				{At: 0.34, Color: base.Alpha(0.9)},
+				{At: 0.64, Color: base.Alpha(0.52)},
+				{At: 1, Color: base.Alpha(0.2)},
+			}}, radius)
+			p.FillGradient(r, ui.LinearGradient{Angle: 180, Stops: []ui.GradientStop{
+				{At: 0, Color: ui.RGBA(0, 0, 0, 0)},
+				{At: 1, Color: ui.RGBA(0, 0, 0, 0.42)},
+			}}, radius)
+		})
+		ui.Row(c).Absolute().Top(0).Left(0).Right(0).Bottom(0).Padding(22).Gap(26).AlignItems(ui.Center).Children(func() {
+			ui.Column(c).Grow(1).Shrink(1).MinWidth(0).Gap(6).Children(func() {
+				label := pod.Category
+				if label == "" {
+					label = "编辑精选"
+				}
+				ui.Row(c).Gap(7).AlignItems(ui.Center).Children(func() {
+					ui.Icon(c, iconPodcast).Size(12, 12).TextColor(white.Alpha(0.7))
+					ui.Text(c, label).FontSize(11).FontWeight(700).LetterSpacing(0.8).TextColor(white.Alpha(0.7))
+				})
+				ui.Text(c, pod.Name).FontSize(26).FontWeight(800).LetterSpacing(-0.5).TextColor(white).SingleLine()
+				ui.RichText(c).FontSize(12).Children(func() {
+					if pod.DJ.UserID != 0 {
+						ui.Text(c, pod.DJ.Nickname).FontWeight(600).TextColor(white.Alpha(0.85))
+						ui.Text(c, " · ").TextColor(white.Alpha(0.5))
+					}
+					ui.Textf(c, "%d 期 · %s 人订阅", pod.ProgramCount, count(int(pod.SubCount))).
+						TextColor(white.Alpha(0.62))
+				})
+				if line := strings.TrimSpace(pod.RcmdText); line != "" {
+					ui.Text(c, line).FontSize(12.5).LineHeight(1.5).TextColor(white.Alpha(0.72)).MaxLines(2)
+				}
+				ui.Row(c).Gap(12).AlignItems(ui.Center).Margin(6, 0, 0, 0).Children(func() {
+					if pillButton(c.Key("play"), iconPlay, "播放", white, base).Clicked() {
+						a.playPodcast(pod.ID)
+					}
+				})
+			})
+			if wide {
+				ui.Box(c).Size(148, 148).Shrink(0).Radius(14).Shadow(0, 18, 44, -10, ui.RGBA(0, 0, 0, 0.5)).Children(func() {
+					a.coverArt(c, pod.PicURL, pod.Name, 500, 14)
+				})
+			}
+		})
+	})
+	if card.Clicked() {
+		a.open(route{page: pagePodcast, id: pod.ID})
 	}
-	id := pod.ID
-	if a.coverCard(c, pod.Name, pod.PicURL, pod.PlayCount, sub, func() { a.playPodcast(id) }) {
-		a.open(route{page: pagePodcast, id: id})
+}
+
+// subCard is a podcast the listener subscribes to, round as a dial, its
+// name under it.
+func (a *app) subCard(c *ui.Context, pod *netease.Podcast) {
+	p := a.pal
+	card := ui.ButtonBase(c).Column().Gap(8).AlignItems(ui.Center).FocusRing(false).Label(pod.Name)
+	hovered := card.Hovered()
+	pose := ui.Pose{}
+	if hovered {
+		pose.Y = -2
+	}
+	card.AnimatePose(pose, ui.Snappy)
+	card.Children(func() {
+		ui.Box(c).Size(84, 84).Radius(999).Children(func() {
+			a.coverFill(c, pod.PicURL, 300, 999)
+			// A dial of its own in the middle of the dial: it plays the
+			// podcast without opening it, and the rest of the card opens.
+			ui.Box(c).Absolute().Top(0).Left(0).Right(0).Bottom(0).Center().Children(func() {
+				play := ui.ButtonBase(c.Key("play")).Size(34, 34).Radius(999).Center().
+					Background(p.accent).TextColor(white).FocusRing(false).Label("播放").
+					Shadow(0, 4, 12, 0, ui.RGBA(0, 0, 0, 0.3))
+				fade := ui.Pose{Fade: 0, Scale: 0.7}
+				if hovered {
+					fade = ui.Pose{Scale: 1}
+				}
+				play.AnimatePose(fade, ui.Snappy)
+				play.Children(func() { ui.Icon(c, iconPlay).Size(14, 14).Margin(0, 0, 0, 1) })
+				if play.Clicked() {
+					a.playPodcast(pod.ID)
+				}
+			})
+		})
+		ui.Text(c, pod.Name).FontSize(12).FontWeight(600).SingleLine()
+	})
+	if card.Clicked() {
+		a.open(route{page: pagePodcast, id: pod.ID})
+	}
+}
+
+// podcastTile is one of the other picks: its cover on the left, its name,
+// who makes it, and a line on why to listen, on a wash of the cover's own
+// color. The pointer lifts it, and a button on the cover plays it.
+func (a *app) podcastTile(c *ui.Context, pod *netease.Podcast) {
+	p := a.pal
+	card := ui.ButtonBase(c).Padding(13).Radius(16).Gap(13).AlignItems(ui.Center).FocusRing(false).Label(pod.Name)
+	hovered := card.Hovered()
+	tint := chartWash(a.avatarTint(pod.PicURL, pod.Name))
+	fill := tint.Alpha(0.1)
+	if p.dark {
+		fill = tint.Alpha(0.16)
+	}
+	if hovered {
+		fill = tint.Alpha(0.18)
+		if p.dark {
+			fill = tint.Alpha(0.26)
+		}
+	}
+	card.Background(card.AnimateColor("bg", fill, ui.Animation{Duration: 140 * time.Millisecond})).Border(1, p.hairline)
+	pose := ui.Pose{}
+	if hovered {
+		pose.Y = -2
+		card.Shadow(0, 10, 26, -12, p.cardShade)
+	}
+	card.AnimatePose(pose, ui.Snappy)
+	card.Children(func() {
+		ui.Box(c).Size(92, 92).Shrink(0).Radius(14).Shadow(0, 3, 10, -3, p.cardShade).Children(func() {
+			a.coverArt(c, pod.PicURL, pod.Name, 300, 14)
+			a.coverPlayButton(c, hovered, func() { a.playPodcast(pod.ID) })
+		})
+		ui.Column(c).Grow(1).Shrink(1).MinWidth(0).Gap(3).Children(func() {
+			ui.Text(c, pod.Name).FontSize(14.5).FontWeight(700).SingleLine()
+			meta := []string{fmt.Sprintf("%d 期", pod.ProgramCount)}
+			if pod.DJ.Nickname != "" {
+				meta = append([]string{pod.DJ.Nickname}, meta...)
+			}
+			ui.Text(c, strings.Join(meta, " · ")).FontSize(11).TextColor(p.faint).SingleLine()
+			line := strings.TrimSpace(pod.RcmdText)
+			if line == "" {
+				line = strings.TrimSpace(pod.Description)
+			}
+			if line != "" {
+				ui.Text(c, line).FontSize(12).LineHeight(1.5).TextColor(p.muted).MaxLines(2).Margin(2, 0, 0, 0)
+			}
+		})
+	})
+	if card.Clicked() {
+		a.open(route{page: pagePodcast, id: pod.ID})
 	}
 }

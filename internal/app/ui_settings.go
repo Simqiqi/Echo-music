@@ -161,24 +161,6 @@ func (a *app) settingsBody(c *ui.Context, p palette, liquid bool) {
 	}
 
 	group("播放", func() {
-		row("音质", "无损与 Hi-Res 需要黑胶 VIP，没有时播放所能播放的最高音质；下一首歌曲开始生效", func() {
-			labels := make([]string, len(qualityLevels))
-			chosen := qualityLevels[2].label
-			for i, q := range qualityLevels {
-				labels[i] = q.label
-				if q.level == s.Quality {
-					chosen = q.label
-				}
-			}
-			if fieldSelect(c.Key("quality"), &chosen, labels, p).Changed() {
-				for _, q := range qualityLevels {
-					if q.label == chosen {
-						s.Quality = q.level
-					}
-				}
-				a.changed()
-			}
-		})
 		row("间奏时显示热评", "前奏、间奏与尾奏时，歌词处换成这首歌的热门评论", func() {
 			if ui.Switch(c.Key("hot-comments"), &s.HotComments).Label("间奏时显示热评").Changed() {
 				a.changed()
@@ -206,10 +188,6 @@ func (a *app) settingsBody(c *ui.Context, p palette, liquid bool) {
 			}
 		})
 	})
-
-	if a.captionsShown() {
-		group("播客", func() { a.captionSettings(row, c) })
-	}
 
 	group("缓存", func() {
 		row("歌曲缓存", "听过的歌曲保存在本机，再次播放无需等待，也不耗流量；"+a.cacheUsage(), func() {
@@ -346,8 +324,6 @@ func (a *app) settingsBody(c *ui.Context, p palette, liquid bool) {
 		})
 	}
 
-	// At the very foot: who keeps this, and where they are found.
-	group("开发者", func() { a.developerCard(c, p) })
 }
 
 // applyEq sets the player's equalizer to the shape the settings name.
