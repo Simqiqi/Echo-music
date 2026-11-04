@@ -2036,3 +2036,14 @@ main {
     padding: 0 22px;
   }
 }
+
+/* The hero's theme button: the new look is wiped in from the click instead
+   of both themes cross-fading, which makes the swap feel hand-made. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+::view-transition-new(root) {
+  z-index: 1;
+}

@@ -34,8 +34,8 @@ const picks = [
 ]
 
 const charts = [
-  { name: '飙升榜', hue: 18, songs: ['春日影', 'アイドル', '青のすみか'] },
-  { name: '新歌榜', hue: 205, songs: ['迷星叫', '碧天伴走', '壱雫空'] },
+  { name: '热歌榜', hue: 18, songs: ['Hong Kong', '我不难过', '恋人'] },
+  { name: '新歌榜', hue: 205, songs: ['无意', '玻璃', '明知故犯'] },
   { name: 'ACG 榜', hue: 150, songs: ['紅蓮華', 'unravel', '残酷な天使のテーゼ'] },
 ]
 
@@ -99,7 +99,7 @@ export function AppWindow() {
             <div class="daily-text">
               <div class="daily-note">{date()} · 每天 6:00 更新</div>
               <div class="daily-title">每日推荐</div>
-              <div class="daily-artists">MyGO!!!!!、YOASOBI、LiSA、Ave Mujica 等</div>
+              <div class="daily-artists">The Weeknd、孙燕姿、李荣浩 等</div>
               <button type="button" class="daily-play" onClick={toggle}>
                 <span class="bars" aria-hidden="true">
                   <i />

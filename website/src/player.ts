@@ -1,11 +1,12 @@
 import { createSignal } from 'solid-js'
 
-// The song the window in the hero plays.
+// The song the window in the hero plays: the top of the hot chart, so the
+// demo sounds like what people are listening to right now.
 export const track = {
-  title: '春日影',
-  artist: 'MyGO!!!!!',
-  src: '/haruhikage.m4a',
-  duration: 281,
+  title: 'Hong Kong',
+  artist: 'The Weeknd, 王菲',
+  src: '/hong-kong.mp3',
+  duration: 217,
 }
 
 const [playing, setPlaying] = createSignal(false)
