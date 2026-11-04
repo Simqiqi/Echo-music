@@ -39,6 +39,10 @@ function element() {
   return el
 }
 
+// Fetching begins with the page's own code, not with the first play, so by
+// the time the visitor is ready the clip has nothing left to wait for.
+if (typeof window !== 'undefined') element()
+
 function start() {
   if (!enabled() || stepped || finished || document.hidden) return
   element()
@@ -52,12 +56,12 @@ function arm() {
   if (armed) return
   armed = true
   const go = () => {
-    document.removeEventListener('pointerdown', go)
-    document.removeEventListener('keydown', go)
+    for (const type of ['pointerdown', 'keydown', 'touchstart'])
+      document.removeEventListener(type, go)
     start()
   }
-  document.addEventListener('pointerdown', go)
-  document.addEventListener('keydown', go)
+  for (const type of ['pointerdown', 'keydown', 'touchstart'])
+    document.addEventListener(type, go)
 }
 
 export function stop() {

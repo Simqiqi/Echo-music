@@ -23,6 +23,8 @@ export const Route = createRootRoute({
     ],
     links: [
       { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' },
+      // The clip starts downloading with the page, not when it is needed.
+      { rel: 'preload', href: '/bgm.mp3', as: 'audio', type: 'audio/mpeg' },
       { rel: 'apple-touch-icon', href: '/icon.png' },
       { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
       { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossOrigin: 'anonymous' },
