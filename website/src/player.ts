@@ -36,9 +36,35 @@ function tick() {
   frame = requestAnimationFrame(tick)
 }
 
+// The hero's spectrum reads the very song the window plays. Building a
+// MediaElementSource takes the element off the default output, so the graph
+// has to reach the speakers again on its own.
+let context: AudioContext | undefined
+let spectrum: AnalyserNode | undefined
+
+export function analyser() {
+  if (spectrum) return spectrum
+  if (typeof AudioContext === 'undefined') return undefined
+  try {
+    context = new AudioContext()
+    const node = context.createAnalyser()
+    node.fftSize = 2048
+    node.smoothingTimeConstant = 0.82
+    context.createMediaElementSource(element()).connect(node)
+    node.connect(context.destination)
+    spectrum = node
+  } catch {
+    // No Web Audio: the page still plays, just without the bars.
+  }
+  return spectrum
+}
+
 export function play() {
   if (playing()) return
   setPlaying(true)
+  analyser()
+  // Browsers start the graph asleep until a gesture wakes it.
+  if (context?.state === 'suspended') void context.resume()
   element()
     .play()
     .then(() => {
