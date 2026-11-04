@@ -53,6 +53,16 @@
 
    Then check https://echo-cloudmusic.<your-subdomain>.workers.dev/download/ shows the new version.
 
+## The update signing key
+
+Installed apps only accept updates signed with the key whose public half is `updates.publicKey` in `mygo.json`, so the release build needs the private half as the `MYGO_UPDATER_PRIVATE_KEY` secret, or `mygo build -upload` refuses to run. The pair was made once with:
+
+```bash
+go tool mygo keygen   # writes mygo-update.key (secret) and mygo-update.pub
+```
+
+The public half goes in `mygo.json`; the private half lives in the repository's Actions secret and in whoever keeps the release keys. Losing it strands every installed app on its current version — they would have to download a new build by hand, and a new pair means a new `updates.publicKey`, which old builds will not accept either.
+
 ## The speech recognition libraries
 
 Podcast captions run sherpa-onnx, whose libraries the app downloads with the model from the `sherpa-onnx-<version>` release, not from the app's own. They only change with sherpa-onnx's version, in `scripts/sherpa`. Then pack them again, signing the macOS ones with the app's Developer ID (the app's hardened runtime loads no others), commit the `internal/speech/natives.go` it writes, and upload them as a prerelease, which never becomes the latest that updates look for:
