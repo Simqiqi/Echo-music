@@ -1,0 +1,90 @@
+# Publishing a release hands installed apps their update manifests from a
+# host they can reach. GitHub's, where `mygo build` leaves them, is blocked
+# or throttled for many of them in China, so the manifests are published
+# again to the "updates" branch, served by jsDelivr, with the archives
+# behind the accelerator the download page uses (website/src/site.ts).
+#
+# Only an archive's address changes: the manifest keeps the size and the
+# signature `mygo build` gave it, which is what an app verifies before it
+# installs anything. A mirror of the archives, signed or not, changes
+# nothing an app trusts.
+name: Update feed
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 要发布清单的版本，如 v0.3.3
+        required: true
+
+permissions:
+  contents: write # the updates branch
+
+jobs:
+  feed:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      MIRROR: https://gh-proxy.com/
+    steps:
+      - name: Take the manifests of the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/feed"
+          gh release download "$TAG" --repo "${{ github.repository }}" \
+            --pattern 'update-*.json' --dir "$RUNNER_TEMP/feed"
+          ls -l "$RUNNER_TEMP/feed"
+
+      - name: Point the archives at the accelerator
+        working-directory: ${{ runner.temp }}/feed
+        run: |
+          set -euo pipefail
+          for f in update-*.json; do
+            jq --arg m "$MIRROR" '
+              def fast: if startswith("https://github.com/") then $m + . else . end;
+              .url |= fast
+              | (.deltas // []) |= map(.url |= fast)
+              | (.previous // []) |= map(.url |= fast)
+            ' "$f" > "$f.new"
+            mv "$f.new" "$f"
+            echo "$f: $(jq -r '.version + " " + .url' "$f")"
+          done
+
+      - name: Publish the updates branch
+        working-directory: ${{ runner.temp }}/feed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git init -q -b updates
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- *.json
+          git commit -q -m "update feed: $TAG"
+          git push -f "https://x-access-token:$GH_TOKEN@github.com/${{ github.repository }}.git" updates
+
+      # jsDelivr keeps a branch's files for twelve hours; the files of a
+      # release are due now, not then.
+      - name: Purge the CDN's copy
+        working-directory: ${{ runner.temp }}/feed
+        run: |
+          sleep 5
+          for f in update-*.json; do
+            curl -fsS --max-time 30 \
+              "https://purge.jsdelivr.net/gh/${{ github.repository }}@updates/$f" \
+              | head -c 200 || echo "purge of $f failed"
+            echo
+          done
+
+      - name: Check the feed answers
+        working-directory: ${{ runner.temp }}/feed
+        run: |
+          for f in update-*.json; do
+            echo "--- $f"
+            curl -fsS --max-time 30 \
+              "https://cdn.jsdelivr.net/gh/${{ github.repository }}@updates/$f" \
+              | jq -r '.version, .url'
+          done
