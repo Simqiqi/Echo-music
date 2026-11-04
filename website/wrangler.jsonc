@@ -11,9 +11,13 @@
   // site is served from a custom domain in the same Cloudflare account:
   // wrangler adds the DNS record and the certificate itself once the zone is
   // active. The zone has to exist first — dpdns.org is on the Public Suffix
-  // List, so echo-cloudmusic.dpdns.org can be added as a zone of its own and
+  // List, so simqiqiecho.dpdns.org can be added as a zone of its own and
   // its nameservers pointed at Cloudflare.
-  "routes": [{ "pattern": "echo-cloudmusic.dpdns.org", "custom_domain": true }],
+  "routes": [{ "pattern": "simqiqiecho.dpdns.org", "custom_domain": true }],
+  // Keep the workers.dev address alive as well: it stays the fallback for
+  // anyone who already has that link, even though it is blocked in mainland
+  // China (which is what the custom domain above is for).
+  "workers_dev": true,
   // Lets `wrangler preview` deploy pull requests; the block can stay empty.
   "previews": {}
 }

@@ -51,7 +51,7 @@
    cd website && bun run deploy
    ```
 
-   Then check https://echo-cloudmusic.dpdns.org/download/ shows the new version. The site is served from that custom domain rather than its workers.dev address, which is blocked in mainland China: the domain is a zone of its own in the same Cloudflare account, and `wrangler.jsonc` names it under `routes` with `custom_domain`, so wrangler writes the DNS record and the certificate on deploy. Both addresses answer once the zone is active.
+   Then check https://simqiqiecho.dpdns.org/download/ shows the new version. The site is served from that custom domain rather than its workers.dev address, which is blocked in mainland China: the domain is a zone of its own in the same Cloudflare account, and `wrangler.jsonc` names it under `routes` with `custom_domain`, so wrangler writes the DNS record and the certificate on deploy. Both addresses answer once the zone is active.
 
 ## The update signing key
 
