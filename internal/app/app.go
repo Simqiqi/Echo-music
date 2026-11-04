@@ -152,7 +152,6 @@ type app struct {
 	homeArtURL            string                  // the cover whose tint the home's background holds
 	homeTint              ui.Color                // the last tint the home's background took
 	songAccent            ui.Color                // the accent the chrome wears, of the song playing
-	sideBars              barState                // the mini bars on the sidebar's playing card
 	npCoverState          coverState              // the cover of Now Playing, as it is tilted and flicked
 	wallState             wallState               // the wall of the queue's covers, as it is dragged
 	wall3                 wall3State              // the wall of covers turning in depth, as it is spun

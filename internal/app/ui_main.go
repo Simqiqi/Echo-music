@@ -298,14 +298,6 @@ func (a *app) sidebar(c *ui.Context) {
 					}
 				})
 		})
-
-		// The words of the moment, then what plays, as a card at the foot
-		// of the sidebar, over who listens.
-		a.lyricPeek(c)
-		if tr := a.pl.Current(); tr != nil {
-			a.sidebarNowPlaying(c, tr)
-		}
-		a.accountRow(c)
 	})
 }
 
@@ -400,53 +392,6 @@ func (a *app) navItem(c *ui.Context, icon *ui.SVG, label string, r route, index 
 	})
 	if b.Clicked() {
 		a.open(r)
-	}
-}
-
-func (a *app) sidebarNowPlaying(c *ui.Context, tr *netease.Track) {
-	p := a.pal
-	card := ui.ButtonBase(c.Key("np-card")).Gap(10).Padding(8).Radius(12).AlignItems(ui.Center).FocusRing(false).Label("正在播放")
-	bg := a.songAccent.Alpha(0.06)
-	if card.Hovered() {
-		bg = a.songAccent.Alpha(0.11)
-	}
-	card.Background(card.AnimateColor("bg", bg, ui.Animation{Duration: 160 * time.Millisecond}))
-	card.Children(func() {
-		cov := a.cover(c, tr.Album.PicURL, 96, 40, 6)
-		cov.Shadow(0, 2, 6, 0, p.cardShade)
-		if a.pl.Playing() && !c.Preferences().ReduceMotion {
-			// #28 呼吸：原先用 cov.Loop 缩放封面，会让侧栏常驻 60fps 整窗重建
-			// （在「为你推荐」等非正在播放页播放时尤其拖累）。改为 30fps 的 Draw
-			// 呼吸光环——不触发视图重建，重绘成本大降，仍有呼吸感。
-			cov.Draw(func(dr *ui.Painter, r ui.Rect) {
-				f := float64(dr.Now().UnixNano()%int64(2000*time.Millisecond)) / float64(2000*time.Millisecond)
-				ph := float32(0.5 - 0.5*math.Cos(2*math.Pi*f))
-				// 外扩 4px，画一圈随相位呼吸的强调色光晕（30fps，不触发整窗重建）。
-				rr := ui.Rect{X: r.X - 4, Y: r.Y - 4, W: r.W + 8, H: r.H + 8}
-				op := 0.28 + 0.34*ph
-				rad := 9 + 3*ph
-				dr.Stroke(rr, a.songAccent.Alpha(op), rad, 3)
-				dr.AnimationFrameRate(30)
-				dr.AnimationFrameRate(30)
-			})
-		}
-		ui.Column(c).Grow(1).Shrink(1).MinWidth(0).Gap(2).Children(func() {
-			ui.Text(c, tr.Name).FontSize(12.5).FontWeight(600).SingleLine()
-			a.artistLinks(c, tr, p.muted, p.text).FontSize(11.5).SingleLine()
-		})
-		// Three slim bars at the foot of the card, dancing while the
-		// music does, still when it does not.
-		ui.Box(c.Key("bars")).Size(17, 16).Draw(func(dr *ui.Painter, r ui.Rect) {
-			lv, live := a.pl.Levels()
-			a.sideBars.step(dr.Now(), lv, live)
-			drawBars(dr, r, &a.sideBars, 3, ui.RGB(28, 28, 30), 2)
-			if live {
-				dr.AnimationFrameRate(20)
-			}
-		})
-	})
-	if card.Clicked() {
-		a.nowPlaying = true
 	}
 }
 
@@ -552,24 +497,60 @@ func (a *app) pageTop(c *ui.Context) {
 	bar := ui.Row(c).Absolute().Top(y).Left(topCapsuleSide).Right(topCapsuleSide).Height(h).
 		Padding(4, 12).Gap(8).AlignItems(ui.Center).Clip()
 	bar.Children(func() {
-		if len(a.history) > 0 || len(a.forward) > 0 {
-			back := a.navButton(c, "back", iconBack, "返回").Disabled(len(a.history) == 0)
-			if len(a.history) == 0 {
-				back.Opacity(0.35)
+		// The way back, and the name of where the page has got to, at the
+		// capsule's left.
+		left := ui.Row(c).AlignItems(ui.Center).Gap(8).Shrink(0)
+		left.Children(func() {
+			if len(a.history) > 0 || len(a.forward) > 0 {
+				back := a.navButton(c, "back", iconBack, "返回").Disabled(len(a.history) == 0)
+				if len(a.history) == 0 {
+					back.Opacity(0.35)
+				}
+				if back.Clicked() {
+					a.back()
+				}
+				if len(a.forward) > 0 && a.navButton(c, "forward", iconForward, "前进").Clicked() {
+					a.goForward()
+				}
 			}
-			if back.Clicked() {
-				a.back()
+			title := a.navTitle
+			if title == "" {
+				title = a.navName()
 			}
-			if len(a.forward) > 0 && a.navButton(c, "forward", iconForward, "前进").Clicked() {
-				a.goForward()
+			a.navLabel(c, title)
+		})
+		// What plays, at the capsule's middle: the sidebar's card came
+		// here, where the eye already rests.
+		ui.Box(c.Key("np-center")).Grow(1).Shrink(1).MinWidth(0).Center().DragWindow().Children(func() {
+			if tr := a.pl.Current(); tr != nil {
+				a.topNowPlaying(c, tr)
 			}
-		}
-		title := a.navTitle
-		if title == "" {
-			title = a.navName()
-		}
-		a.navLabel(c, title)
+		})
+		// Who listens, at the capsule's right: the avatar and its menu.
+		a.topAccount(c)
 	})
+}
+
+// topNowPlaying is the card of what plays, as the top bar holds it: the
+// cover, the name and who sings it on a line, for a click to open Now
+// Playing. It takes only the room the middle of the bar can spare.
+func (a *app) topNowPlaying(c *ui.Context, tr *netease.Track) {
+	p := a.pal
+	card := ui.ButtonBase(c.Key("np-top")).Gap(8).Padding(3, 8).Radius(9).AlignItems(ui.Center).
+		FocusRing(false).Label("正在播放").MaxWidth(360).Shrink(1).MinWidth(0)
+	bg := ui.Transparent
+	if card.Hovered() {
+		bg = p.hover
+	}
+	card.Background(card.AnimateColor("bg", bg, ui.Animation{Duration: 160 * time.Millisecond}))
+	card.Children(func() {
+		a.cover(c, tr.Album.PicURL, 96, 24, 5).Shadow(0, 1, 4, 0, p.cardShade)
+		ui.Text(c, tr.Name).FontSize(12).FontWeight(600).SingleLine().Shrink(1).MinWidth(0)
+		a.artistLinks(c, tr, p.muted, p.text).FontSize(11.5).SingleLine().Shrink(1).MinWidth(0)
+	})
+	if card.Clicked() {
+		a.nowPlaying = true
+	}
 }
 
 // The capsule's measures: a little air above it, and its height, which the

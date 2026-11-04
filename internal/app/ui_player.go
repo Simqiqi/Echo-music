@@ -374,7 +374,7 @@ func (a *app) playerBar(c *ui.Context) {
 	// The controls keep the middle, between sides that share what is left:
 	// narrower, the middle gives up to 140 DIPs, and what plays keeps room
 	// for its cover, some of its title and its heart.
-	const controls = 5*32 + 2*4 // lyrics, the queue, the mini player, the moon and the speaker
+	const controls = 4*32 + 2*4 // lyrics, the mini player, the moon and the speaker
 	bar := ui.Row(c).Absolute().PaddingX(20).Gap(20).AlignItems(ui.Center)
 	if liquid {
 		bar.Left(12).Right(12).Bottom(8).Height(glassBarHeight).PaddingX(16)
@@ -444,8 +444,10 @@ func (a *app) playerBar(c *ui.Context) {
 			})
 		})
 
-		// Lyrics, the mini player and volume.
+		// The words of the moment in the room the buttons leave, then the
+		// buttons themselves.
 		ui.Row(c).Grow(1).Basis(0).MinWidth(controls).Justify(ui.End).AlignItems(ui.Center).Gap(4).Children(func() {
+			a.lyricPeek(c)
 			lyr := p.muted
 			if a.nowPlaying {
 				lyr = p.accent
@@ -456,9 +458,6 @@ func (a *app) playerBar(c *ui.Context) {
 			}
 			if iconButton(c.Key("lyrics"), iconLyrics, 16, lyr, label).Clicked() && tr != nil {
 				a.nowPlaying, a.npPane = true, a.lyricsPaneChosen()
-			}
-			if iconButton(c.Key("queue"), iconQueue, 16, p.muted, "播放队列").Clicked() && tr != nil {
-				a.nowPlaying, a.npPane = true, paneQueue
 			}
 			// The window itself, put away for a card of the player.
 			if mini := iconButton(c.Key("mini"), iconShrink, 15, p.muted, "迷你播放器"); mini.Clicked() && tr != nil {

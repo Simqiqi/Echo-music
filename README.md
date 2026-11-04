@@ -70,6 +70,7 @@ go test ./...        # 运行测试
 
 - [mygo-cloudmusic](https://github.com/egoist/mygo-cloudmusic)：本项目的起点，客户端主体功能由其实现
 - [MyGo](https://github.com/egoist/mygo)：原生 UI 与应用框架
+- [Remix Icon](https://remixicon.com/)：应用内图标（[Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0)）
 - [NeteaseCloudMusicApi](https://github.com/Binaryify/NeteaseCloudMusicApi)：eapi 加密与登录流程的参考
 - [folia-major](https://github.com/chthollyphile/folia-major)：歌词动画效果的参考
 - [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)、[Qwen3-ASR](https://github.com/QwenLM/Qwen3-ASR) 与 [Silero VAD](https://github.com/snakers4/silero-vad)：本机语音识别
