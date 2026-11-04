@@ -43,11 +43,14 @@ jobs:
         run: |
           set -euo pipefail
           for f in update-*.json; do
+            # A first release has neither deltas nor previous archives, and
+            # an empty array is not a path for |=: each is rewritten only
+            # where it is there.
             jq --arg m "$MIRROR" '
-              def fast: if startswith("https://github.com/") then $m + . else . end;
+              def fast: if type == "string" and startswith("https://github.com/") then $m + . else . end;
               .url |= fast
-              | (.deltas // []) |= map(.url |= fast)
-              | (.previous // []) |= map(.url |= fast)
+              | if .deltas then .deltas |= map(.url |= fast) else . end
+              | if .previous then .previous |= map(.url |= fast) else . end
             ' "$f" > "$f.new"
             mv "$f.new" "$f"
             echo "$f: $(jq -r '.version + " " + .url' "$f")"
