@@ -3,6 +3,7 @@ import { For, createSignal, onCleanup, onMount, type JSX } from 'solid-js'
 import { Layout } from '../components/Layout'
 import { Stage } from '../components/Stage'
 import { LyricStage } from '../components/LyricStage'
+import { Listen } from '../components/Listen'
 import { Icon, type IconName } from '../components/Icon'
 import { ThemeSwitch, flipTone } from '../theme'
 import { mygo, release, site } from '../site'
@@ -187,6 +188,7 @@ function Desk() {
           decoding="async"
         />
       </div>
+      <Listen />
       <p class="lp-desk-hint">光标移过去，它会轻轻迎向你</p>
     </section>
   )
