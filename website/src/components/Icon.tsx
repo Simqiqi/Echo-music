@@ -26,6 +26,7 @@ const paths = {
   disk: () => <><ellipse cx="12" cy="5" rx="8" ry="3" /><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6" /></>,
   sparkle: () => <path d="M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4zM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z" />,
   notch: () => <><rect x="2" y="4" width="20" height="16" rx="3" /><path d="M9 4v1.5a1.5 1.5 0 0 0 1.5 1.5h3A1.5 1.5 0 0 0 15 5.5V4" /></>,
+  shield: () => <><path d="M12 3 5 6v5.5c0 4.4 2.9 7.9 7 9.5 4.1-1.6 7-5.1 7-9.5V6z" /><path d="m9 12 2 2 4-4" /></>,
 } satisfies Record<string, () => JSX.Element>
 
 export type IconName = keyof typeof paths

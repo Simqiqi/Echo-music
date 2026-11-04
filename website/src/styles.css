@@ -1328,6 +1328,85 @@ main {
   color: var(--ink-2);
   text-underline-offset: 3px;
 }
+/* The first launch, before either system has learned to trust the app. */
+.gatekeeper {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 26px 28px 24px;
+  border-radius: 22px;
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 1px var(--line);
+}
+.gatekeeper-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.gatekeeper-head svg {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.gatekeeper h2 {
+  font-size: 18px;
+  font-weight: 700;
+}
+.gatekeeper-lede {
+  max-width: 64ch;
+  font-size: 14.5px;
+  line-height: 1.7;
+  color: var(--ink-2);
+  text-wrap: pretty;
+}
+.gatekeeper-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 40px;
+  margin-top: 4px;
+}
+.gatekeeper h3 {
+  margin-bottom: 6px;
+  font-size: 14px;
+  font-weight: 700;
+}
+.gatekeeper ol {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding-left: 1.2em;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--ink-2);
+  text-wrap: pretty;
+}
+.gatekeeper kbd {
+  display: inline-block;
+  padding: 0 5px;
+  border-radius: 5px;
+  font-family: var(--sans);
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--ink-2);
+  background: var(--raised);
+  box-shadow: 0 0 0 1px var(--line);
+}
+.gatekeeper .command {
+  margin-top: 10px;
+}
+.gatekeeper .command-line {
+  padding-left: 12px;
+}
+.gatekeeper .command-line code {
+  font-size: 12.5px;
+}
+.gatekeeper-fine {
+  margin-top: 2px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--ink-3);
+}
 .download-more {
   margin-top: 28px;
 }
@@ -1342,10 +1421,15 @@ main {
   .platform-note {
     min-height: 0;
   }
+  .gatekeeper-grid {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
 }
 @media (max-width: 600px) {
   .platform,
-  .install {
+  .install,
+  .gatekeeper {
     padding: 24px;
   }
 }

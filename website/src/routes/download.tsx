@@ -24,7 +24,7 @@ const platforms: { os: OS; name: string; note: string; builds: Build[] }[] = [
   {
     os: 'mac',
     name: 'macOS',
-    note: 'macOS 13 或更新，已签名并经过 Apple 公证',
+    note: 'macOS 13 或更新。本版没有 Apple 公证，首次打开要放行一次（见下）',
     builds: [
       { label: 'Apple 芯片', kind: '.dmg', match: has('arm64', '.dmg'), primary: true },
       { label: 'Intel', kind: '.dmg', match: has('amd64', '.dmg') },
@@ -33,7 +33,7 @@ const platforms: { os: OS; name: string; note: string; builds: Build[] }[] = [
   {
     os: 'windows',
     name: 'Windows',
-    note: '安装到当前用户，无需管理员权限',
+    note: '安装到当前用户，无需管理员权限。首次运行会被 SmartScreen 拦一下',
     builds: [
       { label: 'x64', kind: '安装程序', match: has('setup', 'amd64', '.exe'), primary: true },
       { label: 'ARM64', kind: '安装程序', match: has('setup', 'arm64', '.exe') },
@@ -54,6 +54,7 @@ const platforms: { os: OS; name: string; note: string; builds: Build[] }[] = [
 
 const installSh = `curl -fsSL ${fast(repo)}/releases/latest/download/install.sh | sh`
 const installPs = `irm ${fast(repo)}/releases/latest/download/install.ps1 | iex`
+const unquarantine = `xattr -dr com.apple.quarantine "/Applications/${site.name}.app"`
 
 // A build's asset; a build the release has none of links to the release.
 const asset = (b: Build) => release.assets.find((a) => b.match(a.name))
@@ -132,6 +133,42 @@ function Download() {
           <a href={`${repo}/releases`}>发行页</a>取原始文件。
         </p>
 
+        <section class="gatekeeper" aria-labelledby="gatekeeper-title">
+          <div class="gatekeeper-head">
+            <Icon name="shield" size={18} />
+            <h2 id="gatekeeper-title">第一次打开要放行一次</h2>
+          </div>
+          <p class="gatekeeper-lede">
+            安装包没有 Apple 开发者证书与 Windows 代码签名证书，系统和浏览器会多问一句。放行一次就好，应用照常运行，之后的自动更新也不受影响。
+          </p>
+          <div class="gatekeeper-grid">
+            <div>
+              <h3>macOS</h3>
+              <ol>
+                <li>
+                  把应用拖进「应用程序」，按住 <kbd>Control</kbd> 点按图标，选「打开」，再点一次「打开」。
+                </li>
+                <li>
+                  也可以在系统弹出的提示里点「仍要打开」，或到「系统设置 → 隐私与安全性」底部点「仍要打开」。
+                </li>
+                <li>若提示「已损坏，无法打开」，多半是下载时带上了隔离标记，执行下面这行再去打开。</li>
+              </ol>
+              <Command label="解除隔离标记" text={unquarantine} />
+            </div>
+            <div>
+              <h3>Windows</h3>
+              <ol>
+                <li>SmartScreen 提示「Windows 已保护你的电脑」时，点「更多信息」，再点「仍要运行」。</li>
+                <li>浏览器若把安装程序标成「不常下载」，在下载栏里选「保留」即可。</li>
+                <li>安装到当前用户目录，不需要管理员权限，也不会改系统的 PATH 之外的东西。</li>
+              </ol>
+            </div>
+          </div>
+          <p class="gatekeeper-fine">
+            用下面的命令行安装的话，文件不经过浏览器，一般不会触发这些提示。
+          </p>
+        </section>
+
         <div class="install">
           <h2>用一行命令安装</h2>
           <p>下载最新版本，装到你的用户目录，以后同样自动更新。</p>
@@ -163,7 +200,7 @@ function Command(props: { label: string; text: string }) {
       <span class="command-label">{props.label}</span>
       <div class="command-line">
         <code>{props.text}</code>
-        <button type="button" class="command-copy" onClick={copy} aria-label={`拷贝${props.label}的安装命令`}>
+        <button type="button" class="command-copy" onClick={copy} aria-label={`拷贝${props.label}`}>
           {copied() ? '已拷贝' : '拷贝'}
         </button>
       </div>
