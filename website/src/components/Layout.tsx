@@ -1,8 +1,8 @@
 import { Link } from '@tanstack/solid-router'
-import { createSignal, onCleanup, onMount, type JSX } from 'solid-js'
+import { Show, createSignal, onCleanup, onMount, type JSX } from 'solid-js'
 import { Icon } from './Icon'
 import { ThemeSwitch } from '../theme'
-import { audible, listen, tap } from '../music'
+import { aloud, audible, blocked, listen, tap } from '../music'
 import { site } from '../site'
 
 export function Layout(props: { children: JSX.Element }) {
@@ -14,6 +14,16 @@ export function Layout(props: { children: JSX.Element }) {
       <Header />
       <main>{props.children}</main>
       <Footer />
+      <Show when={blocked()}>
+        <button type="button" class="sound-hint" onClick={aloud}>
+          <span class="sound-hint-eq" aria-hidden="true">
+            <i />
+            <i />
+            <i />
+          </span>
+          轻点一下，音乐响起
+        </button>
+      </Show>
     </>
   )
 }

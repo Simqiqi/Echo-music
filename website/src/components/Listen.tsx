@@ -31,6 +31,9 @@ export function Listen() {
     el.addEventListener('ended', () => setOn(false))
     el.addEventListener('pause', () => setOn(false))
     el.addEventListener('play', () => setOn(true))
+    // In the document, so the page-wide media listeners can hear it and let
+    // the background music step aside while this plays.
+    if (document.body) document.body.appendChild(el)
     audio = el
 
     // The bar is drawn second by second, which timeupdate is too coarse for.
@@ -44,6 +47,7 @@ export function Listen() {
     onCleanup(() => {
       cancelAnimationFrame(frame)
       el.pause()
+      el.remove()
       el.src = ''
     })
   })
