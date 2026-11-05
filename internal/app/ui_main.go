@@ -386,7 +386,7 @@ func (a *app) navItem(c *ui.Context, icon *ui.SVG, label string, r route, index 
 			Children(func() {
 				ic := ui.Icon(c, icon).Size(17, 17).TextColor(color)
 				var s float32
-				if selected && !reduce {
+				if playing && !reduce {
 					s = ic.Loop("nav-ic-"+label, 2*time.Second, ui.EaseInOut)
 				}
 				sc := float32(1)
