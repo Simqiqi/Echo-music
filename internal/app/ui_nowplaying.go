@@ -110,15 +110,23 @@ func (a *app) nowPlayingView(c *ui.Context) {
 		ui.Column(c).Absolute().Top(0).Left(0).Right(0).Bottom(0).Children(func() { a.nowPlayingBody(c, tr, art, accent, w, h, pointerIn) })
 		// The backdrop's own choice, over everything the view paints, at
 		// the top right where nothing else is; and beside it, the switch
-		// that keeps the line being sung on the particles page.
-		ui.Row(c).Absolute().Top(8).Right(12).Gap(8).AlignItems(ui.Center).Children(func() {
+		// that keeps the line being sung on the particles page. The corner
+		// steps in past the window controls, which Windows draws over it.
+		ui.Row(c).Absolute().Top(8).Right(12 + captionRoom(c)).Gap(8).AlignItems(ui.Center).Children(func() {
 			if a.npPane == paneParticles {
-				a.particleShapePicker(c, tint)
-				a.particleLyricPlace(c, tint)
 				a.particleLyricSwitch(c, tint)
 			}
 			a.backdropPicker(c, tint, "np-backdrop")
 		})
+		// The particles page's other choices are wider than the corner has
+		// room for beside the way out, which stands at the middle of the
+		// top: they take a row of their own under it.
+		if a.npPane == paneParticles {
+			ui.Row(c).Absolute().Top(topBar(c) + npTabsHeight).Right(12 + captionRoom(c)).Gap(8).AlignItems(ui.Center).Children(func() {
+				a.particleShapePicker(c, tint)
+				a.particleLyricPlace(c, tint)
+			})
+		}
 	})
 }
 

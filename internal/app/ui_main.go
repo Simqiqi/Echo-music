@@ -670,12 +670,20 @@ func topCapsule(top float32) (y, h float32) {
 	return topCapsuleInset, min(topCapsuleTall, top-2*topCapsuleInset)
 }
 
+// captionRoom is the room the window controls take at the top right of a
+// window with a hidden title bar: Windows draws them over the view, where
+// the app's own corner elements would otherwise reach; macOS has nothing
+// to the right. Whatever the app puts in that corner keeps out of it.
+func captionRoom(c *ui.Context) float32 {
+	return c.TitleBar().Right
+}
+
 // topCapsuleRight is the capsule's inset from the window's right edge:
 // its own margin plus the room the window controls take there. Windows
 // draws them at the top right of a hidden title bar, over where the
 // capsule used to reach; macOS has nothing to the right.
 func topCapsuleRight(c *ui.Context) float32 {
-	return topCapsuleSide + c.TitleBar().Right
+	return topCapsuleSide + captionRoom(c)
 }
 
 // barLine is where the capsule's foot is: the line a section's name has to
