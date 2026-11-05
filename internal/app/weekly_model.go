@@ -22,9 +22,10 @@ import (
 // weeklyTrack is what the card says of a song: its name, its artists, and
 // where its cover hangs.
 type weeklyTrack struct {
-	Name   string `json:"name"`
-	Artist string `json:"artist"`
-	Pic    string `json:"pic"`
+	Name    string `json:"name"`
+	Artist  string `json:"artist"`
+	Pic     string `json:"pic"`
+	AlbumID int64  `json:"album_id,omitempty"`
 }
 
 // weeklyData is the record itself: a song's seconds on a day, the hour of
@@ -108,9 +109,12 @@ func (w *weeklyState) add(now time.Time, tr netease.Track, secs float64) {
 	}
 	w.data.Hours[day][now.Hour()] += secs
 	if _, ok := w.data.Tracks[tr.ID]; !ok {
-		w.data.Tracks[tr.ID] = weeklyTrack{Name: tr.Name, Artist: tr.ArtistNames(), Pic: tr.Album.PicURL}
+		w.data.Tracks[tr.ID] = weeklyTrack{Name: tr.Name, Artist: tr.ArtistNames(), Pic: tr.Album.PicURL, AlbumID: tr.Album.ID}
 	} else {
 		t := w.data.Tracks[tr.ID]
+		if t.AlbumID == 0 {
+			t.AlbumID = tr.Album.ID
+		}
 		if t.Name == "" {
 			t.Name = tr.Name
 		}
@@ -122,8 +126,9 @@ func (w *weeklyState) add(now time.Time, tr netease.Track, secs float64) {
 		}
 		w.data.Tracks[tr.ID] = t
 	}
-	// A fortnight of days, no more.
-	cut := weeklyKey(now.AddDate(0, 0, -14))
+	// A month and a little more: the weekly page needs a fortnight, and
+	// a look back over thirty days needs the rest.
+	cut := weeklyKey(now.AddDate(0, 0, -35))
 	for day := range w.data.Days {
 		if day < cut {
 			delete(w.data.Days, day)
@@ -222,7 +227,7 @@ func (w *weeklyState) recent(now time.Time, n int) []netease.Track {
 	out := make([]netease.Track, 0, len(list))
 	for _, h := range list {
 		t := w.data.Tracks[h.id]
-		tr := netease.Track{ID: h.id, Name: t.Name, Album: netease.Album{PicURL: t.Pic}}
+		tr := netease.Track{ID: h.id, Name: t.Name, Album: netease.Album{ID: t.AlbumID, PicURL: t.Pic}}
 		if t.Artist != "" {
 			tr.Artists = []netease.Artist{{Name: t.Artist}}
 		}
@@ -246,7 +251,6 @@ func (w *weeklyState) report(now time.Time) weeklyReport {
 	key := weeklyKey(monday)
 	last := weeklyKey(monday.AddDate(0, 0, -7))
 	perSong := map[int64]float64{}
-	perArtist := map[string]float64{}
 	perHour := map[int]float64{}
 	for day, songs := range w.data.Days {
 		if day < key {
@@ -269,15 +273,19 @@ func (w *weeklyState) report(now time.Time) weeklyReport {
 		return r
 	}
 	r.Story = weeklyStory(perHour)
+	r.Minutes, r.Songs, r.Tops, r.Artists = w.rank(perSong)
+	return r
+}
+
+// rank turns a span's seconds per song into its totals, the songs heard
+// most and the singers behind them. Its caller holds the record's lock.
+func (w *weeklyState) rank(perSong map[int64]float64) (minutes, songs int, tops []weeklyTop, artists []weeklyArtist) {
+	perArtist := map[string]float64{}
 	ids := make([]int64, 0, len(perSong))
 	for id, secs := range perSong {
-		var total float64
-		r.Songs++
-		total += secs
-		_ = total
-		r.Minutes += int(secs/60 + 0.5)
-		t, ok := w.data.Tracks[id]
-		if ok && t.Artist != "" {
+		songs++
+		minutes += int(secs/60 + 0.5)
+		if t, ok := w.data.Tracks[id]; ok && t.Artist != "" {
 			for _, name := range strings.Split(t.Artist, "/") {
 				perArtist[strings.TrimSpace(name)] += secs
 			}
@@ -298,7 +306,7 @@ func (w *weeklyState) report(now time.Time) weeklyReport {
 		if t.Name == "" {
 			continue
 		}
-		r.Tops = append(r.Tops, weeklyTop{ID: id, Track: t, Minutes: int(perSong[id]/60 + 0.5)})
+		tops = append(tops, weeklyTop{ID: id, Track: t, Minutes: int(perSong[id]/60 + 0.5)})
 	}
 	names := make([]string, 0, len(perArtist))
 	for name := range perArtist {
@@ -314,7 +322,59 @@ func (w *weeklyState) report(now time.Time) weeklyReport {
 		if n == 3 {
 			break
 		}
-		r.Artists = append(r.Artists, weeklyArtist{Name: name, Minutes: int(perArtist[name]/60 + 0.5)})
+		artists = append(artists, weeklyArtist{Name: name, Minutes: int(perArtist[name]/60 + 0.5)})
 	}
+	return
+}
+
+// periodDays is how many minutes each of the last days heard, oldest first.
+func (w *weeklyState) periodDays(now time.Time, days int) []float64 {
+	if w == nil {
+		return nil
+	}
+	days = max(days, 1)
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	out := make([]float64, days)
+	for i := range days {
+		var secs float64
+		for _, v := range w.data.Days[weeklyKey(now.AddDate(0, 0, -(days-1-i)))] {
+			secs += v
+		}
+		out[i] = secs / 60
+	}
+	return out
+}
+
+// periodReport gathers the last days of listening, today in, for a poster
+// that looks back over a month as the page looks back over a week. It has
+// no week to stand against, so LastWeekMinutes stays empty.
+func (w *weeklyState) periodReport(now time.Time, days int) weeklyReport {
+	if w == nil {
+		return weeklyReport{}
+	}
+	days = max(days, 1)
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	r := weeklyReport{}
+	from := weeklyKey(now.AddDate(0, 0, -(days - 1)))
+	perSong := map[int64]float64{}
+	perHour := map[int]float64{}
+	for day, songs := range w.data.Days {
+		if day < from {
+			continue
+		}
+		for id, secs := range songs {
+			perSong[id] += secs
+		}
+		for hour, secs := range w.data.Hours[day] {
+			perHour[hour] += secs
+		}
+	}
+	if len(perSong) == 0 {
+		return r
+	}
+	r.Story = weeklyStory(perHour)
+	r.Minutes, r.Songs, r.Tops, r.Artists = w.rank(perSong)
 	return r
 }

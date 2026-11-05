@@ -386,6 +386,10 @@ func ArtistLatestSongs(id int64, limit int) ([]Track, error) {
 
 var ErrUnavailable = errors.New("this song isn't available to stream")
 
+// ErrFormat says a stream came in a format no decoder here can play. Like
+// an unavailable song, it cannot be fixed by asking again.
+var ErrFormat = errors.New("unsupported format")
+
 // Stream is where a track streams from, and what it is.
 type Stream struct {
 	URL  string `json:"-"`
@@ -439,7 +443,7 @@ func SongURL(id int64, level string) (*Stream, error) {
 	s := d.Stream
 	s.Type = strings.ToLower(s.Type)
 	if s.Type != "" && s.Type != "mp3" && s.Type != "flac" {
-		return nil, fmt.Errorf("unsupported format %s", s.Type)
+		return nil, fmt.Errorf("%w %s", ErrFormat, s.Type)
 	}
 	if d.Peak != nil {
 		s.Peak = *d.Peak

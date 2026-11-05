@@ -55,6 +55,17 @@ func (a *app) weeklyPage(c *ui.Context) {
 			return
 		}
 
+		// Posters of the span, to keep or to send: the week itself, and a
+		// look back over the last thirty days.
+		ui.Row(c).Gap(8).Justify(ui.End).Margin(0, 0, 14, 0).Children(func() {
+			if rowButton(c, "export-week", "导出周报", a.pal).Clicked() {
+				a.shareReport(7)
+			}
+			if rowButton(c, "export-month", "导出月报", a.pal).Clicked() {
+				a.shareReport(30)
+			}
+		})
+
 		// The week's poster, and then its clock, drawn as wide as the
 		// page: the two things the week is worth a look for.
 		var st weeklyStats

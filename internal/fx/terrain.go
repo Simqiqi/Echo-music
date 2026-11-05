@@ -136,7 +136,7 @@ func DrawTerrain(p *ui.Painter, r ui.Rect, tint ui.Color, drift float32, bands [
 // a cover of tint: its hue, deeper than a night sky and brighter than a
 // lamp, so that white reads over both. A gray cover stays gray.
 func NightColors(tint ui.Color) (deep, glow ui.Color) {
-	h, s, _ := HSV(float64(tint.R)/255, float64(tint.G/255)/255, float64(tint.B)/255)
+	h, s, _ := HSV(float64(tint.R)/255, float64(tint.G)/255, float64(tint.B)/255)
 	if s > 0.12 {
 		s = min(max(s*1.35, 0.55), 0.9)
 	}

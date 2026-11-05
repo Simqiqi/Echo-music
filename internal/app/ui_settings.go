@@ -324,6 +324,43 @@ func (a *app) settingsBody(c *ui.Context, p palette, liquid bool) {
 		})
 	}
 
+	group("反馈与帮助", func() {
+		row("遇到问题了？", "闪退、播放异常、界面错乱，附上复现步骤会更快修好", func() {
+			if rowButton(c, "report-bug", "报告问题", p).Clicked() {
+				a.writeFeedback("问题反馈")
+			}
+		})
+		row("想让它更好？", "想加的功能、想改的交互，都欢迎告诉我们", func() {
+			if rowButton(c, "suggest", "提建议", p).Clicked() {
+				a.writeFeedback("功能建议")
+			}
+		})
+		row("连接自检", "检查登录、网易云接口、播放地址与更新镜像；失败项会随反馈邮件一起发出", func() {
+			label := "开始检查"
+			if a.checking {
+				label = "检查中…"
+			}
+			if rowButton(c, "connection-check", label, p).Disabled(a.checking).Clicked() {
+				a.startChecks()
+			}
+		})
+		if a.checking {
+			ui.Text(c, "正在检查…").FontSize(12).TextColor(p.muted).Padding(2, 16, 6, 16)
+		}
+		for _, r := range a.checks {
+			res := r
+			ui.Row(c).Padding(4, 16, 4, 16).Gap(8).AlignItems(ui.Center).Children(func() {
+				dot := ui.RGB(74, 190, 120)
+				if !res.ok {
+					dot = ui.RGB(232, 92, 92)
+				}
+				ui.Box(c).Size(7, 7).Radius(4).Background(dot)
+				ui.Text(c, res.name).FontSize(12.5).TextColor(p.text).Width(84)
+				ui.Text(c, res.detail).FontSize(11.5).TextColor(p.muted).
+					Grow(1).Shrink(1).MinWidth(0).SingleLine()
+			})
+		}
+	})
 }
 
 // applyEq sets the player's equalizer to the shape the settings name.

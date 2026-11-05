@@ -40,6 +40,8 @@ type Player struct {
 	// Changed, if set, hears that what plays, where it is or whether it
 	// plays changed.
 	Changed func()
+	// Diagnose, if set, hears why a load failed, for a feedback report.
+	Diagnose func(where string, err error)
 
 	queue   []netease.Track
 	order   []int // the queue's indices in play order: shuffled or not
@@ -640,6 +642,31 @@ func (p *Player) stop() {
 	p.fade.attach(nil, 1)
 }
 
+// A URL request that failed once often works the next moment. Asking again
+// costs less than playing a song the listener did not choose.
+const openRetryDelay = 250 * time.Millisecond
+
+// skipOnError says a failed open is a song this account cannot play at all.
+// A network, HTTP or decode failure is not one of them: it must not move
+// the queue on to another song.
+func skipOnError(err error) bool {
+	return errors.Is(err, netease.ErrUnavailable) || errors.Is(err, netease.ErrFormat)
+}
+
+// nextOnFailure gives the track to hand over to after a failed open, or
+// false when the player stays on the song it was asked to play. Only songs
+// that cannot play are skipped, and only until the whole queue was tried.
+func nextOnFailure(err error, at, skipped, n int) (int, bool) {
+	if !skipOnError(err) || skipped+1 >= n {
+		return at, false
+	}
+	next := at + 1
+	if next >= n {
+		next = 0
+	}
+	return next, true
+}
+
 // load plays the track at order[at], skipping those that cannot play.
 func (p *Player) load(at int) {
 	p.loadSkipping(at, 0, true, 0)
@@ -691,6 +718,13 @@ func (p *Player) loadSkipping(at, skipped int, play bool, from time.Duration) {
 			level = p.Quality()
 		}
 		info, s, err := p.open(t, level)
+		if err != nil && !skipOnError(err) {
+			// A hiccup in the URL request or in the first bytes often
+			// clears at once. Ask for the same song again before letting
+			// a failure be decided on the main thread.
+			time.Sleep(openRetryDelay)
+			info, s, err = p.open(t, level)
+		}
 		p.post(func() {
 			if gen != p.gen {
 				if s != nil {
@@ -701,24 +735,28 @@ func (p *Player) loadSkipping(at, skipped int, play bool, from time.Duration) {
 			p.loading = false
 			if err != nil {
 				p.err = err.Error()
+				if p.Diagnose != nil {
+					p.Diagnose("播放", err)
+				}
 				switch {
-				case err != netease.ErrUnavailable:
+				case !errors.Is(err, netease.ErrUnavailable):
 				case t.ProgramID != 0:
 					p.err = "这期节目需要购买才能收听"
 				default:
 					p.err = "这首歌需要 VIP 才能播放"
 				}
-				// Skip what cannot play, unless nothing in the queue can.
-				if skipped+1 < len(p.order) {
-					next := at + 1
-					if next >= len(p.order) {
-						next = 0
-					}
+				// A song that cannot play hands over to the next one. A
+				// network or decode failure stays on the song chosen, so
+				// a click never quietly plays a different one.
+				if next, ok := nextOnFailure(err, at, skipped, len(p.order)); ok {
 					p.loadSkipping(next, skipped+1, p.playing, 0)
-				} else {
-					p.playing = false
-					p.sync()
+					return
 				}
+				if !skipOnError(err) {
+					p.err = "这首歌暂时加载失败，再点一次试试"
+				}
+				p.playing = false
+				p.sync()
 				return
 			}
 			p.stream, p.info = s, info

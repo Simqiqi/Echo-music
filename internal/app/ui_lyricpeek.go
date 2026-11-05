@@ -9,6 +9,31 @@ import (
 	"github.com/simqiqi/simqiqi-music/internal/lyrics"
 )
 
+// sungLine is the line being sung, the one after it, and how long until
+// that one begins. It answers nothing when there is nothing to show — no
+// track, lyrics still loading, an instrumental.
+func (a *app) sungLine() (sung, next string, until time.Duration, ok bool) {
+	pl := a.pl
+	lines, loaded := pl.Lyrics()
+	if !loaded || len(lines) == 0 || pl.Current() == nil {
+		return "", "", 0, false
+	}
+	pos := pl.Position()
+	cur := lyrics.Index(lines, pos)
+	if pl.Playing() && cur+1 < len(lines) {
+		until = lines[cur+1].At - pos + 20*time.Millisecond
+	}
+	if cur >= 0 {
+		sung = strings.TrimSpace(lines[cur].Text)
+	}
+	// The line after is the next one with words in it: a blank line
+	// between verses would leave the second row empty.
+	for i := cur + 1; i < len(lines) && next == ""; i++ {
+		next = strings.TrimSpace(lines[i].Text)
+	}
+	return sung, next, until, sung != "" || next != ""
+}
+
 // lyricPeek shows the line being sung and the one after it, in the room
 // the player bar's buttons leave at its right: the words at a glance,
 // without opening the lyrics. A click opens them.
@@ -16,30 +41,13 @@ import (
 // It takes no room of its own when there is nothing to show — no track,
 // lyrics still loading, an instrumental — so the bar is what it was.
 func (a *app) lyricPeek(c *ui.Context) {
-	pl := a.pl
-	lines, loaded := pl.Lyrics()
-	if !loaded || len(lines) == 0 || pl.Current() == nil {
+	sung, next, until, ok := a.sungLine()
+	if !ok {
 		return
 	}
-	pos := pl.Position()
-	cur := lyrics.Index(lines, pos)
 	// Redraw as the next line begins, so the two keep the song's time.
-	if pl.Playing() && cur+1 < len(lines) {
-		c.After(lines[cur+1].At - pos + 20*time.Millisecond)
-	}
-
-	sung := ""
-	if cur >= 0 {
-		sung = strings.TrimSpace(lines[cur].Text)
-	}
-	// The line after is the next one with words in it: a blank line
-	// between verses would leave the second row empty.
-	next := ""
-	for i := cur + 1; i < len(lines) && next == ""; i++ {
-		next = strings.TrimSpace(lines[i].Text)
-	}
-	if sung == "" && next == "" {
-		return
+	if until > 0 {
+		c.After(until)
 	}
 
 	p := a.pal

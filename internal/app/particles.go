@@ -290,7 +290,7 @@ func (a *app) particlePane(c *ui.Context, tr *netease.Track, art *artwork, accen
 	a.particleRecord(c, tr, art, a.recAt)
 	a.particleLyrics(c, accent, w, a.recLyric)
 	a.wall3DBar(c, tr, accent, false)
-	reveal(npTabsRow(c, w), pointerIn).Children(func() { a.paneTabs(c) })
+	reveal(a.npTabsRow(c, w), pointerIn).Children(func() { a.paneTabs(c) })
 }
 
 // particleFoot is what the bar at the foot of the pane takes, and what the

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/egoist/mygo"
+	"github.com/egoist/mygo/plugins/glass"
 	"github.com/egoist/mygo/ui"
 
 	"github.com/simqiqi/simqiqi-music/internal/lyrics"
@@ -161,7 +162,7 @@ func (a *app) nowPlayingBody(c *ui.Context, tr *netease.Track, art *artwork, acc
 		if a.npPane == paneStage {
 			// The stage takes the whole view: the lyrics are the show, the
 			// controls a slim bar at the foot.
-			reveal(npTabsRow(c, w), pointerIn).Children(func() {
+			reveal(a.npTabsRow(c, w), pointerIn).Children(func() {
 				a.paneTabs(c)
 				a.stageStyleButton(c)
 			})
@@ -196,7 +197,7 @@ func (a *app) nowPlayingBody(c *ui.Context, tr *netease.Track, art *artwork, acc
 		// the controls.
 		side = max(coverSize, 280)
 		padX := npSideX(w)
-		reveal(npTabsRow(c, w), pointerIn).Children(func() { a.paneTabs(c) })
+		reveal(a.npTabsRow(c, w), pointerIn).Children(func() { a.paneTabs(c) })
 		ui.Row(c).Grow(1).Padding(0, padX, 44, padX).Gap(72).AlignItems(ui.Stretch).Children(func() {
 			var coverTop float32
 			ui.Column(c).Width(side).Justify(ui.Center).Gap(0).Children(func() {
@@ -306,9 +307,60 @@ const npTabsHeight = 28
 // npTabsRow is the row of Now Playing's tabs, in the same place for every
 // pane, so that they stay put going from one to another: at the top, level
 // with the cover's left. They start from the left, so that only the last,
-// the comments, moves as its count changes.
-func npTabsRow(c *ui.Context, w float32) ui.Element {
-	return ui.Row(c.Key("tabs")).Absolute().Top(topBar(c)).Left(npSideX(w)).Height(npTabsHeight).Gap(6).AlignItems(ui.Center)
+// the comments, moves as its count changes. With Liquid Glass on, one
+// capsule of it floats under the whole row: the cover and the effects
+// behind frost along its rim, without moving the tabs by a pixel.
+func (a *app) npTabsRow(c *ui.Context, w float32) ui.Element {
+	row := ui.Row(c.Key("tabs")).Absolute().Top(topBar(c)).Left(npSideX(w)).Height(npTabsHeight).Gap(6).AlignItems(ui.Center)
+	if a.settings.glassOn() {
+		row.PaddingX(6).Radius(npTabsHeight/2).
+			Material(glass.Glass{Clarity: a.glassClarity(0.45), Tint: ui.RGBA(255, 255, 255, 0.07)}).
+			Shadow(0, 6, 18, -8, ui.RGBA(0, 0, 0, 0.18))
+	}
+	a.npTabRowX = row.LayoutBounds().X
+	// The row takes the press and keeps it, so a choice can be carried
+	// along with the pointer: sliding across picks whatever tab is under
+	// it, and letting go picks the one under it, which is also a click.
+	row.HandleInput(func(ev ui.InputEvent) bool {
+		switch ev.Kind {
+		case ui.InputPointerDown:
+			if ev.Button != 0 {
+				return false
+			}
+			a.npTabDrag = true
+			return true
+		case ui.InputPointerMove:
+			if !a.npTabDrag {
+				return false
+			}
+			if pane := a.npTabAt(ev.X); pane >= 0 && pane != a.npPane {
+				a.choosePane(pane)
+			}
+			return true
+		case ui.InputPointerUp:
+			if !a.npTabDrag {
+				return false
+			}
+			a.npTabDrag = false
+			if pane := a.npTabAt(ev.X); pane >= 0 {
+				a.choosePane(pane)
+			}
+			return true
+		}
+		return false
+	})
+	return row
+}
+
+// npTabAt is the tab under x, a pointer's position inside the row.
+func (a *app) npTabAt(x float32) int {
+	wx := x + a.npTabRowX
+	for k, box := range a.npTabBoxes {
+		if wx >= box.X && wx <= box.X+box.W {
+			return a.npTabPanes[k]
+		}
+	}
+	return -1
 }
 
 // reveal fades e in while the pointer is in the window, and out when it
@@ -364,6 +416,10 @@ func (a *app) npTabs() []npTab {
 }
 
 func (a *app) paneTabs(c *ui.Context) {
+	// The row's input handler reads these boxes on the next pointer move,
+	// so they are collected afresh with every build.
+	a.npTabBoxes = a.npTabBoxes[:0]
+	a.npTabPanes = a.npTabPanes[:0]
 	for _, t := range a.npTabs() {
 		label := t.label
 		if t.pane == paneComments {
@@ -458,9 +514,11 @@ func (a *app) paneTab(c *ui.Context, i int, label string) {
 	bg, fg := ui.Transparent, white.Alpha(0.55)
 	if a.npPane == i {
 		bg, fg = white.Alpha(0.14), white
-	} else if b.Hovered() {
+	} else if b.Hovered() || b.Pressed() {
 		bg = white.Alpha(0.06)
 	}
+	a.npTabBoxes = append(a.npTabBoxes, b.LayoutBounds())
+	a.npTabPanes = append(a.npTabPanes, i)
 	b.Background(b.AnimateColor("bg", bg, ui.Animation{Duration: 120 * time.Millisecond}))
 	b.Children(func() {
 		if i != paneComments {

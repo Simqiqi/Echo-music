@@ -156,7 +156,7 @@ func (a *app) wall3DPane(c *ui.Context, tr *netease.Track, accent ui.Color, w, h
 	const foot = 150
 	a.wall3D(c, top, w, max(h-top-foot, 200), accent, pointerIn)
 	a.wall3DBar(c, tr, accent, true)
-	reveal(npTabsRow(c, w), pointerIn).Children(func() { a.paneTabs(c) })
+	reveal(a.npTabsRow(c, w), pointerIn).Children(func() { a.paneTabs(c) })
 }
 
 // wall3D stands the queue's covers on the wall, in an area from top down,

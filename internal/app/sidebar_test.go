@@ -23,7 +23,7 @@ func TestSidebarPlaylistCollapse(t *testing.T) {
 			a.playlists[tc.playlist] = &netease.Playlist{ID: tc.playlist, Name: tc.row}
 			a.pl.Cue(a.playlists[10].Tracks)
 			before := a.route
-			tt := ui.NewTester(a.view, 1200, 800)
+			tt := ui.NewTester(a.view, 1200, 1000)
 			tt.Frame()
 
 			if err := tt.Click(tc.header); err != nil {
@@ -56,7 +56,7 @@ func TestSidebarPlaylistCollapse(t *testing.T) {
 // The plus still opens the naming dialog with both sections collapsed, without expanding either one.
 func TestNewPlaylistInCollapsedSidebar(t *testing.T) {
 	a := editTestApp()
-	tt := ui.NewTester(a.view, 1200, 800)
+	tt := ui.NewTester(a.view, 1200, 1000)
 	tt.Frame()
 	for _, header := range []string{"我的歌单", "收藏的歌单"} {
 		if err := tt.Click(header); err != nil {

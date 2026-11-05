@@ -68,6 +68,9 @@ type app struct {
 	liked        map[int64]bool     // the songs the listener likes
 	toast        string             // a message to show once
 	saveImage    func([]byte) error // where a lyric card goes: the clipboard, unless a test says
+	checking     bool               // a connection check is out, waiting for its probes
+	checks       []checkResult      // what the last connection check found
+	updatePeek   updatePeek         // the newest release heard of, if newer
 	picked       pickedUp           // the song a login picked up, waiting to play
 
 	// The episodes the listener likes, and doesn't, as far as NetEase has
@@ -116,6 +119,12 @@ type app struct {
 	npChangedAt time.Time // when it last opened or closed
 	npPane      int       // paneLyrics, paneQueue, paneStage, paneComments, paneProgram or paneCaptions
 	npPaneTop   float32   // how far the cover beside the pane starts below its top
+	// The tabs' boxes of the last build, and whether a press is being
+	// carried across them: a drag chooses whichever tab is under it.
+	npTabBoxes  []ui.Rect
+	npTabPanes  []int
+	npTabRowX   float32
+	npTabDrag   bool
 	lyricScroll ui.ScrollState
 	lyricGlide  lyricGlide
 	lyricAt     int
@@ -251,6 +260,7 @@ func Run() error {
 	}
 	moveOldData()
 	a.useUpdater()
+	a.watchUpdates()
 	mygo.App.WhenReady(func() {
 		a.settings = loadSettings()
 		a.settings.applyAppearance()
@@ -269,6 +279,7 @@ func Run() error {
 			a.keepSession()
 			a.syncCaptions()
 		}
+		a.pl.Diagnose = noteDiagnostic
 		a.weekly = newWeekly()
 		// The weather is read from what was kept before the window
 		// stands; asking the sky waits until there is a window to post

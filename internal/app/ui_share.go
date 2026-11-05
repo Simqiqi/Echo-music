@@ -131,14 +131,20 @@ func (a *app) shareLyrics() {
 
 // writeLyricCard draws the card, and puts it on the clipboard.
 func (a *app) writeLyricCard(card lyricCard) {
-	img := ui.Render(func(c *ui.Context) { a.shareCard(c, card) }, cardW, cardH, 2)
+	a.writeCard(func(c *ui.Context) { a.shareCard(c, card) }, "歌词卡片已复制，粘贴即可分享")
+}
+
+// writeCard renders a card of the shared size and copies its PNG, saying
+// what happened. The lyric card and the listening poster both go this way.
+func (a *app) writeCard(draw func(*ui.Context), done string) {
+	img := ui.Render(draw, cardW, cardH, 2)
 	var buf bytes.Buffer
 	if err := png.Encode(&buf, img); err != nil || a.putImage(buf.Bytes()) != nil {
-		a.toast = "没能生成歌词卡片"
+		a.toast = "没能生成图片"
 		a.redraw()
 		return
 	}
-	a.toast = "歌词卡片已复制，粘贴即可分享"
+	a.toast = done
 	a.redraw()
 }
 
@@ -151,21 +157,43 @@ func (a *app) putImage(data []byte) error {
 	return mygo.Clipboard.WriteImage(data)
 }
 
-// shareCard draws a lyric card: the song's color rising behind the words,
-// the line being sung in the middle, and what plays at the foot.
-func (a *app) shareCard(c *ui.Context, card lyricCard) {
-	ink := card.color
-	ui.Column(c).Size(cardW, cardH).Clip().Draw(func(p *ui.Painter, r ui.Rect) {
-		// Near black, so the words are white whatever the cover holds,
-		// then the song's color from the corner the photo would be in.
-		p.Fill(r, ui.Hex("#0c0c0f"), 0)
+// cardBackdrop carries a cover across the whole card and lets it fade
+// into the dark where the words sit: the photograph comes through the
+// middle and along one edge, with the song's own color gathered over it.
+// Without a cover, the color alone makes the same ground as before.
+func cardBackdrop(c *ui.Context, cover *ui.Bitmap, ink ui.Color) {
+	ui.Box(c).Absolute().Top(0).Left(0).Right(0).Bottom(0).
+		Background(ui.Hex("#0c0c0f"))
+	if cover != nil {
+		ui.Image(c, cover).Absolute().Top(0).Left(0).Right(0).Bottom(0).Fit(ui.Cover)
+	}
+	ui.Box(c).Absolute().Top(0).Left(0).Right(0).Bottom(0).Draw(func(p *ui.Painter, r ui.Rect) {
+		// The cover's color, and then the dark the white words need:
+		// heaviest at the head and foot, thinner through the middle.
 		p.FillGradient(r, ui.LinearGradient{Angle: 150, Oklab: true, Stops: []ui.GradientStop{
-			{Color: ink.Alpha(0.62), At: 0},
-			{Color: ink.Alpha(0.22), At: 0.42},
+			{Color: ink.Alpha(0.5), At: 0},
+			{Color: ink.Alpha(0.18), At: 0.42},
 			{Color: ink.Alpha(0), At: 0.82},
 		}}, 0)
-	}).Children(func() {
-		ui.Column(c).Grow(1).Padding(44, 46, 40, 46).Gap(0).Children(func() {
+		p.FillGradient(r, ui.LinearGradient{Angle: 90, Oklab: true, Stops: []ui.GradientStop{
+			{Color: ui.RGBA(8, 8, 12, 0.82), At: 0},
+			{Color: ui.RGBA(8, 8, 12, 0.3), At: 0.36},
+			{Color: ui.RGBA(8, 8, 12, 0.42), At: 0.66},
+			{Color: ui.RGBA(8, 8, 12, 0.92), At: 1},
+		}}, 0)
+	})
+}
+
+// shareCard draws a lyric card: the cover held behind the words, the line
+// being sung in the middle, and what plays at the foot.
+func (a *app) shareCard(c *ui.Context, card lyricCard) {
+	ink := card.color
+	ui.Column(c).Size(cardW, cardH).Clip().Children(func() {
+		cardBackdrop(c, card.cover, ink)
+		// Absolute too: the backdrop is a stack of absolute layers, and a
+		// flowing column would be painted beneath them.
+		ui.Column(c).Absolute().Top(0).Left(0).Right(0).Bottom(0).
+			Padding(44, 46, 40, 46).Gap(0).Children(func() {
 			ui.Text(c, "“").FontSize(74).FontWeight(800).LineHeight(0.82).
 				TextColor(ink.Mix(white, 0.5))
 			if card.before != "" {

@@ -552,6 +552,7 @@ func (a *app) pageTop(c *ui.Context) {
 				title = a.navName()
 			}
 			a.navLabel(c, title)
+			a.netDot(c)
 		})
 		// What plays, at the capsule's middle: the sidebar's card came
 		// here, where the eye already rests.
@@ -561,17 +562,74 @@ func (a *app) pageTop(c *ui.Context) {
 			}
 		})
 		// Who listens, at the capsule's right: the avatar and its menu.
+		a.updateDot(c)
 		a.topAccount(c)
 	})
 }
 
+// netDot is the lamp beside a page's name: it breathes while something
+// loads, and stays amber for a minute after a failure, so that a slow
+// network reads as slow rather than as broken. A click says what went
+// wrong.
+func (a *app) netDot(c *ui.Context) {
+	p := a.pal
+	fail, failed := lastDiagnostic(time.Minute)
+	busy := a.pl.Loading()
+	if !busy && !failed {
+		return
+	}
+	color, detail := p.accent, "正在加载"
+	if failed {
+		color, detail = ui.Hex("#f5a524"), fail.where+"："+fail.detail
+	}
+	dot := ui.ButtonBase(c.Key("net-dot")).Size(18, 18).Center().Radius(999).
+		FocusRing(false).Label("网络状态")
+	var lamp ui.Element
+	dot.Children(func() {
+		lamp = ui.Box(c).Size(7, 7).Radius(3.5).Background(color)
+	})
+	if busy && !failed {
+		t := lamp.Loop("net-breathe", 1200*time.Millisecond, ui.Linear)
+		lamp.Opacity(0.35 + 0.65*(1-float32(math.Abs(float64(2*t-1)))))
+	}
+	if dot.Clicked() {
+		a.toast = detail
+	}
+}
+
+// updateDot is the mark the top bar wears when a newer release is out: a
+// click opens the updater's window, which is where it installs from.
+func (a *app) updateDot(c *ui.Context) {
+	if !a.updatePeek.out() {
+		return
+	}
+	p := a.pal
+	b := ui.ButtonBase(c.Key("update-dot")).Size(22, 22).Center().Radius(999).
+		FocusRing(false).Label("有新版本 " + a.updatePeek.tag)
+	if b.Hovered() {
+		b.Background(p.hover)
+	}
+	b.Children(func() {
+		ui.Box(c).Size(8, 8).Radius(4).Background(p.accent)
+	})
+	if b.Clicked() {
+		checkForUpdates()
+	}
+}
+
 // topNowPlaying is the card of what plays, as the top bar holds it: the
-// cover, the name and who sings it on a line, for a click to open Now
-// Playing. It takes only the room the middle of the bar can spare.
+// cover, then the name with who sings it, the line being sung under them,
+// and the heart that keeps it — for a click elsewhere to open Now Playing.
+// It takes only the room the middle of the bar can spare.
 func (a *app) topNowPlaying(c *ui.Context, tr *netease.Track) {
 	p := a.pal
+	sung, _, until, _ := a.sungLine()
+	// Redraw as the next line begins, so the words keep the song's time.
+	if until > 0 {
+		c.After(until)
+	}
 	card := ui.ButtonBase(c.Key("np-top")).Gap(8).Padding(3, 8).Radius(9).AlignItems(ui.Center).
-		FocusRing(false).Label("正在播放").MaxWidth(360).Shrink(1).MinWidth(0)
+		FocusRing(false).Label("正在播放").MaxWidth(420).Shrink(1).MinWidth(0)
 	bg := ui.Transparent
 	if card.Hovered() {
 		bg = p.hover
@@ -579,8 +637,20 @@ func (a *app) topNowPlaying(c *ui.Context, tr *netease.Track) {
 	card.Background(card.AnimateColor("bg", bg, ui.Animation{Duration: 160 * time.Millisecond}))
 	card.Children(func() {
 		a.cover(c, tr.Album.PicURL, 96, 24, 5).Shadow(0, 1, 4, 0, p.cardShade)
-		ui.Text(c, tr.Name).FontSize(12).FontWeight(600).SingleLine().Shrink(1).MinWidth(0)
-		a.artistLinks(c, tr, p.muted, p.text).FontSize(11.5).SingleLine().Shrink(1).MinWidth(0)
+		// Two rows in the room of one: what plays, and what is being sung
+		// of it. Without words the card is the one it was.
+		words := ui.Column(c).Grow(1).Shrink(1).MinWidth(0).Justify(ui.Center).Gap(1)
+		words.Children(func() {
+			line := ui.Row(c).Gap(6).AlignItems(ui.Center).MinWidth(0)
+			line.Children(func() {
+				ui.Text(c, tr.Name).FontSize(12).FontWeight(600).SingleLine().Shrink(1).MinWidth(0)
+				a.artistLinks(c, tr, p.muted, p.text).FontSize(11).SingleLine().Shrink(1).MinWidth(0)
+			})
+			if sung != "" {
+				ui.Text(c, sung).FontSize(10.5).TextColor(p.muted).SingleLine().Shrink(1).MinWidth(0)
+			}
+		})
+		a.likeButton(c, tr, 15, p.muted).Key("top-heart")
 	})
 	if card.Clicked() {
 		a.nowPlaying = true
