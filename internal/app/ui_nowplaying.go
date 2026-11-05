@@ -321,20 +321,20 @@ func (a *app) npTabsRow(c *ui.Context, w float32) ui.Element {
 	// The row takes the press and keeps it, so a choice can be carried
 	// along with the pointer: sliding across picks whatever tab is under
 	// it, and letting go picks the one under it, which is also a click.
-		row.HandleInput(func(ev ui.InputEvent) bool {
-			switch ev.Kind {
-			case ui.InputPointerDown:
-				if ev.Button != 0 {
-					return false
-				}
-				// The style pill is a child of the row, not a tab: the row
-				// leaving its press to the pill is what lets the pill's
-				// menu open.
-				if a.onStylePill(ev.X) {
-					return false
-				}
-				a.npTabDrag = true
-				return true
+	row.HandleInput(func(ev ui.InputEvent) bool {
+		switch ev.Kind {
+		case ui.InputPointerDown:
+			if ev.Button != 0 {
+				return false
+			}
+			// The style pill is a child of the row, not a tab: the row
+			// leaving its press to the pill is what lets the pill's
+			// menu open.
+			if a.onStylePill(ev.X) {
+				return false
+			}
+			a.npTabDrag = true
+			return true
 		case ui.InputPointerMove:
 			if !a.npTabDrag {
 				return false
