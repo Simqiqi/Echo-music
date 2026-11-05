@@ -518,7 +518,7 @@ func (a *app) pageTop(c *ui.Context) {
 	ui.Box(c.Key("top-strip")).Absolute().Top(0).Left(0).Right(0).Height(top).DragWindow()
 	// The capsule itself: glass where the app wears it, and a quiet plate
 	// of the page's own ground where it does not.
-	shell := ui.Box(c.Key("top-capsule")).Absolute().Top(y).Left(topCapsuleSide).Right(topCapsuleSide).
+	shell := ui.Box(c.Key("top-capsule")).Absolute().Top(y).Left(topCapsuleSide).Right(topCapsuleRight(c)).
 		Height(h).Radius(h / 2).DragWindow()
 	if a.settings.glassOn() {
 		shell.Material(glass.Glass{Clarity: a.glassClarity(0.45)})
@@ -528,7 +528,7 @@ func (a *app) pageTop(c *ui.Context) {
 	shell.Shadow(0, 8, 24, -10, a.pal.cardShade)
 	// What it holds: the way back, and the name of where the page has got
 	// to; the name changes with the page, not with the bar.
-	bar := ui.Row(c).Absolute().Top(y).Left(topCapsuleSide).Right(topCapsuleSide).Height(h).
+	bar := ui.Row(c).Absolute().Top(y).Left(topCapsuleSide).Right(topCapsuleRight(c)).Height(h).
 		Padding(4, 12).Gap(8).AlignItems(ui.Center).Clip()
 	bar.Children(func() {
 		// The way back, and the name of where the page has got to, at the
@@ -668,6 +668,14 @@ const (
 // topCapsule is where the capsule over a page sits and how tall it is.
 func topCapsule(top float32) (y, h float32) {
 	return topCapsuleInset, min(topCapsuleTall, top-2*topCapsuleInset)
+}
+
+// topCapsuleRight is the capsule's inset from the window's right edge:
+// its own margin plus the room the window controls take there. Windows
+// draws them at the top right of a hidden title bar, over where the
+// capsule used to reach; macOS has nothing to the right.
+func topCapsuleRight(c *ui.Context) float32 {
+	return topCapsuleSide + c.TitleBar().Right
 }
 
 // barLine is where the capsule's foot is: the line a section's name has to
