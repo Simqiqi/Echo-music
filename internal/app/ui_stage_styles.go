@@ -57,6 +57,7 @@ func (a *app) stageStyleButton(c *ui.Context) {
 			a.settings.save()
 		}
 	})
+	a.npStyleBox = b.LayoutBounds()
 }
 
 // sparkTime is how long a word's sparks fly.

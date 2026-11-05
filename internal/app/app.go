@@ -125,6 +125,7 @@ type app struct {
 	npTabPanes  []int
 	npTabRowX   float32
 	npTabDrag   bool
+	npStyleBox  ui.Rect // the stage style pill's box of the last build
 	lyricScroll ui.ScrollState
 	lyricGlide  lyricGlide
 	lyricAt     int
