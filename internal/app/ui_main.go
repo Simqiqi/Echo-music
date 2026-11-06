@@ -513,12 +513,15 @@ func edgeShown(el ui.Element, under bool) float32 {
 func (a *app) pageTop(c *ui.Context) {
 	top, _ := a.insets(c)
 	y, h := topCapsule(top)
+	// Windows 的最小化/最大化/关闭立在右上角，胶囊得在它们之前收住；
+	// macOS 的红绿灯在左边，TitleBar().Right 恒为 0，这里不受影响。
+	side := topCapsuleSide + c.TitleBar().Right
 	// Where the strip was is still the window's to drag, along its whole
 	// width.
 	ui.Box(c.Key("top-strip")).Absolute().Top(0).Left(0).Right(0).Height(top).DragWindow()
 	// The capsule itself: glass where the app wears it, and a quiet plate
 	// of the page's own ground where it does not.
-	shell := ui.Box(c.Key("top-capsule")).Absolute().Top(y).Left(topCapsuleSide).Right(topCapsuleSide).
+	shell := ui.Box(c.Key("top-capsule")).Absolute().Top(y).Left(topCapsuleSide).Right(side).
 		Height(h).Radius(h / 2).DragWindow()
 	if a.settings.glassOn() {
 		shell.Material(glass.Glass{Clarity: a.glassClarity(0.45)})
@@ -528,7 +531,7 @@ func (a *app) pageTop(c *ui.Context) {
 	shell.Shadow(0, 8, 24, -10, a.pal.cardShade)
 	// What it holds: the way back, and the name of where the page has got
 	// to; the name changes with the page, not with the bar.
-	bar := ui.Row(c).Absolute().Top(y).Left(topCapsuleSide).Right(topCapsuleSide).Height(h).
+	bar := ui.Row(c).Absolute().Top(y).Left(topCapsuleSide).Right(side).Height(h).
 		Padding(4, 12).Gap(8).AlignItems(ui.Center).Clip()
 	bar.Children(func() {
 		// The way back, and the name of where the page has got to, at the
