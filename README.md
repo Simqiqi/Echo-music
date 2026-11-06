@@ -1,6 +1,6 @@
-# Echo
+# Echo云音乐
 
-一个 macOS 上的音乐桌面客户端加液态玻璃、黑胶唱机、逐字歌词、听歌周报、天气电台、下载管理与新碟速递。
+一个 macOS 上的网易云音乐桌面客户端。界面用 Go 原生绘制，没有 WebView，随手切歌也不掉帧；在网易云客户端之外，加了自己的东西：液态玻璃、黑胶唱机、逐字歌词、听歌周报、天气电台、下载管理与新碟速递。
 
 ## 这一版做了什么
 
@@ -19,26 +19,61 @@
 
 ## 功能
 
-- 搜索单曲、歌手、专辑、用户，输入时显示搜索建议，保留搜索历史
+- 扫码登录，登录态保存在系统凭据存储中
+- 每日推荐、推荐歌单、排行榜、我的歌单
+- 搜索单曲、歌手、专辑、用户与播客，输入时显示搜索建议，保留搜索历史
 - 歌手页的热门与最新歌曲、专辑与动态，关注歌手；专辑页与用户页
+- 播客：浏览与收听节目，订阅播客；在本机把节目转写成字幕（Qwen3-ASR），像歌词一样随播放滚动
+- 私人 FM（推荐 / 熟悉 / 探索）与心动模式
+- 边下边播，支持标准 / 较高 / 极高 / 无损（FLAC）/ Hi-Res 音质
+- 听过的歌曲缓存在本机，再次播放无需等待
+- 音量均衡，暂停与继续时淡出淡入，拖动进度无杂音
+- 退出后再打开，从上次的播放队列与进度继续
 - 逐字歌词与翻译，正在播放页的「律动」视图与歌曲评论
+- 刘海播放器：在屏幕顶部刘海处显示迷你播放器，悬停展开（在设置中开启）
 - 喜欢歌曲、播放队列、随机与循环播放
 - 浅色 / 深色 / 跟随系统
 
+## 代码在哪
 
+| 目录 | 放什么 |
+|---|---|
+| `main.go` | 入口，把窗口交给 `internal/app` |
+| `internal/app/` | 界面与交互：页面、组件、动效的驱动，以及设置、缓存策略、更新检查 |
+| `internal/fx/` | 真正在 GPU 上跑的特效与配色：星空、地形、涟漪、黑胶、水彩，以及共用的 HSV 换算 |
+| `internal/player/` | 解码与播放：队列、跳转、淡入淡出、缓存、均衡器、切歌过渡 |
+| `internal/netease/` | 网易云接口：eapi 加密、扫码登录、目录与搜索、动态与新碟、播放地址 |
+| `internal/lyrics/` | 歌词解析（含逐字与翻译） |
+| `internal/speech/` | 本机语音识别：sherpa-onnx、Qwen3-ASR 与 VAD |
+| `scripts/` | 语音模型与原生库的打包脚本 |
+| `website/` | 下载页 |
+
+## 构建
+
+需要 Go 1.27+ 与 macOS。
+
+```bash
+go tool mygo dev     # 开发模式运行
+go tool mygo build   # 打包到 build/
+go test ./...        # 运行测试
+```
 
 ## 演进方向
 
 本仓库自 2026 年 11 月起独立演进，不再合并原项目的提交。界面与功能的改动集中在 `internal/app/`，特效在 `internal/fx/`，播放器的扩展在 `internal/player/`（`eq.go`、`transition.go`）。
 
+## 来源与修改声明
+
+本项目基于 [egoist/mygo-cloudmusic](https://github.com/egoist/mygo-cloudmusic)（AGPL-3.0）二次开发。原项目及其全部贡献者的著作权归其各自作者所有；本仓库保留原始许可证与版权声明，并按 AGPL-3.0 第 5 条注明：本仓库自 2026 年 10 月起对界面布局、播放动效、应用标识与代码结构做了修改，具体版本记录见 [CHANGELOG](CHANGELOG.md)。
 
 ## 致谢
 
+- [mygo-cloudmusic](https://github.com/egoist/mygo-cloudmusic)：本项目的起点，客户端主体功能由其实现
 - [MyGo](https://github.com/egoist/mygo)：原生 UI 与应用框架
 - [Remix Icon](https://remixicon.com/)：应用内图标（[Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0)）
 - [NeteaseCloudMusicApi](https://github.com/Binaryify/NeteaseCloudMusicApi)：eapi 加密与登录流程的参考
 - [folia-major](https://github.com/chthollyphile/folia-major)：歌词动画效果的参考
-
+- [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)、[Qwen3-ASR](https://github.com/QwenLM/Qwen3-ASR) 与 [Silero VAD](https://github.com/snakers4/silero-vad)：本机语音识别
 
 本项目与网易云音乐官方无关，音乐版权归各权利人所有。
 
