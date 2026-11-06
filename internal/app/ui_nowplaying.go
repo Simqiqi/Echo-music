@@ -110,8 +110,10 @@ func (a *app) nowPlayingView(c *ui.Context) {
 		ui.Column(c).Absolute().Top(0).Left(0).Right(0).Bottom(0).Children(func() { a.nowPlayingBody(c, tr, art, accent, w, h, pointerIn) })
 		// The backdrop's own choice, over everything the view paints, at
 		// the top right where nothing else is; and beside it, the switch
-		// that keeps the line being sung on the particles page.
-		ui.Row(c).Absolute().Top(8).Right(12).Gap(8).AlignItems(ui.Center).Children(func() {
+		// that keeps the line being sung on the particles page. On Windows
+		// the caption buttons stand at the right, so the row keeps clear
+		// of them.
+		ui.Row(c).Absolute().Top(8).Right(12 + c.TitleBar().Right).Gap(8).AlignItems(ui.Center).Children(func() {
 			if a.npPane == paneParticles {
 				a.particleShapePicker(c, tint)
 				a.particleLyricPlace(c, tint)
