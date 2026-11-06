@@ -136,7 +136,7 @@ function Download() {
         </div>
 
         <p class="fine download-mirror">
-          链接都走本站自己的地址，文件由就近的加速节点分发，国内通常能跑满带宽。
+          链接都走本站自己的地址，文件也由本站直接送达，国内通常能跑满带宽。
         </p>
 
         <section class="gatekeeper" aria-labelledby="gatekeeper-title">
