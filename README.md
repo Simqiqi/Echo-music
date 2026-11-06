@@ -1,6 +1,8 @@
 # Echo云音乐
 
-一个 macOS 上的音乐桌面客户端。界面用 Go 原生绘制，没有 WebView，随手切歌也不掉帧；在网易云客户端之外，加了自己的东西：液态玻璃、黑胶唱机、逐字歌词、听歌周报、天气电台、下载管理与新碟速递。
+一个 macOS 上的网易云音乐桌面客户端。界面用 Go 原生绘制，没有 WebView，随手切歌也不掉帧；在网易云客户端之外，加了自己的东西：液态玻璃、黑胶唱机、逐字歌词、听歌周报、天气电台、下载管理与新碟速递。
+
+**官网与下载**：[simqiqiecho.dpdns.org](https://simqiqiecho.dpdns.org)
 
 ## 这一版做了什么
 
@@ -46,7 +48,7 @@
 | `internal/lyrics/` | 歌词解析（含逐字与翻译） |
 | `internal/speech/` | 本机语音识别：sherpa-onnx、Qwen3-ASR 与 VAD |
 | `scripts/` | 语音模型与原生库的打包脚本 |
-| `website/` | 下载页 |
+| `website/` | 官网与下载页，[simqiqiecho.dpdns.org](https://simqiqiecho.dpdns.org) |
 
 ## 构建
 
