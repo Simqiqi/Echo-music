@@ -1,6 +1,6 @@
 # Echo云音乐
 
-一个 macOS 上的网易云音乐桌面客户端。界面用 Go 原生绘制，没有 WebView，随手切歌也不掉帧；在网易云客户端之外，加了自己的东西：液态玻璃、黑胶唱机、逐字歌词、听歌周报、天气电台、下载管理与新碟速递。
+一个 macOS 上的音乐桌面客户端。界面用 Go 原生绘制，没有 WebView，随手切歌也不掉帧；液态玻璃、黑胶唱机、逐字歌词、听歌周报、天气电台、下载管理与新碟速递。
 
 **官网与下载**：[simqiqiecho.dpdns.org](https://simqiqiecho.dpdns.org)
 
@@ -44,25 +44,14 @@
 | `internal/app/` | 界面与交互：页面、组件、动效的驱动，以及设置、缓存策略、更新检查 |
 | `internal/fx/` | 真正在 GPU 上跑的特效与配色：星空、地形、涟漪、黑胶、水彩，以及共用的 HSV 换算 |
 | `internal/player/` | 解码与播放：队列、跳转、淡入淡出、缓存、均衡器、切歌过渡 |
-| `internal/netease/` | 网易云接口：eapi 加密、扫码登录、目录与搜索、动态与新碟、播放地址 |
+| `internal/netease/` | 接口：eapi 加密、扫码登录、目录与搜索、动态与新碟、播放地址 |
 | `internal/lyrics/` | 歌词解析（含逐字与翻译） |
-| `internal/speech/` | 本机语音识别：sherpa-onnx、Qwen3-ASR 与 VAD |
-| `scripts/` | 语音模型与原生库的打包脚本 |
 | `website/` | 官网与下载页，[simqiqiecho.dpdns.org](https://simqiqiecho.dpdns.org) |
 
-## 构建
-
-需要 Go 1.27+ 与 macOS。
-
-```bash
-go tool mygo dev     # 开发模式运行
-go tool mygo build   # 打包到 build/
-go test ./...        # 运行测试
-```
 
 ## 演进方向
 
-本仓库自 2026 年 11 月起独立演进，不再合并原项目的提交。界面与功能的改动集中在 `internal/app/`，特效在 `internal/fx/`，播放器的扩展在 `internal/player/`（`eq.go`、`transition.go`）。
+本仓库自 2026 年 10 月起独立演进，不再合并原项目的提交。界面与功能的改动集中在 `internal/app/`，特效在 `internal/fx/`，播放器的扩展在 `internal/player/`（`eq.go`、`transition.go`）。
 
 ## 来源与修改声明
 
@@ -75,7 +64,7 @@ go test ./...        # 运行测试
 - [Remix Icon](https://remixicon.com/)：应用内图标（[Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0)）
 - [NeteaseCloudMusicApi](https://github.com/Binaryify/NeteaseCloudMusicApi)：eapi 加密与登录流程的参考
 - [folia-major](https://github.com/chthollyphile/folia-major)：歌词动画效果的参考
-- [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)、[Qwen3-ASR](https://github.com/QwenLM/Qwen3-ASR) 与 [Silero VAD](https://github.com/snakers4/silero-vad)：本机语音识别
+
 
 本项目与网易云音乐官方无关，音乐版权归各权利人所有。
 
