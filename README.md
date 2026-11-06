@@ -26,6 +26,12 @@
 - 浅色 / 深色 / 跟随系统
 
 
+
+## 演进方向
+
+本仓库自 2026 年 11 月起独立演进，不再合并原项目的提交。界面与功能的改动集中在 `internal/app/`，特效在 `internal/fx/`，播放器的扩展在 `internal/player/`（`eq.go`、`transition.go`）。
+
+
 ## 致谢
 
 - [MyGo](https://github.com/egoist/mygo)：原生 UI 与应用框架
@@ -35,7 +41,6 @@
 
 
 本项目与网易云音乐官方无关，音乐版权归各权利人所有。
-
 
 ## 许可证
 
