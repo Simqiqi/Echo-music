@@ -131,8 +131,7 @@ func TestNowPlayingHoldsStillWithoutBadge(t *testing.T) {
 }
 
 // ⌘ and a number choose Now Playing's tab in that place, for a song and
-// for an episode, whose tabs are others: its last is the comments, wherever
-// the captions it may have put it.
+// for an episode, whose tabs are others: its last is the comments.
 func TestCmdNumberChoosesTab(t *testing.T) {
 	for _, c := range []struct {
 		track netease.Track

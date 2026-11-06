@@ -63,11 +63,3 @@ go tool mygo keygen   # writes mygo-update.key (secret) and mygo-update.pub
 
 The public half goes in `mygo.json`; the private half lives in the repository's Actions secret and in whoever keeps the release keys. Losing it strands every installed app on its current version — they would have to download a new build by hand, and a new pair means a new `updates.publicKey`, which old builds will not accept either.
 
-## The speech recognition libraries
-
-Podcast captions run sherpa-onnx, whose libraries the app downloads with the model from the `sherpa-onnx-<version>` release, not from the app's own. They only change with sherpa-onnx's version, in `scripts/sherpa`. Then pack them again, signing the macOS ones with the app's Developer ID (the app's hardened runtime loads no others), commit the `internal/speech/natives.go` it writes, and upload them as a prerelease, which never becomes the latest that updates look for:
-
-```bash
-go run ./scripts/sherpa -sign "Developer ID Application: xinyu zeng (GJE9R5VE87)"
-gh release create sherpa-onnx-2.0.1 --prerelease --latest=false build/sherpa/*
-```

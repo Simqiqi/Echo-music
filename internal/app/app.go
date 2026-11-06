@@ -117,7 +117,7 @@ type app struct {
 	nowPlaying  bool
 	npOpen      bool      // Now Playing as it last showed: open or not
 	npChangedAt time.Time // when it last opened or closed
-	npPane      int       // paneLyrics, paneQueue, paneStage, paneComments, paneProgram or paneCaptions
+	npPane      int       // paneLyrics, paneQueue, paneStage, paneComments or paneProgram
 	npPaneTop   float32   // how far the cover beside the pane starts below its top
 	// The tabs' boxes of the last build, and whether a press is being
 	// carried across them: a drag chooses whichever tab is under it.
@@ -181,7 +181,6 @@ type app struct {
 
 	wx       *wxState     // the sky outside, and the music it asks for
 	quiet    quietState   // the quiet parts of the song playing, for its hot comments
-	captions captionState // the episode playing's captions, and the model that writes them
 	sig      playerSig
 	quitting bool
 
@@ -277,7 +276,6 @@ func Run() error {
 		a.pl.Cache = newSongCache(a.settings.CacheMB)
 		a.pl.Changed = func() {
 			a.keepSession()
-			a.syncCaptions()
 		}
 		a.pl.Diagnose = noteDiagnostic
 		a.weekly = newWeekly()
@@ -355,9 +353,6 @@ func Run() error {
 		a.settings.Volume = a.volume
 		a.settings.save()
 		a.saveSession()
-		if write := a.transcriptWrite(); write != nil {
-			write()
-		}
 	})
 	// Windows leaves an icon in the notification area after its app until
 	// the pointer passes over it.

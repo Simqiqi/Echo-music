@@ -127,19 +127,14 @@ func (a *app) nowPlayingView(c *ui.Context) {
 func (a *app) nowPlayingBody(c *ui.Context, tr *netease.Track, art *artwork, accent ui.Color, w, h float32, pointerIn bool) {
 	pl := a.pl
 	a.commentsFor(tr)
-	// An episode has what it is about and its captions in place of lyrics;
-	// a song, lyrics in place of those.
+	// An episode has what it is about in place of lyrics; a song, lyrics
+	// in place of that.
 	switch program := tr.ProgramID != 0; {
 	case program && (a.npPane == paneWall || a.npPane == paneWall3D || a.npPane == paneParticles):
 		a.npPane = paneQueue
 	case program && (a.npPane == paneLyrics || a.npPane == paneStage):
 		a.npPane = paneProgram
-		if a.captionsOn() {
-			a.npPane = paneCaptions
-		}
-	case program && a.npPane == paneCaptions && !a.captionsShown():
-		a.npPane = paneProgram
-	case !program && (a.npPane == paneProgram || a.npPane == paneCaptions):
+	case !program && a.npPane == paneProgram:
 		a.npPane = a.lyricsPaneChosen()
 	}
 	if a.npPane != paneQueue {
@@ -282,8 +277,6 @@ func (a *app) nowPlayingBody(c *ui.Context, tr *netease.Track, art *artwork, acc
 					a.commentsPane(c, tr)
 				case paneProgram:
 					a.programPane(c, tr)
-				case paneCaptions:
-					a.captionsPane(c, tr, h)
 				default:
 					a.queuePane(c)
 				}
@@ -392,7 +385,6 @@ const (
 	paneStage
 	paneComments
 	paneProgram
-	paneCaptions
 	paneWall
 	paneWall3D
 	paneParticles
@@ -409,9 +401,6 @@ type npTab struct {
 func (a *app) npTabs() []npTab {
 	if tr := a.pl.Current(); tr != nil && tr.ProgramID != 0 {
 		tabs := []npTab{{paneProgram, "简介"}}
-		if a.captionsShown() {
-			tabs = append(tabs, npTab{paneCaptions, "字幕"})
-		}
 		return append(tabs, npTab{paneQueue, "待播清单"}, npTab{paneComments, "评论"})
 	}
 	return []npTab{{paneLyrics, "歌词"}, {paneStage, "律动"}, {paneQueue, "待播清单"}, {paneWall, "选歌"}, {paneWall3D, "海报墙"}, {paneParticles, "粒子"}, {paneComments, "评论"}}
