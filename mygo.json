@@ -2,7 +2,7 @@
   "name": "Echo云音乐",
   "identifier": "com.simqiqi.echo",
   "slug": "echo-cloudmusic",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "out": "build",
   "updates": {
     "publicKey": "CP+beYJ4K6Bvks+4e4QBRJ2aCgUv3dJ9rEntJ9W/ujs=",
