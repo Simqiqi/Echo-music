@@ -12,12 +12,12 @@ import (
 	"github.com/simqiqi/simqiqi-music/internal/player"
 )
 
-const pagePad = 40
+const pagePad = 28
 
 // columns returns how many cards of at least min DIPs fit across the page.
 func (a *app) columns(c *ui.Context, min float32) int {
 	w, _ := c.Size()
-	inner := w - sidebarWidth - 2*pagePad
+	inner := w - a.sideWidth() - 2*pagePad
 	return max(2, int((inner+20)/(min+20)))
 }
 
@@ -40,6 +40,10 @@ func (a *app) section(c *ui.Context, title string) ui.Element {
 	return el
 }
 
+// homePage is the day's edition: a masthead, one lead record, a calendar
+// of what the listener keeps, then two unequal columns of charts and
+// playlists. The plate is drawn even before the network answers — an
+// empty issue still reads as an issue, not as a loading screen.
 func (a *app) homePage(c *ui.Context) {
 	loading := len(a.featured) == 0 && len(a.charts) == 0
 	if loading && !a.homeLoading {
@@ -48,45 +52,408 @@ func (a *app) homePage(c *ui.Context) {
 	}
 	now := c.Now()
 	top, bottom := a.insets(c)
-	ui.Scroll(c.Key("home")).TrackScroll(&a.pageScroll).Grow(1).Padding(top+pageGap, pagePad, bottom+48, pagePad).ScrollbarInsets(top, 0, bottom, 0).Children(func() {
+	ui.Scroll(c.Key("home")).TrackScroll(&a.pageScroll).Grow(1).
+		Padding(top+pageGap, pagePad, bottom+48, pagePad).
+		ScrollbarInsets(top, 0, bottom, 0).Children(func() {
 		a.startMark(c)
 		defer a.endMark(c)
-		hello := greeting(now)
-		if a.profile != nil {
-			hello += "，" + a.profile.Nickname
-		}
-		a.heading(c, hello, fmt.Sprintf("%d月%d日 %s", now.Month(), now.Day(), weekday(now)))
-		if loading {
-			a.homeSkeleton(c, a.pageShimmer(c))
-			return
-		}
-		a.dailyCard(c, now)
+		a.issueHeader(c, now)
+
+		ui.Row(c).Gap(18).Margin(0, 0, 28, 0).Children(func() {
+			ui.Box(c).Grow(2).Basis(0).MinWidth(0).Children(func() { a.issueHero(c) })
+			ui.Box(c).Grow(1).Basis(0).MinWidth(0).Children(func() { a.issueCalendar(c, now) })
+		})
+
+		ui.Row(c).Gap(28).Margin(0, 0, 30, 0).Children(func() {
+			ui.Box(c).Grow(1).Basis(0).MinWidth(0).Children(func() { a.issueRanking(c) })
+			ui.Box(c).Grow(1).Basis(0).MinWidth(0).Children(func() { a.issuePlaylists(c) })
+		})
 
 		if heard := a.weekly.recent(now, 6); len(heard) > 0 {
 			a.section(c, "最近在听")
 			a.recentRow(c, heard)
 		}
-
 		if len(a.recPlaylists) > 0 {
 			a.section(c, "今日为你推荐")
 			a.pickGrid(c)
 		}
+		if len(a.featured) > 0 {
+			a.section(c, "推荐歌单")
+			ui.Grid(c).Columns(a.columns(c, 168)).GapX(20).GapY(28).Children(func() {
+				for i := range a.featured {
+					a.playlistCard(c.Key(a.featured[i].ID), &a.featured[i])
+				}
+			})
+		}
+	})
+}
 
-		a.section(c, "官方榜单")
-		official := a.charts[:min(4, len(a.charts))]
-		cols := min(4, max(2, a.columns(c, 168)))
-		ui.Grid(c).Columns(cols).GapX(20).GapY(28).Children(func() {
-			for i := range official {
-				a.chartCardCompact(c.Key(official[i].ID), &official[i])
+// solarTerm names the season the day sits in, by the civil dates of the
+// 24 terms. It is a label for the edition, not an ephemeris.
+func solarTerm(t time.Time) string {
+	terms := [12][2]struct {
+		day  int
+		name string
+	}{
+		{{5, "小寒"}, {20, "大寒"}},
+		{{4, "立春"}, {19, "雨水"}},
+		{{6, "惊蛰"}, {21, "春分"}},
+		{{5, "清明"}, {20, "谷雨"}},
+		{{6, "立夏"}, {21, "小满"}},
+		{{6, "芒种"}, {21, "夏至"}},
+		{{7, "小暑"}, {23, "大暑"}},
+		{{7, "立秋"}, {23, "处暑"}},
+		{{8, "白露"}, {23, "秋分"}},
+		{{8, "寒露"}, {23, "霜降"}},
+		{{7, "立冬"}, {22, "小雪"}},
+		{{7, "大雪"}, {22, "冬至"}},
+	}
+	m := int(t.Month()) - 1
+	pair := terms[m]
+	if t.Day() >= (pair[0].day+pair[1].day)/2 {
+		return pair[1].name
+	}
+	return pair[0].name
+}
+
+// issueHeader is the masthead: the date, the weekday and the season on
+// one line, the edition's question beneath it, and a vermilion rule.
+func (a *app) issueHeader(c *ui.Context, now time.Time) {
+	p := a.pal
+	ui.Column(c).Gap(7).Margin(0, 0, 22, 0).Children(func() {
+		ui.Row(c).AlignItems(ui.Center).Gap(9).Children(func() {
+			ui.Text(c, fmt.Sprintf("%d月%d日", now.Month(), now.Day())).FontSize(12).FontWeight(600).TextColor(p.accent)
+			ui.Box(c).Size(3, 3).Radius(1.5).Background(p.faint)
+			ui.Text(c, weekday(now)).FontSize(12).TextColor(p.muted)
+			ui.Box(c).Size(3, 3).Radius(1.5).Background(p.faint)
+			ui.Text(c, solarTerm(now)).FontSize(12).TextColor(p.muted)
+			ui.Box(c).Grow(1)
+			ui.Text(c, "为你而选 · 每日 06:00 更新").FontSize(11).TextColor(p.faint)
+		})
+		ui.Text(c, "今天，听点什么").FontSize(30).FontWeight(700).LetterSpacing(-0.6).TextColor(p.text)
+		ui.Box(c).Width(36).Height(2).Background(p.accent).Margin(4, 0, 0, 0)
+	})
+}
+
+// issueHero is the lead record: a drawn disc at the left, the day's pick
+// at the right, on a plate of warm ink. With nothing loaded yet it still
+// reads as a cover, with the button quietly waiting.
+func (a *app) issueHero(c *ui.Context) {
+	p := a.pal
+	base := ui.Hex("#24211d")
+	var pl *netease.Playlist
+	switch {
+	case len(a.charts) > 0:
+		pl = &a.charts[0]
+	case len(a.recPlaylists) > 0:
+		pl = &a.recPlaylists[0]
+	}
+	name, sub, freq := "今日首选", "正在为你准备今天的唱片", "每日更新"
+	id := int64(0)
+	if pl != nil {
+		name, id = pl.Name, pl.ID
+		sub = "一份适合此刻的歌单"
+		if pl.UpdateFreq != "" {
+			freq = pl.UpdateFreq
+		}
+	}
+	// The disc wears the cover of whatever plays now. With nothing
+	// playing it keeps its plain grooves instead.
+	var cover string
+	if tr := a.pl.Current(); tr != nil {
+		cover = tr.Album.PicURL
+	}
+	card := ui.ButtonBase(c.Key("issue-hero")).Height(220).Radius(16).Clip().
+		FocusRing(false).Label(name).Background(base).TextColor(white)
+	// The plate is a dark room for the disc, but not the same dark every
+	// day: it wears a random ground of its own, a hue away from the page's
+	// and from the chart card's, and light crosses it now and then.
+	h := wrapHue(a.wash.hue + 210)
+	if card.Hovered() {
+		if !a.heroHover {
+			a.heroHover = true
+			a.heroSweep = c.Now()
+		}
+	} else {
+		a.heroHover = false
+	}
+	card.Draw(func(dr *ui.Painter, r ui.Rect) {
+		from := ui.Oklch(0.34, 0.10, h)
+		to := ui.Oklch(0.16, 0.06, wrapHue(h+48))
+		dr.FillGradient(r, ui.LinearGradient{From: from, To: to, Angle: a.wash.angle}, 16)
+		// A band of light crosses it on its own every few seconds, and
+		// once more as the pointer comes onto it.
+		pulse := c.Now().Truncate(3200 * time.Millisecond)
+		if c.Now().Sub(pulse) <= time.Second {
+			dr.Clip(r, 16, func() { lightSweep(dr, r, pulse, c.Now()) })
+			dr.After(time.Second / 40)
+		}
+		if !a.heroSweep.IsZero() && c.Now().Sub(a.heroSweep) <= time.Second {
+			dr.Clip(r, 16, func() { lightSweep(dr, r, a.heroSweep, c.Now()) })
+			dr.After(time.Second / 40)
+		}
+	})
+	card.Children(func() {
+		disc := ui.Box(c.Key("issue-vinyl")).Absolute().Left(24).Top(30).
+			Size(160, 160).Radius(80).Clip()
+		if a.pl.Playing() {
+			turn := disc.Loop("issue-vinyl-spin", 8*time.Second, ui.Linear)
+			disc.Rotate(360 * turn)
+		}
+		disc.Children(func() {
+			if cover != "" {
+				ui.Box(c).Absolute().Top(2).Left(2).Size(156, 156).Radius(78).Clip().
+					Children(func() {
+						a.cover(c, netease.Sized(cover, 400), 400, 156, 78)
+					})
+			}
+			ui.Box(c).Absolute().Top(0).Left(0).Right(0).Bottom(0).PassThrough().
+				Draw(func(dr *ui.Painter, r ui.Rect) {
+					cx, cy := r.X+r.W/2, r.Y+r.H/2
+					if cover == "" {
+						dr.Fill(ui.Rect{X: cx - 78, Y: cy - 78, W: 156, H: 156}, ui.Hex("#34302a"), 78)
+					} else {
+						dr.Fill(r, ui.RGBA(0, 0, 0, 0.22), 80)
+					}
+					for _, rad := range []float32{69, 58, 47, 36} {
+						dr.Stroke(ui.Rect{X: cx - rad, Y: cy - rad, W: 2 * rad, H: 2 * rad},
+							white.Alpha(0.075), rad, 1)
+					}
+					dr.Fill(ui.Rect{X: cx - 26, Y: cy - 26, W: 52, H: 52}, p.accent, 26)
+					dr.Fill(ui.Rect{X: cx - 4, Y: cy - 4, W: 8, H: 8}, ui.Hex("#f7f4ed"), 4)
+				})
+		})
+		ui.Column(c).Absolute().Left(206).Top(28).Right(22).Bottom(22).Gap(8).Children(func() {
+			ui.Text(c, "今 日 首 选").FontSize(11).FontWeight(600).LetterSpacing(2).TextColor(ui.Hex("#e7a58a"))
+			ui.Box(c).Grow(1)
+			ui.Text(c, name).FontSize(23).FontWeight(700).LetterSpacing(-0.4).
+				TextColor(white).SingleLine().Shrink(1).MinWidth(0)
+			ui.Text(c, sub).FontSize(12).TextColor(white.Alpha(0.62)).
+				SingleLine().Shrink(1).MinWidth(0)
+			ui.Row(c).Gap(12).AlignItems(ui.Center).Margin(8, 0, 0, 0).Children(func() {
+				play := pillButton(c.Key("issue-play"), iconPlay, "播放", white, base)
+				if id == 0 {
+					play.Disabled(true).Opacity(0.45)
+				}
+				if play.Clicked() && id != 0 {
+					a.loadPlaylist(id, true)
+				}
+				ui.Text(c, freq).FontSize(11).TextColor(white.Alpha(0.55))
+			})
+		})
+	})
+	if card.Clicked() && id != 0 {
+		a.open(route{page: pagePlaylist, id: id})
+	}
+}
+
+// issueCalendar is the small stock card at the hero's right: the day in
+// large type, and the three things the listener keeps, each a way in.
+func (a *app) issueCalendar(c *ui.Context, now time.Time) {
+	p := a.pal
+	ui.Column(c).Height(220).Radius(16).Background(p.bg).
+		Border(1, p.hairline).Padding(18).Children(func() {
+		ui.Row(c).AlignItems(ui.Center).Children(func() {
+			ui.Text(c, "音乐日历").FontSize(13).FontWeight(600).TextColor(p.text)
+			ui.Box(c).Grow(1)
+			ui.Text(c, fmt.Sprintf("%02d.%02d", now.Month(), now.Day())).FontSize(11).TextColor(p.accent)
+		})
+		ui.Row(c).AlignItems(ui.End).Gap(10).Margin(12, 0, 10, 0).Children(func() {
+			ui.Textf(c, "%02d", now.Day()).FontSize(38).FontWeight(700).LetterSpacing(-2).TextColor(p.text)
+			ui.Text(c, weekday(now)+" · "+solarTerm(now)).FontSize(11).TextColor(p.muted).Margin(0, 0, 7, 0)
+		})
+		ui.Box(c).Height(1).Background(p.hairline).Margin(0, 0, 8, 0)
+		rows := []struct {
+			label, value string
+			r            route
+		}{
+			{"新碟速递", fmt.Sprintf("%d 张", len(a.newAlbums.albums)), route{page: pageNewAlbums}},
+			{"本地缓存", fmt.Sprintf("%d 首", len(a.downloads.entries)), route{page: pageDownloads}},
+		}
+		for i := range rows {
+			row := &rows[i]
+			b := ui.ButtonBase(c.Key("cal-" + row.label)).Height(29).PaddingX(6).Radius(7).
+				AlignItems(ui.Center).Gap(8).FocusRing(false).Label(row.label)
+			if b.Hovered() {
+				b.Background(p.hover)
+			}
+			b.Children(func() {
+				ui.Box(c).Size(5, 5).Radius(2.5).Background(p.accent.Alpha(0.8)).Shrink(0)
+				ui.Text(c, row.label).FontSize(11.5).TextColor(p.text).Shrink(0)
+				ui.Box(c).Grow(1)
+				ui.Text(c, row.value).FontSize(11).TextColor(p.muted).Shrink(0)
+				ui.Icon(c, iconForward).Size(11, 11).TextColor(p.faint)
+			})
+			if b.Clicked() {
+				a.open(row.r)
+			}
+		}
+		ui.Box(c).Grow(1)
+		ui.Text(c, "刊物每日 06:00 更新").FontSize(10.5).TextColor(p.faint)
+	})
+}
+
+// issueRanking is the left column: a numbered list, the first line in
+// vermilion, with a rule under each. It reads as a contents list even
+// before the charts arrive.
+func (a *app) issueRanking(c *ui.Context) {
+	p := a.pal
+	// The card wears one of the wallpaper's two random hues, so the
+	// chart list looks different each time the app opens. A pointer
+	// coming onto it sends one band of light across the card.
+	card := ui.Box(c.Key("issue-ranking")).Radius(14).Clip()
+	if card.Hovered() {
+		if !a.rankHover {
+			a.rankHover = true
+			a.rankSweep = c.Now()
+		}
+	} else {
+		a.rankHover = false
+	}
+	// A hue well away from the wallpaper's, so the card reads as its own
+	// random ground rather than melting into the page behind it.
+	h := wrapHue(a.wash.hue + 150)
+	card.Draw(func(dr *ui.Painter, r ui.Rect) {
+		from := ui.Oklch(0.36, 0.11, h)
+		to := ui.Oklch(0.22, 0.09, wrapHue(h+45))
+		alpha := float32(0.84)
+		if !p.dark {
+			from = ui.Oklch(0.92, 0.06, h)
+			to = ui.Oklch(0.82, 0.075, wrapHue(h+45))
+			alpha = 0.9
+		}
+		dr.FillGradient(r, ui.LinearGradient{
+			From: from.Alpha(alpha), To: to.Alpha(alpha), Angle: a.wash.angle,
+		}, 14)
+		// Light crosses the card on its own every few seconds, and once
+		// more as the pointer comes onto it.
+		pulse := c.Now().Truncate(2600 * time.Millisecond)
+		if c.Now().Sub(pulse) <= time.Second {
+			dr.Clip(r, 14, func() { lightSweep(dr, r, pulse, c.Now()) })
+			dr.After(time.Second / 40)
+		}
+		if !a.rankSweep.IsZero() && c.Now().Sub(a.rankSweep) <= time.Second {
+			dr.Clip(r, 14, func() { lightSweep(dr, r, a.rankSweep, c.Now()) })
+			dr.After(time.Second / 40)
+		}
+	})
+	card.Children(func() {
+		ui.Column(c).Padding(14).Children(func() {
+			ui.Row(c).AlignItems(ui.Center).Margin(0, 0, 12, 0).Children(func() {
+				ui.Text(c, "飙升榜").FontSize(16).FontWeight(700).TextColor(p.text)
+				ui.Box(c).Grow(1)
+				a.rankVinyl(c, p, h)
+				all := ui.ButtonBase(c.Key("issue-all-charts")).PaddingX(6).Height(24).
+					Radius(6).FocusRing(false).Label("全部榜单")
+				all.Children(func() { ui.Text(c, "全部 ›").FontSize(11).TextColor(p.accent) })
+				if all.Clicked() {
+					a.open(route{page: pageCharts})
+				}
+			})
+			type line struct{ first, second string }
+			var lines []line
+			if len(a.charts) > 0 {
+				for _, l := range a.charts[0].Preview {
+					lines = append(lines, line{l.First, l.Second})
+				}
+			}
+			if len(lines) == 0 {
+				lines = []line{
+					{"榜单正在路上", "每日 06:00"},
+					{"登录后可见完整排行", "—"},
+					{"也可以先逛逛歌单", "—"},
+					{"或从私人 FM 开始", "—"},
+				}
+			}
+			for i, l := range lines[:min(4, len(lines))] {
+				ui.Row(c).Height(36).AlignItems(ui.Center).Gap(12).Children(func() {
+					col := p.faint
+					if i == 0 {
+						col = p.accent
+					}
+					ui.Textf(c, "%02d", i+1).FontSize(14).FontWeight(700).
+						FontFeatures("tnum").TextColor(col).Width(24).Shrink(0)
+					ui.Text(c, l.first).FontSize(12.5).TextColor(p.text).
+						SingleLine().Shrink(1).MinWidth(0)
+					ui.Box(c).Grow(1)
+					ui.Text(c, l.second).FontSize(11).TextColor(p.faint).SingleLine().Shrink(0)
+				})
+				ui.Box(c).Height(1).Background(p.hairline)
 			}
 		})
+	})
+}
 
-		a.section(c, "推荐歌单")
-		ui.Grid(c).Columns(a.columns(c, 168)).GapX(20).GapY(28).Children(func() {
-			for i := range a.featured {
-				a.playlistCard(c.Key(a.featured[i].ID), &a.featured[i])
-			}
-		})
+// rankVinyl is the chart card's own little record: the cover of what
+// plays over a random wash, grooved, highlighted, and turning.
+func (a *app) rankVinyl(c *ui.Context, p palette, hue float32) {
+	var cover string
+	if tr := a.pl.Current(); tr != nil {
+		cover = tr.Album.PicURL
+	}
+	disc := ui.Box(c.Key("rank-vinyl")).Size(34, 34).Radius(17).Clip().Shrink(0)
+	disc.Children(func() {
+		ui.Box(c).Absolute().Top(0).Left(0).Right(0).Bottom(0).
+			Background(ui.Oklch(0.42, 0.12, hue))
+		if cover != "" {
+			ui.Box(c).Absolute().Top(0).Left(0).Right(0).Bottom(0).Children(func() {
+				a.cover(c, netease.Sized(cover, 200), 200, 34, 17)
+			})
+		}
+		ui.Box(c).Absolute().Top(0).Left(0).Right(0).Bottom(0).PassThrough().
+			Draw(func(dr *ui.Painter, r ui.Rect) {
+				cx, cy := r.X+r.W/2, r.Y+r.H/2
+				dr.Fill(r, ui.RGBA(0, 0, 0, 0.16), 17)
+				for _, rad := range []float32{14, 11} {
+					dr.Stroke(ui.Rect{X: cx - rad, Y: cy - rad, W: 2 * rad, H: 2 * rad},
+						white.Alpha(0.13), rad, 0.8)
+				}
+				// A highlight turning with the disc: its own light.
+				dr.FillGradient(ui.Rect{X: cx - 3, Y: cy - 16, W: 6, H: 16},
+					ui.LinearGradient{From: white.Alpha(0.32), To: ui.Transparent, Angle: 90}, 0)
+				dr.Fill(ui.Rect{X: cx - 5, Y: cy - 5, W: 10, H: 10}, p.accent, 5)
+				dr.Fill(ui.Rect{X: cx - 1.5, Y: cy - 1.5, W: 3, H: 3}, p.bg, 1.5)
+			})
+	})
+	spin := disc.Loop("rank-vinyl-spin", 8*time.Second, ui.Linear)
+	disc.Rotate(360 * spin)
+}
+
+// issuePlaylists is the right column: three covers in a row, washed in
+// paper tones where the network has not answered yet.
+func (a *app) issuePlaylists(c *ui.Context) {
+	p := a.pal
+	ui.Row(c).AlignItems(ui.Center).Margin(0, 0, 12, 0).Children(func() {
+		ui.Text(c, "歌单速递").FontSize(16).FontWeight(700).TextColor(p.text)
+		ui.Box(c).Grow(1)
+		ui.Text(c, fmt.Sprintf("%d 张", len(a.featured))).FontSize(11).TextColor(p.faint)
+	})
+	names := []string{"城市夜行", "雨天书房", "清晨慢跑"}
+	tints := []ui.Color{ui.Hex("#f0ddd0"), ui.Hex("#e4e5db"), ui.Hex("#ded8cb")}
+	ui.Row(c).Gap(12).Children(func() {
+		for i := 0; i < 3; i++ {
+			idx := i
+			ui.Column(c).Grow(1).Basis(0).MinWidth(0).Gap(8).Children(func() {
+				art := ui.ButtonBase(c.Key(fmt.Sprintf("issue-pl-%d", idx))).Height(108).
+					Radius(12).Clip().FocusRing(false).Label(names[idx])
+				if idx < len(a.featured) {
+					pl := &a.featured[idx]
+					art.Children(func() { a.coverArt(c, pl.Cover(), pl.Name, 300, 12) })
+				} else {
+					art.Background(tints[idx])
+					art.Children(func() {
+						ui.Box(c).Absolute().Top(0).Left(0).Right(0).Bottom(0).Center().Children(func() {
+							ui.Icon(c, iconNote).Size(22, 22).TextColor(p.faint)
+						})
+					})
+				}
+				ui.Text(c, names[idx]).FontSize(11.5).TextColor(p.text).
+					SingleLine().Shrink(1).MinWidth(0)
+				if art.Clicked() && idx < len(a.featured) {
+					a.open(route{page: pagePlaylist, id: a.featured[idx].ID})
+				}
+			})
+		}
 	})
 }
 

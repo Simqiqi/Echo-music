@@ -154,9 +154,12 @@ type wall3Col struct {
 func (a *app) wall3DPane(c *ui.Context, tr *netease.Track, accent ui.Color, w, h float32, pointerIn bool) {
 	top := topBar(c) + npTabsHeight
 	const foot = 150
+	tabs, _, bareFoot, line := a.npBareParts()
 	a.wall3D(c, top, w, max(h-top-foot, 200), accent, pointerIn)
-	a.wall3DBar(c, tr, accent, true)
-	reveal(a.npTabsRow(c, w), pointerIn).Children(func() { a.paneTabs(c) })
+	if !bareFoot && !line {
+		a.wall3DBar(c, tr, accent, true)
+	}
+	reveal(a.npTabsRow(c, w), pointerIn && !tabs).Children(func() { a.paneTabs(c) })
 }
 
 // wall3D stands the queue's covers on the wall, in an area from top down,

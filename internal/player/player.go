@@ -617,7 +617,41 @@ func (p *Player) Duration() time.Duration {
 	if p.track == nil {
 		return 0
 	}
-	return p.track.Length()
+	if d := p.track.Length(); d > 0 {
+		return d
+	}
+	// Some tracks come without their length in the catalog: an episode, a
+	// live take, a song the service holds back. The stream knows its own
+	// length once it is open, so take it from there and the bar fills.
+	if p.out != nil {
+		if d := p.out.Duration(); d > 0 {
+			return d
+		}
+	}
+	return 0
+}
+
+// learnLength reads the length of what streams, once it knows it, and
+// keeps it for the song: a list shows it from the next frame on, and the
+// app remembers it to the next it opens with. A stream that never tells,
+// as a live one, leaves the song as it was.
+func (p *Player) learnLength(gen int, out *audio.Player, id int64) {
+	go func() {
+		for range 20 { // up to four seconds
+			time.Sleep(200 * time.Millisecond)
+			d := out.Duration()
+			if d <= 0 {
+				continue
+			}
+			netease.RememberLength(id, d)
+			p.post(func() {
+				if gen == p.gen {
+					p.sync()
+				}
+			})
+			return
+		}
+	}()
 }
 
 // Levels returns the spectrum of what plays now.
@@ -738,12 +772,25 @@ func (p *Player) loadSkipping(at, skipped int, play bool, from time.Duration) {
 				if p.Diagnose != nil {
 					p.Diagnose("播放", err)
 				}
+				// Why it would not play, said as it is: a subscription
+				// that lapsed, an album to buy, a song taken down. Saying
+				// "VIP" to a subscriber for every of them is no answer.
 				switch {
 				case !errors.Is(err, netease.ErrUnavailable):
 				case t.ProgramID != 0:
 					p.err = "这期节目需要购买才能收听"
+				case t.Fee == 4:
+					p.err = "这张数字专辑需要单独购买，会员不包含"
+				case errors.Is(err, netease.ErrPreview) && t.Playable():
+					// The catalogue says the listener may hear it, and the
+					// stream holds back a trial: the session went stale.
+					p.err = "会员权益没有生效，请在设置里退出后重新登录"
+				case errors.Is(err, netease.ErrPreview):
+					p.err = "这首歌只能试听，需要购买或开通会员"
+				case t.Fee == 1:
+					p.err = "这首歌需要 VIP 会员才能播放"
 				default:
-					p.err = "这首歌需要 VIP 才能播放"
+					p.err = "这首歌暂时没有可用音源（版权受限或已下架）"
 				}
 				// A song that cannot play hands over to the next one. A
 				// network or decode failure stays on the song chosen, so
@@ -766,6 +813,10 @@ func (p *Player) loadSkipping(at, skipped int, play bool, from time.Duration) {
 				p.out = audio.NewPlayer(eqDecoder{stream: s, eq: p.EQ})
 			} else {
 				p.out = audio.NewPlayer(s)
+			}
+			if t.Length() == 0 {
+				// The catalogue had no length for it: the stream has.
+				p.learnLength(gen, p.out, t.ID)
 			}
 			// From its middle, as a session picked up again, it fades in.
 			// A natural end hands over more slowly than a skip does,

@@ -32,33 +32,37 @@ type palette struct {
 func paletteFor(t *ui.Theme, accent string) palette {
 	hue := accentHue(accent)
 	if t.Dark {
+		// The night edition: warm ink rather than blue-black, the same
+		// vermilion rule running through it.
 		return palette{
 			dark:      true,
-			bg:        ui.Hex("#141416"),
-			sidebar:   ui.Hex("#1c1c1f"),
-			text:      ui.Hex("#f5f5f7"),
-			muted:     ui.RGBA(235, 235, 245, 0.56),
-			faint:     ui.RGBA(235, 235, 245, 0.3),
-			hairline:  ui.RGBA(255, 255, 255, 0.07),
-			hover:     ui.RGBA(255, 255, 255, 0.06),
-			press:     ui.RGBA(255, 255, 255, 0.1),
+			bg:        ui.Hex("#171614"),
+			sidebar:   ui.Hex("#201d19"),
+			text:      ui.Hex("#f4f0e8"),
+			muted:     ui.RGBA(240, 232, 220, 0.58),
+			faint:     ui.RGBA(240, 232, 220, 0.32),
+			hairline:  ui.RGBA(255, 244, 225, 0.09),
+			hover:     ui.RGBA(255, 244, 225, 0.065),
+			press:     ui.RGBA(255, 244, 225, 0.11),
 			accent:    ui.Oklch(0.68, 0.19, hue),
 			onAccent:  ui.Hex("#ffffff"),
-			cardShade: ui.RGBA(0, 0, 0, 0.45),
+			cardShade: ui.RGBA(0, 0, 0, 0.5),
 		}
 	}
+	// The paper edition: warm stock, ink, and a vermilion the listener
+	// can still change the hue of.
 	return palette{
-		bg:        ui.Hex("#ffffff"),
-		sidebar:   ui.Hex("#f4f4f6"),
-		text:      ui.Hex("#1d1d1f"),
-		muted:     ui.RGBA(60, 60, 67, 0.62),
-		faint:     ui.RGBA(60, 60, 67, 0.32),
-		hairline:  ui.RGBA(0, 0, 0, 0.07),
-		hover:     ui.RGBA(0, 0, 0, 0.04),
-		press:     ui.RGBA(0, 0, 0, 0.08),
+		bg:        ui.Hex("#f7f4ed"),
+		sidebar:   ui.Hex("#efeae0"),
+		text:      ui.Hex("#24211d"),
+		muted:     ui.RGBA(52, 44, 36, 0.62),
+		faint:     ui.RGBA(52, 44, 36, 0.34),
+		hairline:  ui.RGBA(70, 55, 40, 0.13),
+		hover:     ui.RGBA(70, 55, 40, 0.055),
+		press:     ui.RGBA(70, 55, 40, 0.1),
 		accent:    ui.Oklch(0.61, 0.2, hue),
 		onAccent:  ui.Hex("#ffffff"),
-		cardShade: ui.RGBA(0, 0, 0, 0.16),
+		cardShade: ui.RGBA(60, 45, 30, 0.18),
 	}
 }
 

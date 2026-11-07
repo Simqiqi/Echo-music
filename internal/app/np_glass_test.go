@@ -29,7 +29,7 @@ func TestNowPlayingTabsClickThroughGlass(t *testing.T) {
 			tt.Frame()
 			tt.Advance(time.Second)
 			tt.Frame()
-			if err := tt.Click("律动"); err != nil {
+			if err := tt.Click("动态"); err != nil {
 				t.Fatalf("click on 律动: %v", err)
 			}
 			tt.Frame()

@@ -22,7 +22,7 @@ func TestNowPlayingClosesAsOneLayer(t *testing.T) {
 	tt.Frame()
 	tt.Advance(time.Second)
 	tt.Frame()
-	if !tt.HasText("待播清单") {
+	if !tt.HasText("评论") {
 		t.Fatal("now playing did not open")
 	}
 	// Mid-way out, it still covers the page and the sidebar alike.
@@ -41,7 +41,7 @@ func TestNowPlayingClosesAsOneLayer(t *testing.T) {
 	}
 	tt.Advance(2 * time.Second)
 	tt.Frame()
-	if tt.HasText("待播清单") {
+	if tt.HasText("评论") {
 		t.Error("now playing still shows after closing")
 	}
 }
@@ -138,7 +138,7 @@ func TestCmdNumberChoosesTab(t *testing.T) {
 		keys  []int // from 1, 0 for the last tab
 		panes []int
 	}{
-		{netease.Track{ID: 1, Name: "宝船", Duration: 200000}, []int{4, 2, 1}, []int{paneWall, paneStage, paneLyrics}},
+		{netease.Track{ID: 1, Name: "宝船", Duration: 200000}, []int{3, 2, 1}, []int{paneWall, paneStage, paneLyrics}},
 		{netease.Track{ID: 2, Name: "节目", ProgramID: 9, Duration: 200000}, []int{0, 1}, []int{paneComments, paneProgram}},
 	} {
 		a := newTestApp()
@@ -182,7 +182,7 @@ func TestNowPlayingTabsStayPut(t *testing.T) {
 	if !ok {
 		t.Fatal("no 歌词 tab")
 	}
-	for _, tab := range []string{"律动", "待播清单", "选歌", "歌词"} {
+	for _, tab := range []string{"动态", "选歌", "海报墙", "歌词"} {
 		tt.Click(tab)
 		settle()
 		if a.npPane == paneLyrics && tab != "歌词" {

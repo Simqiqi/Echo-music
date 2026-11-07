@@ -286,11 +286,18 @@ func (a *app) particlePane(c *ui.Context, tr *netease.Track, art *artwork, accen
 	if st.step(c.Now()) {
 		c.After(16 * time.Millisecond)
 	}
-	a.wall3Foot(c, pointerIn)
+	tabs, _, bareFoot, line := a.npBareParts()
+	if !bareFoot {
+		a.wall3Foot(c, pointerIn)
+	}
 	a.particleRecord(c, tr, art, a.recAt)
-	a.particleLyrics(c, accent, w, a.recLyric)
-	a.wall3DBar(c, tr, accent, false)
-	reveal(a.npTabsRow(c, w), pointerIn).Children(func() { a.paneTabs(c) })
+	if !line {
+		a.particleLyrics(c, accent, w, a.recLyric)
+	}
+	if !bareFoot {
+		a.wall3DBar(c, tr, accent, false)
+	}
+	reveal(a.npTabsRow(c, w), pointerIn && !tabs).Children(func() { a.paneTabs(c) })
 }
 
 // particleFoot is what the bar at the foot of the pane takes, and what the
@@ -518,4 +525,46 @@ func (a *app) particleLyricSwitch(c *ui.Context, accent ui.Color) {
 		a.settings.ParticleLyricsOff = on
 		a.settings.save()
 	}
+}
+
+// particleOptionsMenu folds the particles page's corner controls into
+// one small button: what the specks look like, whether the line being
+// sung shows, and where it stands. The record keeps the width the three
+// pills used to take.
+func (a *app) particleOptionsMenu(c *ui.Context, accent ui.Color) {
+	b := ui.ButtonBase(c.Key("particle-options")).Height(npTabsHeight).PaddingX(12).
+		Radius(999).Gap(5).AlignItems(ui.Center).Label("粒子页选项").Tooltip("粒子页选项")
+	bg, fg := white.Alpha(0.08), white.Alpha(0.8)
+	if b.Hovered() {
+		bg, fg = white.Alpha(0.18), white
+	}
+	b.Background(b.AnimateColor("bg", bg, ui.Animation{Duration: 120 * time.Millisecond}))
+	b.Children(func() {
+		ui.Icon(c, iconMore).Size(15, 15).TextColor(fg)
+		ui.Text(c, "选项").FontSize(12).FontWeight(600).TextColor(fg).SingleLine()
+		ui.Icon(c, iconDown).Size(11, 11).TextColor(accent)
+	})
+	b.Menu(func(m *ui.Menu) {
+		for i, name := range []string{"圆点", "方块", "星形"} {
+			if m.Item(name).Checked(a.settings.ParticleShape == i).Chosen() && a.settings.ParticleShape != i {
+				a.settings.ParticleShape = i
+				a.settings.save()
+			}
+		}
+		m.Separator()
+		if m.Item("显示歌词").Checked(!a.settings.ParticleLyricsOff).Chosen() {
+			a.settings.ParticleLyricsOff = !a.settings.ParticleLyricsOff
+			a.settings.save()
+		}
+		if !a.settings.ParticleLyricsOff {
+			if m.Item("歌词在下方").Checked(!a.settings.ParticleLyricMid).Chosen() {
+				a.settings.ParticleLyricMid = false
+				a.settings.save()
+			}
+			if m.Item("歌词在中间").Checked(a.settings.ParticleLyricMid).Chosen() {
+				a.settings.ParticleLyricMid = true
+				a.settings.save()
+			}
+		}
+	})
 }

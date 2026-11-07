@@ -27,6 +27,9 @@ var stageStyles = []struct{ id, label string }{
 // stageStyleButton names the stage's style, and opens the menu of the
 // others.
 func (a *app) stageStyleButton(c *ui.Context) {
+	if a.npTabsV < 0.35 {
+		return
+	}
 	label := stageStyles[0].label
 	for _, s := range stageStyles {
 		if s.id == a.settings.StageStyle {
@@ -34,7 +37,7 @@ func (a *app) stageStyleButton(c *ui.Context) {
 		}
 	}
 	b := ui.ButtonBase(c.Key("stage-style")).Padding(6, 10, 6, 14).Radius(999).Gap(4).AlignItems(ui.Center).
-		FocusRing(false).Label("律动效果").Tooltip("律动效果")
+		FocusRing(false).Label("动态效果").Tooltip("动态效果")
 	bg, fg := ui.Transparent, white.Alpha(0.55)
 	if b.Hovered() {
 		bg, fg = white.Alpha(0.06), white.Alpha(0.8)

@@ -54,9 +54,11 @@ type app struct {
 	wash   wallpaper // the colors the app opened onto: see newWallpaper
 	opened time.Time // when it opened: the clock the wallpaper breathes by
 
-	route   route
-	history []route
-	forward []route // the pages gone back from, the last first to go to
+	route     route
+	history   []route
+	forward   []route // the pages gone back from, the last first to go to
+	rail      bool    // the directory folded into its icon-only rail
+	sideAnimW float32 // the column's width as it glides open or shut
 
 	profile      *netease.Profile
 	mine, saved  []netease.Playlist // the listener's playlists: made, and saved
@@ -118,6 +120,13 @@ type app struct {
 	npOpen      bool      // Now Playing as it last showed: open or not
 	npChangedAt time.Time // when it last opened or closed
 	npPane      int       // paneLyrics, paneQueue, paneStage, paneComments or paneProgram
+	npBare      bool      // Tab has put Now Playing's chrome away
+	npTabsLeft  time.Time // when the pointer last left the tab row
+	npTabsV     float32   // how far the tab row is unfolded this frame
+	rankHover   bool      // the pointer is on the home page's chart card
+	rankSweep   time.Time // when its light last began to pass over it
+	heroHover   bool      // the pointer is on the home page's lead record
+	heroSweep   time.Time // when its light last began to pass over it
 	npPaneTop   float32   // how far the cover beside the pane starts below its top
 	// The tabs' boxes of the last build, and whether a press is being
 	// carried across them: a drag chooses whichever tab is under it.
@@ -179,8 +188,8 @@ type app struct {
 	newAlbums newAlbumsState
 	weekSky   weekSweep // the light that crosses the week's poster
 
-	wx       *wxState     // the sky outside, and the music it asks for
-	quiet    quietState   // the quiet parts of the song playing, for its hot comments
+	wx       *wxState   // the sky outside, and the music it asks for
+	quiet    quietState // the quiet parts of the song playing, for its hot comments
 	sig      playerSig
 	quitting bool
 

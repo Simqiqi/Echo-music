@@ -16,6 +16,26 @@ import (
 // its pane of glass and the room around it.
 const sidebarWidth = 232
 
+// railWidth is the directory folded into an icon-only rail: the page
+// takes back 168 DIPs of width, which the edition's wide columns use.
+const railWidth = 64
+
+// glide is the one motion the whole window uses, so nothing snaps or
+// arrives at a different speed than the drawer beside it.
+const glideDur = 460 * time.Millisecond
+
+// sideWidth is how much of the window the navigation holds right now:
+// the animated width while a real window glides, else the whole column.
+func (a *app) sideWidth() float32 {
+	if a.sideAnimW > 0 {
+		return a.sideAnimW
+	}
+	if a.rail {
+		return railWidth
+	}
+	return sidebarWidth
+}
+
 // sidebarInset is the room the sidebar's pane of glass keeps from the
 // window's edges, floating it over the page, and sidebarRadius its
 // corners, as macOS 26's floating sidebars round them.
@@ -66,21 +86,60 @@ func (a *app) view(c *ui.Context) {
 			// and frost. The player runs the whole width of the foot, so
 			// the sidebar stops above it and leaves that much of its
 			// column clear.
-			bg := a.homeTinted(&p)
+			// The directory breathes with the pointer: over its column it
+			// opens into the full contents page; once the pointer moves out
+			// into the page it folds back to a rail of icons and gives the
+			// edition its width back. A test has no window, and so keeps
+			// the full directory, where its labels stay clickable.
+			if a.win != nil {
+				probe := ui.Box(c.Key("side-probe")).Absolute().Top(0).Left(0).Right(0).Bottom(0).PassThrough()
+				// Leaving the column closes it at once; coming back onto
+				// the rail opens it. The width then glides rather than
+				// jumping a frame.
+				bound := float32(sidebarWidth)
+				if a.rail {
+					bound = railWidth
+				}
+				// The player occupies the foot of the window: a pointer
+				// down on its cover is not on the column, however far
+				// left it is. Check both axes, not just the width.
+				_, h := c.Size()
+				foot := float32(playerBarHeight + 8)
+				if x, y, over := probe.PointerPosition(); over {
+					inColumn := x <= bound && y >= 0 && y < h-foot
+					a.rail = !inColumn
+				}
+				target := float32(1)
+				if a.rail {
+					target = 0
+				}
+				v := probe.AnimateTo("side-w", target,
+					ui.Animation{Duration: glideDur, Ease: ui.EaseOut})
+				a.sideAnimW = railWidth + (sidebarWidth-railWidth)*v
+			}
 			liquid := a.settings.glassOn()
+			// The day's own drift of color under the edition: the cards
+			// and the type sit on the random wallpaper, as before.
+			bg := a.homeTinted(&p)
 			a.ground(page, bg)
-			side := ui.Column(c).Width(sidebarWidth)
+			side := ui.Column(c).Width(a.sideWidth())
+			if a.win != nil {
+				// A drawer closing: its contents are clipped to the column
+				// while the width eases down to the rail.
+				side.Clip()
+			}
 			foot := float32(playerBarHeight)
 			if !liquid {
 				foot += 8
 			}
-			switch {
-			case liquid:
+			if liquid {
 				side.Padding(sidebarInset, sidebarInset, foot, sidebarInset)
-			case !c.Vibrancy():
-				side.Padding(0, 0, foot, 0).Background(p.sidebar)
-			default:
-				side.Padding(0, 0, foot, 0)
+			} else {
+				// The paper edition has no pane of glass: a plain stock
+				// column with a rule at its right edge, like a magazine's
+				// contents page.
+				side.Padding(0, 0, foot, 0).Background(p.sidebar).
+					BorderWidth(0, 1, 0, 0).BorderColor(p.hairline)
 			}
 			side.Children(func() {
 				pill := ui.Column(c).Fill()
@@ -162,6 +221,9 @@ func (a *app) shortcuts(c *ui.Context) {
 	})
 	if a.nowPlaying {
 		c.OnShortcut(0, ui.KeyEscape, func() { a.nowPlaying = false })
+		// Tab puts the chrome away, and brings it back: an unadorned
+		// view of the words, the wall or the record.
+		c.OnShortcut(0, ui.KeyTab, func() { a.npBare = !a.npBare })
 		// ⌘ and a number choose Now Playing's tab of that place.
 		if a.pl.Current() != nil {
 			for i, t := range a.npTabs() {
@@ -276,9 +338,98 @@ func (a *app) sidebar(c *ui.Context) {
 		// its own inset gives back.
 		top -= sidebarInset
 	}
+	if a.rail {
+		a.railNav(c, top)
+		return
+	}
+	a.directory(c, top)
+}
+
+// railNav is the directory folded to a 64 DIP strip of icons: the page
+// takes the width back, and the pointer over an item says what it is.
+func (a *app) railNav(c *ui.Context, top float32) {
+	p := a.pal
+	items := []railEntry{
+		{iconHome, "为你推荐", route{page: pageHome}},
+		{iconDaily, "每日推荐", route{page: pageDaily}},
+		{iconWeekly, "听歌周报", route{page: pageWeekly}},
+		{iconRadio, "私人 FM", route{page: pageFM}},
+		{iconWeather, "天气电台", route{page: pageWeather}},
+		{iconCharts, "排行榜", route{page: pageCharts}},
+		{iconPodcast, "播客", route{page: pagePodcasts}},
+		{iconDownloads, "下载管理", route{page: pageDownloads}},
+		{iconNewAlbums, "新碟速递", route{page: pageNewAlbums}},
+	}
+	ui.Column(c).Fill().MinWidth(railWidth-12).
+		Padding(top, 6, 14, 6).Gap(2).AlignItems(ui.Center).DragWindow().Children(func() {
+		ui.Icon(c, iconMore).Size(17, 17).TextColor(p.faint).Margin(0, 0, 6, 0)
+		if iconButton(c.Key("rail-search"), iconSearch, 16, p.muted, "搜索歌曲").Clicked() {
+			a.rail = false
+		}
+		ui.Box(c).Height(1).Background(p.hairline).Margin(4, 0, 8, 0)
+		for i := range items {
+			a.railItem(c, &items[i], i)
+		}
+		ui.Box(c).Grow(1)
+		if iconButton(c.Key("rail-playlists"), iconNote, 16, p.muted, "我的歌单").Clicked() {
+			a.rail = false
+		}
+	})
+}
+
+type railEntry struct {
+	icon  *ui.SVG
+	label string
+	r     route
+}
+
+func (a *app) railItem(c *ui.Context, it *railEntry, index int) {
+	p := a.pal
+	selected := a.route.page == it.r.page && !a.nowPlaying
+	b := ui.ButtonBase(c.Key("rail-"+it.label)).Size(44, 44).Center().Radius(11).
+		FocusRing(false).Label(it.label).TextColor(p.text)
+	bg := ui.Transparent
+	if selected {
+		bg = a.songAccent.Alpha(0.14)
+	} else if b.Hovered() {
+		bg = p.hover
+	}
+	b.Background(b.AnimateColor("bg", bg, ui.Animation{Duration: 140 * time.Millisecond}))
+	color := p.muted
+	if selected {
+		color = a.songAccent
+	}
+	b.Children(func() {
+		ui.Icon(c, it.icon).Size(19, 19).TextColor(color)
+		if selected {
+			ui.Box(c).Absolute().Left(-6).Top(10).Size(3, 24).Radius(1.5).Background(a.songAccent)
+		}
+	})
+	if b.Clicked() {
+		a.open(it.r)
+	}
+}
+
+// directory is the contents page of the edition: its issue line, then
+// the numbered index of pages and the listener's playlists.
+func (a *app) directory(c *ui.Context, top float32) {
+	p := a.pal
 	// Where nothing in it takes the press, the sidebar moves the window, as
 	// the title bar it reaches up into would.
-	ui.Column(c).Fill().Padding(top, 14, 14, 14).Gap(4).DragWindow().Children(func() {
+	// The contents keep the full directory width even while the column
+	// glides open: a narrow column would wrap each label into a vertical
+	// run of characters for a frame. The column itself clips the rest.
+	ui.Column(c).Fill().MinWidth(sidebarWidth-28).
+		Padding(top, 14, 14, 14).Gap(4).DragWindow().Children(func() {
+		ui.Row(c).Height(34).AlignItems(ui.Center).Gap(8).Margin(0, 0, 8, 0).Children(func() {
+			ui.Column(c).Grow(1).Shrink(1).MinWidth(0).Gap(2).Children(func() {
+				ui.Text(c, "目录 / CONTENTS").FontSize(10.5).FontWeight(600).LetterSpacing(1).TextColor(p.accent)
+				ui.Text(c, fmt.Sprintf("第 %d 期 · %d月%d日", c.Now().YearDay(), c.Now().Month(), c.Now().Day())).
+					FontSize(11).TextColor(p.muted)
+			})
+			ui.Icon(c, iconUpDown).Size(14, 14).TextColor(p.faint)
+		})
+		ui.Box(c).Height(1).Background(p.hairline).Margin(0, 0, 8, 0)
 		a.searchField(c)
 
 		// #31 滚动渐隐：顶/底毛玻璃，随滚动柔化边缘。
@@ -296,8 +447,7 @@ func (a *app) sidebar(c *ui.Context) {
 				a.navItem(c, iconCharts, "排行榜", route{page: pageCharts}, 5)
 				a.navItem(c, iconPodcast, "播客", route{page: pagePodcasts}, 6)
 				a.navItem(c, iconDownloads, "下载管理", route{page: pageDownloads}, 7)
-				a.navItem(c, iconFeed, "关注动态", route{page: pageFeed}, 8)
-				a.navItem(c, iconNewAlbums, "新碟速递", route{page: pageNewAlbums}, 9)
+				a.navItem(c, iconNewAlbums, "新碟速递", route{page: pageNewAlbums}, 8)
 				if a.searched.query != "" {
 					a.navItem(c, iconSearch, "搜索结果", a.searched, 7)
 				}
@@ -369,6 +519,7 @@ func (a *app) navItem(c *ui.Context, icon *ui.SVG, label string, r route, index 
 		color = a.songAccent
 	}
 	b.Children(func() {
+		ui.Textf(c, "%02d", index+1).FontSize(10).FontFeatures("tnum").TextColor(p.faint).Width(20).Shrink(0)
 		// #27 图标：hover 放大；选中态持续轻微呼吸。#30 播放中：图标外呼吸光环。
 		ui.Box(c.Key("ic")).Size(19, 19).AlignItems(ui.Center).Justify(ui.Center).
 			Draw(func(dr *ui.Painter, r ui.Rect) {
@@ -778,8 +929,8 @@ func (a *app) content(c *ui.Context) {
 	page := ui.Box(c.Key(key)).Grow(1)
 	if !c.Preferences().ReduceMotion && a.settings.transitions() {
 		page.Transition(ui.ElementTransition{
-			Duration: 220 * time.Millisecond,
-			Enter:    &ui.Motion{Y: 10, Opacity: 0},
+			Animation: &ui.Animation{Duration: glideDur, Ease: ui.EaseOut},
+			Enter:     &ui.Motion{X: 26, Opacity: 0},
 		})
 	}
 	page.Children(func() { a.pageOf(c) })

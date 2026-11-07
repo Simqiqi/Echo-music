@@ -4,7 +4,7 @@
 // no longer leave a click with nothing coming down. The file is fetched from
 // where the releases live — reachable from the edge, though not always from
 // a visitor — and an accelerator is only the fallback if even that fails.
-const upstream = 'https://github.com/Simqiqi/simqiqi-music'
+const upstream = 'https://github.com/Simqiqi/Echo-music'
 const accelerator = 'https://gh-proxy.com/'
 
 type Env = { ASSETS: { fetch(request: Request): Promise<Response> } }

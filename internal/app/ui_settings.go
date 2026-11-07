@@ -161,6 +161,13 @@ func (a *app) settingsBody(c *ui.Context, p palette, liquid bool) {
 	}
 
 	group("播放", func() {
+		row("播放页标签自动收起", "鼠标离开标签栏 2 秒后，从右向左收成一个小圆；移回即可展开", func() {
+			on := s.tabsAutoHide()
+			if ui.Switch(c.Key("np-tabs-autohide"), &on).Label("播放页标签自动收起").Changed() {
+				s.NPTabsAutoHide = &on
+				a.changed()
+			}
+		})
 		row("间奏时显示热评", "前奏、间奏与尾奏时，歌词处换成这首歌的热门评论", func() {
 			if ui.Switch(c.Key("hot-comments"), &s.HotComments).Label("间奏时显示热评").Changed() {
 				a.changed()

@@ -16,7 +16,7 @@ import (
 // asks the network.
 var latestRelease = func() (tag, page string, err error) {
 	c := &http.Client{Timeout: 12 * time.Second}
-	res, err := c.Get("https://api.github.com/repos/Simqiqi/simqiqi-music/releases/latest")
+	res, err := c.Get("https://api.github.com/repos/Simqiqi/Echo-music/releases/latest")
 	if err != nil {
 		return "", "", err
 	}

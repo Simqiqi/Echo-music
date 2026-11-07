@@ -52,6 +52,24 @@ type Track struct {
 	Description string `json:"description,omitempty"`
 }
 
+// UnmarshalJSON reads a song both as the newer endpoints send it, its
+// length in dt, and as the older ones do, in duration: a song is not left
+// without a length because the endpoint that named it was an old one.
+func (t *Track) UnmarshalJSON(b []byte) error {
+	type plain Track
+	old := struct {
+		*plain
+		Legacy int64 `json:"duration"`
+	}{plain: (*plain)(t)}
+	if err := json.Unmarshal(b, &old); err != nil {
+		return err
+	}
+	if t.Duration == 0 {
+		t.Duration = old.Legacy
+	}
+	return nil
+}
+
 // Privilege is what NetEase lets the listener signed in, or nobody, do
 // with a track.
 type Privilege struct {
@@ -97,7 +115,17 @@ func (t *Track) Playable() bool {
 	return t.Fee != 1 && t.Fee != 4
 }
 
-func (t *Track) Length() time.Duration { return time.Duration(t.Duration) * time.Millisecond }
+func (t *Track) Length() time.Duration {
+	if t.Duration > 0 {
+		return time.Duration(t.Duration) * time.Millisecond
+	}
+	// The catalogue had no length for it, but its stream may have had:
+	// the length learned when it played is kept for it, by id.
+	if d, ok := lengthOf(t.ID); ok {
+		return d
+	}
+	return 0
+}
 
 // URL is the track's page on the NetEase website.
 func (t *Track) URL() string {
@@ -231,9 +259,15 @@ func DailySongs() ([]Track, error) {
 	return songs, nil
 }
 
-// detailPrivileges gives songs the privileges their details carry for the
-// listener, which are right where other lists have none, or wrong ones.
+// detailPrivileges fills songs in from their details: the privileges the
+// listener really has, which other lists have not, or have wrong, and the
+// fields a list left out, as an old endpoint's song comes without its
+// length or its cover. The details are asked for once, and everything they
+// say is kept.
 func detailPrivileges(songs []Track) {
+	if len(songs) == 0 {
+		return
+	}
 	ids := make([]int64, len(songs))
 	for i := range songs {
 		ids[i] = songs[i].ID
@@ -242,13 +276,34 @@ func detailPrivileges(songs []Track) {
 	if err != nil {
 		return
 	}
-	var privileges []Privilege
-	for _, d := range details {
+	byID := make(map[int64]*Track, len(details))
+	for i := range details {
+		byID[details[i].ID] = &details[i]
+	}
+	for i := range songs {
+		d := byID[songs[i].ID]
+		if d == nil {
+			continue
+		}
 		if d.Privilege != nil {
-			privileges = append(privileges, *d.Privilege)
+			songs[i].Privilege = d.Privilege
+		}
+		if songs[i].Duration <= 0 {
+			songs[i].Duration = d.Duration
+		}
+		if songs[i].Name == "" {
+			songs[i].Name = d.Name
+		}
+		if len(songs[i].Artists) == 0 {
+			songs[i].Artists = d.Artists
+		}
+		if songs[i].Album.PicURL == "" {
+			songs[i].Album = d.Album
+		}
+		if len(songs[i].Alias) == 0 {
+			songs[i].Alias = d.Alias
 		}
 	}
-	withPrivileges(songs, privileges)
 }
 
 // Charts returns the charts, each with its top three songs.
@@ -386,6 +441,11 @@ func ArtistLatestSongs(id int64, limit int) ([]Track, error) {
 
 var ErrUnavailable = errors.New("this song isn't available to stream")
 
+// ErrPreview says the song streams only its trial clip: it is a paid album
+// or single the listener has not bought, or a subscription that does not
+// reach it. It is always an ErrUnavailable too, so a queue moves on.
+var ErrPreview = errors.New("this song streams a preview only")
+
 // ErrFormat says a stream came in a format no decoder here can play. Like
 // an unavailable song, it cannot be fixed by asking again.
 var ErrFormat = errors.New("unsupported format")
@@ -414,7 +474,24 @@ func Lossless(level string) bool { return level == "lossless" || level == "hires
 // SongURL returns where to stream a track, MP3 or FLAC, at level (one of
 // Levels) or the best below it the listener may play. It goes through
 // the eapi, which carries the session, so VIP songs play for subscribers.
+//
+// A level the listener has no right to may come back with no URL at all,
+// rather than a lower one: so a level that comes back unplayable is asked
+// again at standard, which everyone may hear. A song is not refused for
+// the quality asked for.
 func SongURL(id int64, level string) (*Stream, error) {
+	s, err := songURLAt(id, level)
+	if err == nil || level == "standard" || !errors.Is(err, ErrUnavailable) {
+		return s, err
+	}
+	if lower, e := songURLAt(id, "standard"); e == nil {
+		return lower, nil
+	}
+	return nil, err
+}
+
+// songURLAt asks for one level, and nothing else.
+func songURLAt(id int64, level string) (*Stream, error) {
 	var res struct {
 		Code int `json:"code"`
 		Data []struct {
@@ -433,12 +510,12 @@ func SongURL(id int64, level string) (*Stream, error) {
 		return nil, err
 	}
 	if len(res.Data) == 0 || res.Data[0].URL == "" {
-		return nil, ErrUnavailable
+		return nil, fmt.Errorf("%w: no url at %s", ErrUnavailable, level)
 	}
 	d := res.Data[0]
 	// A preview of a VIP song is no song.
 	if len(d.FreeTrialInfo) > 0 && string(d.FreeTrialInfo) != "null" {
-		return nil, ErrUnavailable
+		return nil, fmt.Errorf("%w: %w at %s", ErrUnavailable, ErrPreview, level)
 	}
 	s := d.Stream
 	s.Type = strings.ToLower(s.Type)

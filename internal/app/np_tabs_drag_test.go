@@ -26,9 +26,9 @@ func TestNowPlayingTabsDragToChoose(t *testing.T) {
 	if !ok {
 		t.Fatal("no 歌词 tab")
 	}
-	to, ok := tt.Find("律动")
+	to, ok := tt.Find("动态")
 	if !ok {
-		t.Fatal("no 律动 tab")
+		t.Fatal("no 动态 tab")
 	}
 	x0, y0 := from.X+from.W/2, from.Y+from.H/2
 	x1, y1 := to.X+to.W/2, to.Y+to.H/2
@@ -40,7 +40,7 @@ func TestNowPlayingTabsDragToChoose(t *testing.T) {
 		tt.Frame()
 	}
 	if a.npPane != paneStage {
-		t.Errorf("dragging to 律动: npPane = %d, want the stage", a.npPane)
+		t.Errorf("dragging to 动态: npPane = %d, want the stage", a.npPane)
 	}
 	tt.Release(x1, y1)
 	tt.Advance(time.Second)

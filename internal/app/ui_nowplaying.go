@@ -113,25 +113,29 @@ func (a *app) nowPlayingView(c *ui.Context) {
 		// that keeps the line being sung on the particles page. On Windows
 		// the caption buttons stand at the right, so the row keeps clear
 		// of them.
-		ui.Row(c).Absolute().Top(8).Right(12 + c.TitleBar().Right).Gap(8).AlignItems(ui.Center).Children(func() {
-			if a.npPane == paneParticles {
-				a.particleShapePicker(c, tint)
-				a.particleLyricPlace(c, tint)
-				a.particleLyricSwitch(c, tint)
-			}
-			a.backdropPicker(c, tint, "np-backdrop")
-		})
+		if _, corner, _, _ := a.npBareParts(); !corner {
+			ui.Row(c).Absolute().Top(8).Right(12 + c.TitleBar().Right).Gap(8).AlignItems(ui.Center).Children(func() {
+				if a.npPane == paneParticles {
+					// The three particle controls used to sit here as three
+					// wide pills; one menu keeps the corner small so the
+					// record has the room.
+					a.particleOptionsMenu(c, tint)
+				}
+				a.backdropPicker(c, tint, "np-backdrop")
+			})
+		}
 	})
 }
 
 func (a *app) nowPlayingBody(c *ui.Context, tr *netease.Track, art *artwork, accent ui.Color, w, h float32, pointerIn bool) {
 	pl := a.pl
 	a.commentsFor(tr)
+	tabs, _, foot, _ := a.npBareParts()
 	// An episode has what it is about in place of lyrics; a song, lyrics
 	// in place of that.
 	switch program := tr.ProgramID != 0; {
 	case program && (a.npPane == paneWall || a.npPane == paneWall3D || a.npPane == paneParticles):
-		a.npPane = paneQueue
+		a.npPane = paneProgram
 	case program && (a.npPane == paneLyrics || a.npPane == paneStage):
 		a.npPane = paneProgram
 	case !program && a.npPane == paneProgram:
@@ -147,24 +151,20 @@ func (a *app) nowPlayingBody(c *ui.Context, tr *netease.Track, art *artwork, acc
 		a.wall3.track = 0
 	}
 	{
-		// The top strip drags the window; the chevron closes the view,
-		// showing only while the pointer is in the window, as the pane tabs do.
-		ui.Row(c).Height(topBar(c)).Justify(ui.Center).AlignItems(ui.Center).DragWindow().Children(func() {
-			reveal(ui.Box(c.Key("close-reveal")), pointerIn).Children(func() {
-				if iconButton(c.Key("close"), iconDown, 22, white.Alpha(0.7), "关闭").Clicked() {
-					a.nowPlaying = false
-				}
-			})
-		})
+		// The top strip only drags the window: Esc is the way back to the
+		// page under this one, so no chevron sits over the words.
+		ui.Row(c).Height(topBar(c)).Justify(ui.Center).AlignItems(ui.Center).DragWindow()
 		if a.npPane == paneStage {
 			// The stage takes the whole view: the lyrics are the show, the
-			// controls a slim bar at the foot.
-			reveal(a.npTabsRow(c, w), pointerIn).Children(func() {
+			// controls a slim bar at the foot. Tab keeps the show alone.
+			reveal(a.npTabsRow(c, w), pointerIn && !tabs).Children(func() {
 				a.paneTabs(c)
 				a.stageStyleButton(c)
 			})
 			a.stage(c, tr, accent)
-			a.stageBar(c, tr, art, accent)
+			if !foot {
+				a.stageBar(c, tr, art, accent)
+			}
 			return
 		}
 		if a.npPane == paneWall {
@@ -194,7 +194,7 @@ func (a *app) nowPlayingBody(c *ui.Context, tr *netease.Track, art *artwork, acc
 		// the controls.
 		side = max(coverSize, 280)
 		padX := npSideX(w)
-		reveal(a.npTabsRow(c, w), pointerIn).Children(func() { a.paneTabs(c) })
+		reveal(a.npTabsRow(c, w), pointerIn && !tabs).Children(func() { a.paneTabs(c) })
 		ui.Row(c).Grow(1).Padding(0, padX, 44, padX).Gap(72).AlignItems(ui.Stretch).Children(func() {
 			var coverTop float32
 			ui.Column(c).Width(side).Justify(ui.Center).Gap(0).Children(func() {
@@ -313,6 +313,38 @@ func (a *app) npTabsRow(c *ui.Context, w float32) ui.Element {
 			Shadow(0, 6, 18, -8, ui.RGBA(0, 0, 0, 0.18))
 	}
 	a.npTabRowX = row.LayoutBounds().X
+	// Two seconds after the pointer leaves, the row draws itself in from
+	// the right until only a small dot remains; moving back over where
+	// the row was opens it again. Only a real window folds: a test needs
+	// the tabs where they are to click them. Folded, the labels are not
+	// built at all, so not so much as a character peeks out of the dot.
+	a.npTabsV = 1
+	const tabsFullW = 400
+	if a.win != nil && a.settings.tabsAutoHide() && !a.npBare {
+		probe := ui.Box(c.Key("tabs-probe")).Absolute().Top(topBar(c) - 10).
+			Left(npSideX(w) - 10).Width(tabsFullW + 20).Height(npTabsHeight + 20).PassThrough()
+		x, y, over := probe.PointerPosition()
+		hovered := over && x >= 0 && y >= 0
+		if hovered {
+			a.npTabsLeft = time.Time{}
+		} else if a.npTabsLeft.IsZero() {
+			a.npTabsLeft = c.Now()
+		}
+		shown := hovered || (!a.npTabsLeft.IsZero() && c.Now().Sub(a.npTabsLeft) < 2*time.Second)
+		target := float32(0)
+		if shown {
+			target = 1
+		}
+		v := row.AnimateTo("tabs-fold", target,
+			ui.Animation{Duration: glideDur, Ease: ui.EaseOut})
+		a.npTabsV = v
+		row.Width(max(1, tabsFullW*v)).Clip()
+		if v < 0.99 {
+			ui.Box(c.Key("tabs-dot")).Absolute().Left(npSideX(w)).
+				Top(topBar(c)+(npTabsHeight-10)/2).Size(10, 10).Radius(5).
+				Background(a.pal.accent).Opacity(1 - v).PassThrough()
+		}
+	}
 	// The row takes the press and keeps it, so a choice can be carried
 	// along with the pointer: sliding across picks whatever tab is under
 	// it, and letting go picks the one under it, which is also a click.
@@ -400,10 +432,28 @@ type npTab struct {
 // chooses the first, ⌘2 the second, and on.
 func (a *app) npTabs() []npTab {
 	if tr := a.pl.Current(); tr != nil && tr.ProgramID != 0 {
-		tabs := []npTab{{paneProgram, "简介"}}
-		return append(tabs, npTab{paneQueue, "待播清单"}, npTab{paneComments, "评论"})
+		return []npTab{{paneProgram, "简介"}, {paneComments, "评论"}}
 	}
-	return []npTab{{paneLyrics, "歌词"}, {paneStage, "律动"}, {paneQueue, "待播清单"}, {paneWall, "选歌"}, {paneWall3D, "海报墙"}, {paneParticles, "粒子"}, {paneComments, "评论"}}
+	return []npTab{{paneLyrics, "歌词"}, {paneStage, "动态"}, {paneWall, "选歌"},
+		{paneWall3D, "海报墙"}, {paneParticles, "粒子"}, {paneComments, "评论"}}
+}
+
+// npBareParts says what Tab has put away on this pane. The row of tabs
+// and the backdrop choice go on every pane; the foot's song and controls
+// go as well on the visual panes, where only the show and its words stay.
+// The poster wall keeps nothing but its posters.
+func (a *app) npBareParts() (tabs, corner, foot, line bool) {
+	if !a.npBare {
+		return false, false, false, false
+	}
+	switch a.npPane {
+	case paneStage, paneWall, paneParticles:
+		return true, true, true, false
+	case paneWall3D:
+		return true, true, true, true
+	default:
+		return true, true, false, false
+	}
 }
 
 func (a *app) paneTabs(c *ui.Context) {
@@ -411,6 +461,9 @@ func (a *app) paneTabs(c *ui.Context) {
 	// so they are collected afresh with every build.
 	a.npTabBoxes = a.npTabBoxes[:0]
 	a.npTabPanes = a.npTabPanes[:0]
+	if a.npTabsV < 0.35 {
+		return
+	}
 	for _, t := range a.npTabs() {
 		label := t.label
 		if t.pane == paneComments {

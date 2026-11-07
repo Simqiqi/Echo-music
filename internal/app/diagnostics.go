@@ -117,7 +117,7 @@ var (
 		return checkResult{"播放地址", true, "取到了播放地址"}
 	}
 	probeFeed = func() checkResult {
-		u := fmt.Sprintf("https://cdn.jsdelivr.net/gh/Simqiqi/simqiqi-music@updates/update-%s-%s.json",
+		u := fmt.Sprintf("https://cdn.jsdelivr.net/gh/Simqiqi/Echo-music@updates/update-%s-%s.json",
 			runtime.GOOS, runtime.GOARCH)
 		if _, err := netease.Fetch(u); err != nil {
 			return checkResult{"更新镜像", false, cleanDiagnostic(err)}

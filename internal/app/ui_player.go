@@ -31,10 +31,16 @@ func secs(s float64) time.Duration { return time.Duration(s * float64(time.Secon
 func (a *app) scrubber(c *ui.Context, st *scrubState, track, fill ui.Color, height float32, smoke ui.Color) ui.Element {
 	pl := a.pl
 	dur := pl.Duration().Seconds()
+	// A stream that never told us its length has no position to seek to:
+	// seeking would land on max(0, dur-1) == 0 and start the song over.
+	seekable := dur > 0
 	if !st.active && !st.held {
 		st.v = pl.Position().Seconds()
 	}
 	s := ui.SliderBase(c, &st.v, 0, max(dur, 1)).Height(height).FocusRing(false).Label("播放进度").Cursor(ui.CursorPointer)
+	if !seekable {
+		s.Disabled(true)
+	}
 	// The press and its release come to the bar wherever the pointer is,
 	// and go on to the slider, which follows the pointer.
 	s.HandleInput(func(ev ui.InputEvent) bool {
@@ -54,9 +60,13 @@ func (a *app) scrubber(c *ui.Context, st *scrubState, track, fill ui.Color, heig
 		// Let go: there, but not right at the end, which would end the
 		// song as it begins to play.
 		st.active = false
-		pl.Seek(secs(min(st.v, max(0, dur-1))))
+		if seekable {
+			pl.Seek(secs(min(st.v, max(0, dur-1))))
+		}
 	case s.Changed():
-		pl.Seek(secs(min(st.v, max(0, dur-1))))
+		if seekable {
+			pl.Seek(secs(min(st.v, max(0, dur-1))))
+		}
 	}
 	hot := s.Hovered() || pressed
 	thick := float32(4)
@@ -411,47 +421,49 @@ func (a *app) playerBar(c *ui.Context) {
 	// frosted and bent along its rim; else, while content is under the
 	// bar, its edge frosts it, with a hairline along the top.
 	liquid := a.settings.glassOn()
+	// The foot keeps the drag but no longer draws a line: the progress
+	// shows around the capsule's rim instead.
+	// Invisible, but keep a real hit area: a hair-thin slider reads a
+	// press as its very left end and seeks back to the start.
+	ui.Box(c.Key("foot-line")).Absolute().Left(0).Right(0).Bottom(0).Height(18).
+		PaddingX(20).Center().Children(func() {
+		a.scrubber(c.Key("bar-scrub"), &a.barScrub, ui.Transparent, ui.Transparent, 14, ui.Transparent).Grow(1)
+	})
+	const capsuleBottom, capsuleHeight = 18, 56
 	var shell, hot ui.Element
 	if liquid {
-		// A still plate where the bar rests: the pointer over it lifts the
-		// bar, and stays over it as the bar moves, rather than blinking at
-		// its very edge.
-		hot = ui.Box(c.Key("bottom-hot")).Absolute().Left(sidebarInset).Right(sidebarInset).Bottom(8).Height(glassBarHeight).
-			Background(ui.RGBA(0, 0, 0, 0.002))
-		shell = ui.Box(c.Key("bottom-edge")).Absolute().Left(sidebarInset).Right(sidebarInset).Bottom(8).Height(glassBarHeight).Radius(22).
-			Material(glass.Glass{})
+		hot = ui.Box(c.Key("bottom-hot")).Absolute().Left(sidebarInset + 12).Right(sidebarInset + 12).
+			Bottom(capsuleBottom).Height(capsuleHeight).Background(ui.RGBA(0, 0, 0, 0.002))
+		shell = ui.Box(c.Key("bottom-edge")).Absolute().Left(sidebarInset + 12).Right(sidebarInset + 12).
+			Bottom(capsuleBottom).Height(capsuleHeight).Radius(capsuleHeight / 2).Material(glass.Glass{})
 	} else {
-		edge := ui.Box(c.Key("bottom-edge")).Absolute().Left(0).Right(0).Bottom(0).Height(playerBarHeight).
-			Material(glass.ScrollEdge{Hard: true, Bottom: true, Background: p.bg})
-		edge.Opacity(edgeShown(edge, a.underBottom))
+		shell = ui.Box(c.Key("bottom-edge")).Absolute().Left(sidebarInset+12).Right(sidebarInset+12).
+			Bottom(capsuleBottom).Height(capsuleHeight).Radius(capsuleHeight/2).
+			Background(p.bg).Shadow(0, 10, 28, -12, p.cardShade)
 	}
 	// The controls keep the middle, between sides that share what is left:
 	// narrower, the middle gives up to 140 DIPs, and what plays keeps room
 	// for its cover, some of its title and its heart.
 	const controls = 4*32 + 78 + 2*4 // four buttons and the quality pill
-	bar := ui.Row(c).Absolute().PaddingX(20).Gap(20).AlignItems(ui.Center)
-	if liquid {
-		bar.Left(sidebarInset).Right(sidebarInset).Bottom(8).Height(glassBarHeight).PaddingX(16)
-	} else {
-		bar.Left(0).Right(0).Bottom(0).Height(playerBarHeight)
-	}
+	bar := ui.Row(c).Absolute().PaddingX(16).Gap(16).AlignItems(ui.Center).
+		Left(sidebarInset + 12).Right(sidebarInset + 12).Bottom(capsuleBottom).Height(capsuleHeight)
 	bar.Children(func() {
 		// What plays.
 		ui.Row(c).Grow(1).Basis(0).MinWidth(150).Children(func() {
 			if tr == nil {
 				ui.Row(c).Gap(12).AlignItems(ui.Center).Children(func() {
-					ui.Box(c).Size(48, 48).Radius(8).Background(p.hover).Center().Children(func() {
-						ui.Icon(c, iconNote).Size(18, 18).TextColor(p.faint)
+					ui.Box(c).Size(38, 38).Radius(8).Background(p.hover).Center().Children(func() {
+						ui.Icon(c, iconNote).Size(17, 17).TextColor(p.faint)
 					})
 					ui.Text(c, "未在播放").FontSize(13).TextColor(p.muted)
 				})
 				return
 			}
-			info := ui.ButtonBase(c.Key("info")).Gap(12).AlignItems(ui.Center).FocusRing(false).Shrink(1).MinWidth(0).Label("打开正在播放")
+			info := ui.ButtonBase(c.Key("info")).Gap(10).AlignItems(ui.Center).FocusRing(false).Shrink(1).MinWidth(0).Label("打开正在播放")
 			hovered := info.Hovered()
 			info.Children(func() {
-				ui.Box(c).Size(48, 48).Shrink(0).Children(func() {
-					a.cover(c, tr.Album.PicURL, 120, 48, 8).Shadow(0, 2, 8, 0, p.cardShade)
+				ui.Box(c).Size(38, 38).Shrink(0).Children(func() {
+					a.cover(c, tr.Album.PicURL, 120, 38, 8).Shadow(0, 2, 8, 0, p.cardShade)
 					if hovered {
 						ui.Box(c).Absolute().Top(0).Left(0).Right(0).Bottom(0).Radius(8).Center().
 							Background(ui.RGBA(0, 0, 0, 0.35)).TextColor(ui.RGB(255, 255, 255)).Children(func() {
@@ -483,17 +495,15 @@ func (a *app) playerBar(c *ui.Context) {
 				a.nowPlaying = true
 			}
 			a.likeButton(c.Key("like"), tr, 16, p.muted).Margin(0, 0, 0, 4).Shrink(0)
-			if tr != nil {
-				a.miniSpectrum(c, p.accent)
-			}
 		})
 
-		// Controls over the progress.
-		ui.Column(c).Width(440).Shrink(1).MinWidth(300).Gap(0).AlignItems(ui.Stretch).Children(func() {
-			a.transport(c, p.text, p.muted, p.accent, 18)
-			ui.Row(c).Gap(10).AlignItems(ui.Center).Margin(-4, 0, 0, 0).Children(func() {
+		// The controls sit in the middle of the capsule; the progress has
+		// left for the line along the window's foot.
+		ui.Column(c).Width(320).Shrink(1).MinWidth(250).Gap(0).AlignItems(ui.Stretch).Children(func() {
+			a.transport(c, p.text, p.muted, p.accent, 17)
+			ui.Row(c).Gap(8).AlignItems(ui.Center).Justify(ui.Center).Margin(-4, 0, 0, 0).Children(func() {
 				ui.Text(c, clock(pl.Position())).FontSize(10.5).FontFeatures("tnum").TextColor(p.faint).Width(34).TextAlign(ui.End)
-				a.scrubber(c.Key("bar-scrub"), &a.barScrub, p.press, p.text.Alpha(0.75), 14, p.accent).Grow(1)
+				ui.Text(c, "/").FontSize(10.5).TextColor(p.faint)
 				ui.Text(c, clock(pl.Duration())).FontSize(10.5).FontFeatures("tnum").TextColor(p.faint).Width(34)
 			})
 		})
@@ -524,6 +534,65 @@ func (a *app) playerBar(c *ui.Context) {
 			a.qualityButton(c)
 		})
 	})
+	// The progress runs around the capsule's rim: a quiet track all the
+	// way round, and the played part drawn from the top, clockwise, so
+	// the glass itself wears the song's time.
+	ui.Box(c.Key("play-ring")).Absolute().Left(sidebarInset + 12).Right(sidebarInset + 12).
+		Bottom(capsuleBottom).Height(capsuleHeight).Radius(capsuleHeight / 2).PassThrough().
+		Draw(func(dr *ui.Painter, r ui.Rect) {
+			inset := ui.Rect{X: r.X + 2, Y: r.Y + 2, W: r.W - 4, H: r.H - 4}
+			rad := inset.H / 2
+			dr.Stroke(inset, p.hairline, rad, 1.4)
+			total := ringLen(inset, rad)
+			dur := pl.Duration().Seconds()
+			start, length := float32(0), float32(0)
+			switch {
+			case tr == nil:
+				// Nothing plays: the rim stays quiet.
+			case !pl.Playing():
+				// Paused, the rainbow runs the rim back and forth, a
+				// short arc going one way and then the other, as a sign
+				// the bar waits: never all the way round, as a wheel.
+				start, length = sweepAt(c.Now(), total, sweepPause, 0.18)
+				dr.After(time.Second / 30)
+			case dur > 0:
+				// Even a song just begun shows a sliver of color.
+				frac := float32(min(1, max(0, pl.Position().Seconds()/dur)))
+				length = max(total*frac, total*0.015)
+			default:
+				// Radio and streams that never tell their length still
+				// wear the rainbow: the same arc, travelling faster.
+				start, length = sweepAt(c.Now(), total, sweepLive, 0.2)
+				dr.After(time.Second / 40)
+			}
+			if length > 1 {
+				// A point every three pixels of rim: sampled at a fixed
+				// count, the capsule's tight corners came out as a few
+				// straight lines, and the arc visibly kinked as it turned
+				// them.
+				n := int(min(float32(1600), max(float32(144), length/3)))
+				pts := make([][2]float32, 0, n+1)
+				for i := 0; i <= n; i++ {
+					pts = append(pts, ringAt(start+length*float32(i)/float32(n), inset, rad))
+				}
+				// A rainbow runs the whole wheel of hues as the ring goes
+				// round, starting at the wallpaper's own random hue. Each
+				// band shares its ends with the next, so the joins stay
+				// continuous.
+				const bands = 24
+				for b := 0; b < bands; b++ {
+					from := b * n / bands
+					// One band's end runs into the next, so a bend where
+					// they meet wears no notch of a butt cap.
+					to := min((b+1)*n/bands+2, n+1)
+					hue := wrapHue(a.wash.hue + 360*float32(b)/bands)
+					dr.StrokePolyline(pts[from:to], 2.6, ui.Oklch(0.72, 0.16, hue))
+				}
+			}
+			if pl.Playing() && dur > 0 {
+				dr.After(120 * time.Millisecond)
+			}
+		})
 	if liquid {
 		// Over it, the bar lifts a little, as a pane of glass rising to be
 		// touched; the content under it carries on behind.
@@ -531,9 +600,86 @@ func (a *app) playerBar(c *ui.Context) {
 		if hot.Hovered() {
 			lift = 2
 		}
-		v := bar.AnimateTo("lift", lift, ui.Animation{Duration: 180 * time.Millisecond})
+		v := bar.AnimateTo("lift", lift, ui.Animation{Duration: glideDur, Ease: ui.EaseOut})
 		shell.Translate(0, -v)
 		bar.Translate(0, -v)
+	}
+}
+
+// The sweeps: how long the rainbow takes to run the rim and come back,
+// while the bar is paused, and while a stream that never tells its length
+// plays.
+const (
+	sweepPause = 7 * time.Second
+	sweepLive  = 4 * time.Second
+)
+
+// sweepAt places an arc of share of the rim that runs it back and forth:
+// at now it has gone this far, with a cosine so that it slows and turns at
+// each end. It never wraps the start, so it reads as a breath back and
+// forth, not a wheel going round.
+func sweepAt(now time.Time, total float32, period time.Duration, share float32) (start, length float32) {
+	length = total * share
+	travel := total - length
+	ph := float32(now.UnixNano()%int64(period)) / float32(period)
+	start = (0.5 - 0.5*float32(math.Cos(2*math.Pi*float64(ph)))) * travel
+	return start, length
+}
+
+// ringLen is the perimeter of a capsule of this rect and corner radius.
+func ringLen(r ui.Rect, rad float32) float32 {
+	return 2*(r.W-2*rad) + 2*(r.H-2*rad) + 2*float32(math.Pi)*rad
+}
+
+// ringAt maps a distance walked clockwise from the capsule's top middle
+// back onto its rim. The four corners are quarter circles; between them
+// the four straight runs. It is what lets a fraction of the song become
+// a fraction of the outline, rather than a fraction of a bar.
+func ringAt(s float32, r ui.Rect, rad float32) [2]float32 {
+	const half = float32(math.Pi / 2)
+	arc := half * rad
+	segs := [...]float32{
+		r.W/2 - rad, arc, r.H - 2*rad, arc,
+		r.W - 2*rad, arc, r.H - 2*rad, arc, r.W/2 - rad,
+	}
+	total := ringLen(r, rad)
+	if s < 0 {
+		s = 0
+	}
+	if s > total {
+		s = total
+	}
+	i := 0
+	for i < len(segs)-1 && s > segs[i] {
+		s -= segs[i]
+		i++
+	}
+	x, y, w, h := r.X, r.Y, r.W, r.H
+	cos, sin := func(a float32) float32 { return float32(math.Cos(float64(a))) },
+		func(a float32) float32 { return float32(math.Sin(float64(a))) }
+	switch i {
+	case 0:
+		return [2]float32{x + w/2 + s, y}
+	case 1:
+		a := -half + s/rad
+		return [2]float32{x + w - rad + rad*cos(a), y + rad + rad*sin(a)}
+	case 2:
+		return [2]float32{x + w, y + rad + s}
+	case 3:
+		a := s / rad
+		return [2]float32{x + w - rad + rad*cos(a), y + h - rad + rad*sin(a)}
+	case 4:
+		return [2]float32{x + w - rad - s, y + h}
+	case 5:
+		a := half + s/rad
+		return [2]float32{x + rad + rad*cos(a), y + h - rad + rad*sin(a)}
+	case 6:
+		return [2]float32{x, y + h - rad - s}
+	case 7:
+		a := float32(math.Pi) + s/rad
+		return [2]float32{x + rad + rad*cos(a), y + rad + rad*sin(a)}
+	default:
+		return [2]float32{x + rad + s, y}
 	}
 }
 

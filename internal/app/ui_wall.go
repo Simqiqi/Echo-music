@@ -122,9 +122,14 @@ func (a *app) wallPane(c *ui.Context, tr *netease.Track, art *artwork, accent ui
 		Draw(func(p *ui.Painter, r ui.Rect) {
 			a.backdropOver(p, ui.Rect{W: w, H: h}, r, func(t float32) float32 { return 0.7 * smoothstep(0, 0.9, t) })
 		})
+	tabs, _, bareFoot, _ := a.npBareParts()
+	// Tab keeps the song's name up in the middle of the pane: only the
+	// bar along its foot goes away.
 	a.wallSong(c, tr, art, top, songH)
-	a.wallBar(c, accent)
-	reveal(a.npTabsRow(c, w), pointerIn).Children(func() { a.paneTabs(c) })
+	if !bareFoot {
+		a.wallBar(c, accent)
+	}
+	reveal(a.npTabsRow(c, w), pointerIn && !tabs).Children(func() { a.paneTabs(c) })
 }
 
 // wallSong is the song playing, over the wall: its cover, which breathes

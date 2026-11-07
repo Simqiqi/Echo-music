@@ -11,6 +11,9 @@ import (
 // settings are the listener's choices, kept in settings.json in the user
 // data directory.
 type settings struct {
+	// NPTabsAutoHide folds Now Playing's tab row into a small dot two
+	// seconds after the pointer leaves it. Nil means on, the default.
+	NPTabsAutoHide *bool `json:"npTabsAutoHide,omitempty"`
 	// Notch shows the quick player around the notch: the listener turns
 	// it on.
 	Notch bool `json:"notch"`
@@ -119,6 +122,12 @@ func (s settings) transitions() bool {
 // says otherwise.
 func (s settings) glassOn() bool {
 	return s.Glass == nil || *s.Glass
+}
+
+// tabsAutoHide reports whether Now Playing's tab row folds away. On
+// until the listener says otherwise.
+func (s settings) tabsAutoHide() bool {
+	return s.NPTabsAutoHide == nil || *s.NPTabsAutoHide
 }
 
 // backdropChoice is a backdrop Now Playing may wear: its id in the

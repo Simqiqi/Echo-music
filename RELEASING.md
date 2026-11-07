@@ -36,14 +36,14 @@
    gh release edit v0.1.8 --draft=false --latest
    ```
 
-6. Publishing the release also starts `.github/workflows/feed.yml`: it takes the release's update manifests, swaps the archives' addresses for the accelerator's prefix (`MIRROR` in the workflow, and `mirror` in `website/src/site.ts`), and pushes them to the `updates` branch. Installed apps check `https://cdn.jsdelivr.net/gh/Simqiqi/simqiqi-music@updates/update-<target>.json` — the release workflow bakes that feed into each build with `MYGO_LDFLAGS` — because GitHub's own is often unreachable in China. Only an address changes; the size and the signature of each archive are what `mygo build` made, so a mirror changes nothing an app trusts. If the accelerator dies, change `MIRROR` and run the workflow again by hand (`workflow_dispatch`, with the tag); the feeds of the released versions heal without a new build. Check both the feed and the release:
+6. Publishing the release also starts `.github/workflows/feed.yml`: it takes the release's update manifests, swaps the archives' addresses for the accelerator's prefix (`MIRROR` in the workflow, and `mirror` in `website/src/site.ts`), and pushes them to the `updates` branch. Installed apps check `https://cdn.jsdelivr.net/gh/Simqiqi/Echo-music@updates/update-<target>.json` — the release workflow bakes that feed into each build with `MYGO_LDFLAGS` — because GitHub's own is often unreachable in China. Only an address changes; the size and the signature of each archive are what `mygo build` made, so a mirror changes nothing an app trusts. If the accelerator dies, change `MIRROR` and run the workflow again by hand (`workflow_dispatch`, with the tag); the feeds of the released versions heal without a new build. Check both the feed and the release:
 
    ```bash
-   curl -sL https://cdn.jsdelivr.net/gh/Simqiqi/simqiqi-music@updates/update-darwin-arm64.json
-   curl -sL https://github.com/Simqiqi/simqiqi-music/releases/latest/download/update-darwin-arm64.json
+   curl -sL https://cdn.jsdelivr.net/gh/Simqiqi/Echo-music@updates/update-darwin-arm64.json
+   curl -sL https://github.com/Simqiqi/Echo-music/releases/latest/download/update-darwin-arm64.json
    ```
 
-   jsDelivr keeps a branch for twelve hours; the workflow purges its copy after pushing, so a feed that still shows the old version an hour later is worth a manual purge at `https://purge.jsdelivr.net/gh/Simqiqi/simqiqi-music@updates/update-darwin-arm64.json`.
+   jsDelivr keeps a branch for twelve hours; the workflow purges its copy after pushing, so a feed that still shows the old version an hour later is worth a manual purge at `https://purge.jsdelivr.net/gh/Simqiqi/Echo-music@updates/update-darwin-arm64.json`.
 
 7. Deploy the website. It reads the latest release when it's prerendered, so it has to be rebuilt after publishing:
 
