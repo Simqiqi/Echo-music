@@ -882,7 +882,15 @@ func (p *Player) loadSkipping(at, skipped int, play bool, from time.Duration, ha
 					return
 				}
 				if !skipOnError(err) {
-					p.err = "这首歌暂时加载失败，再点一次试试"
+					if errors.Is(err, netease.ErrRisk) {
+						// Nothing is wrong with the song: the service
+						// turned a run of calls away, and answers again in
+						// a moment. Said plainly, rather than as the song
+						// stumbling a second time.
+						p.err = "网易云暂时限制了取歌请求，等几秒再点播放"
+					} else {
+						p.err = "这首歌暂时加载失败，再点一次试试"
+					}
 				}
 				p.playing = false
 				p.sync()

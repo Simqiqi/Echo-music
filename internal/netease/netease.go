@@ -450,6 +450,16 @@ var ErrPreview = errors.New("this song streams a preview only")
 // an unavailable song, it cannot be fixed by asking again.
 var ErrFormat = errors.New("unsupported format")
 
+// ErrRisk says NetEase turned the call away as coming too fast from this
+// network ("检测到您的网络环境存在风险，请稍后再试"): the song is fine, and the
+// same call is answered a moment later. Asking again is the whole fix, so
+// it is kept apart from a song that cannot play at all.
+var ErrRisk = errors.New("netease turned the call away as too fast")
+
+// riskCodes are the answers NetEase gives to a run of calls it suspects:
+// -460 to the API, -110 to the login.
+var riskCodes = map[int]bool{-460: true, -462: true, -110: true}
+
 // Stream is where a track streams from, and what it is.
 type Stream struct {
 	URL  string `json:"-"`
@@ -470,6 +480,11 @@ type Stream struct {
 // a slow start.
 const urlRetryDelay = 150 * time.Millisecond
 
+// A call turned away as too fast is answered once the run of them has
+// passed: a second is long enough for that, and short enough not to be
+// heard as the player starting late.
+const riskRetryDelay = time.Second
+
 // Levels are the stream levels, from the lowest.
 var Levels = []string{"standard", "higher", "exhigh", "lossless", "hires"}
 
@@ -478,7 +493,7 @@ func Lossless(level string) bool { return level == "lossless" || level == "hires
 
 // SongURL returns where to stream a track, MP3 or FLAC, at level (one of
 // Levels) or the best below it the listener may play. It goes through
-// the eapi, which carries the session, so VIP songs play for subscribers.
+// the APIs that carry the session, so VIP songs play for subscribers.
 //
 // A level the listener has no right to may come back with no URL at all,
 // rather than a lower one: so a level that comes back unplayable is asked
@@ -488,6 +503,15 @@ func SongURL(id int64, level string) (*Stream, error) {
 	s, err := songURLAt(id, level)
 	if err == nil {
 		return s, nil
+	}
+	// A call turned away as too fast is not about the song at all: the same
+	// one lands once that run of calls has passed, a second or so later,
+	// and the song plays instead of saying it cannot.
+	if errors.Is(err, ErrRisk) {
+		time.Sleep(riskRetryDelay)
+		if again, e := songURLAt(id, level); e == nil {
+			return again, nil
+		}
 	}
 	// No URL is also what one failed call looks like: asked again a moment
 	// later, the same request usually finds it. A preview is an answer
@@ -507,31 +531,72 @@ func SongURL(id int64, level string) (*Stream, error) {
 	return nil, err
 }
 
-// songURLAt asks for one level, and nothing else.
-func songURLAt(id int64, level string) (*Stream, error) {
-	var res struct {
-		Code int `json:"code"`
-		Data []struct {
-			Stream
-			URL           string          `json:"url"`
-			Peak          *float64        `json:"peak"`
-			FreeTrialInfo json.RawMessage `json:"freeTrialInfo"`
-		} `json:"data"`
-	}
+// songURLAnswer is what both APIs answer about a song's address.
+type songURLAnswer struct {
+	Code int `json:"code"`
+	Data []struct {
+		Stream
+		URL           string          `json:"url"`
+		Peak          *float64        `json:"peak"`
+		FreeTrialInfo json.RawMessage `json:"freeTrialInfo"`
+	} `json:"data"`
+}
+
+// songURLQuery is what either API is asked for one song at one level.
+func songURLQuery(id int64, level string) map[string]any {
 	encode := "mp3"
 	if Lossless(level) {
 		encode = "flac"
 	}
-	data := map[string]any{"ids": fmt.Sprintf("[%d]", id), "level": level, "encodeType": encode}
-	if err := eapiPost("/api/song/enhance/player/url/v1", data, &res); err != nil {
+	return map[string]any{"ids": fmt.Sprintf("[%d]", id), "level": level, "encodeType": encode}
+}
+
+// songURLAt asks for one level, and nothing else. The web API is asked
+// first: it answers the same as the eapi about a song, and where the eapi
+// turns a run of calls away as too fast, it does not. The eapi is what the
+// song is asked of when the web API will not say.
+func songURLAt(id int64, level string) (*Stream, error) {
+	var res songURLAnswer
+	werr := weapiPost("/api/song/enhance/player/url/v1", songURLQuery(id, level), &res)
+	var weErr error
+	if werr == nil && res.Code == 200 {
+		var s *Stream
+		if s, weErr = playable(&res, level); weErr == nil {
+			return s, nil
+		}
+	}
+	var back songURLAnswer
+	if err := eapiPost("/api/song/enhance/player/url/v1", songURLQuery(id, level), &back); err != nil {
+		if weErr != nil {
+			// The web API answered about the song, and it is the better
+			// answer to keep: the eapi did not answer at all.
+			return nil, weErr
+		}
+		if werr == nil {
+			// The web API answered, if not with the song: its code says
+			// what became of it.
+			return nil, songURLError(res.Code, level)
+		}
 		return nil, err
 	}
-	// A code that is not 200 is the call failing, not the song being
-	// unavailable: telling them apart keeps the player retrying a request
-	// that stumbled instead of skipping a song it never got an answer for.
-	if res.Code != 200 {
-		return nil, fmt.Errorf("netease: song url: code %d at %s", res.Code, level)
+	if back.Code == 200 {
+		return playable(&back, level)
 	}
+	return nil, songURLError(back.Code, level)
+}
+
+// songURLError says what a code means: a call turned away as too fast, or
+// one that failed, neither of which is a song that cannot play.
+func songURLError(code int, level string) error {
+	if riskCodes[code] {
+		return fmt.Errorf("%w: code %d at %s", ErrRisk, code, level)
+	}
+	return fmt.Errorf("netease: song url: code %d at %s", code, level)
+}
+
+// playable reads an answer that came with code 200 into where the song
+// streams from.
+func playable(res *songURLAnswer, level string) (*Stream, error) {
 	if len(res.Data) == 0 || res.Data[0].URL == "" {
 		return nil, fmt.Errorf("%w: no url at %s", ErrUnavailable, level)
 	}
