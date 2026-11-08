@@ -31,9 +31,11 @@ type settings struct {
 	Quality string `json:"quality"`
 	// Appearance is light, dark, or system to follow the system.
 	Appearance string `json:"appearance"`
-	// Smoke makes the progress bars comets trailing smoke as music plays,
-	// for a few percent of a core: the listener turns it on.
-	Smoke bool `json:"smoke"`
+	// ProgressBar shows the song's time on the player bar's left, in the
+	// room what plays leaves before the controls: a bar whose playhead
+	// trails smoke as music plays, for a few percent of a core. The
+	// listener turns it on, and off.
+	ProgressBar bool `json:"progressBar"`
 	// LyricsStage shows lyrics on the stage, Folia's style, in Now
 	// Playing, rather than scrolling.
 	LyricsStage bool `json:"lyricsStage"`
@@ -104,12 +106,65 @@ type settings struct {
 	CacheMB int `json:"cacheMB"`
 	// SearchHistory keeps submitted keywords, most recent first.
 	SearchHistory []string `json:"searchHistory,omitempty"`
+	// TopAccount is the account the listener wants in the top bar (its
+	// providerID). Zero means no choice was made, and the app prefers a
+	// bridge account (汽水音乐) over 网易云 by default; a set value wins
+	// whenever that account is still signed in.
+	TopAccount int `json:"topAccount"`
+	// TopAccountManual marks TopAccount as the listener's own pick ("设为
+	// 常用") rather than the account a sign-in merely left behind. Only a
+	// manual pick pins the top bar; otherwise the bar follows whoever signed
+	// in last, so logging in to 汽水音乐 no longer keeps showing 网易云's
+	// avatar on the next launch. Older builds wrote every sign-in to
+	// TopAccount, so a stored value without this mark is ignored once, and
+	// the bar re-resolves.
+	TopAccountManual bool `json:"topAccountManual,omitempty"`
+	// SidebarAutoCollapse folds the directory to its icon rail when the
+	// pointer leaves it, and opens it back as the pointer returns; off
+	// leaves the directory open. The default is on, so nil means yes.
+	SidebarAutoCollapse *bool `json:"sidebarAutoCollapse,omitempty"`
+	// SidebarHome shows "为你推荐" in the sidebar. Default on.
+	SidebarHome bool `json:"sidebarHome"`
+	// SidebarDaily shows "每日推荐" in the sidebar. Default on.
+	SidebarDaily bool `json:"sidebarDaily"`
+	// SidebarWeekly shows "听歌周报" in the sidebar. Default on.
+	SidebarWeekly bool `json:"sidebarWeekly"`
+	// SidebarFM shows "私人 FM" in the sidebar. Default on.
+	SidebarFM bool `json:"sidebarFM"`
+	// SidebarWeather shows "天气电台" in the sidebar. Default on.
+	SidebarWeather bool `json:"sidebarWeather"`
+	// SidebarCharts shows "排行榜" in the sidebar. Default on.
+	SidebarCharts bool `json:"sidebarCharts"`
+	// SidebarPodcasts shows "播客" in the sidebar. Default on.
+	SidebarPodcasts bool `json:"sidebarPodcasts"`
+	// SidebarDownloads shows "下载管理" in the sidebar. Default on.
+	SidebarDownloads bool `json:"sidebarDownloads"`
+	// SidebarNewAlbums shows "新碟速递" in the sidebar. Default on.
+	SidebarNewAlbums bool `json:"sidebarNewAlbums"`
 
 	path string // where they were loaded from, and are saved to
 }
 
 func defaultSettings() settings {
-	return settings{NotchActivity: true, Quality: "exhigh", Appearance: "system", Volume: 0.8, Normalize: true, AppIcon: "dock-and-menubar", CacheMB: 2048}
+	return settings{
+		NotchActivity:     true,
+		Quality:           "exhigh",
+		Appearance:        "system",
+		ProgressBar:       true,
+		Volume:            0.8,
+		Normalize:         true,
+		AppIcon:           "dock-and-menubar",
+		CacheMB:           2048,
+		SidebarHome:       true,
+		SidebarDaily:      true,
+		SidebarWeekly:     true,
+		SidebarFM:         true,
+		SidebarWeather:    true,
+		SidebarCharts:     true,
+		SidebarPodcasts:   true,
+		SidebarDownloads:  true,
+		SidebarNewAlbums:  true,
+	}
 }
 
 // transitions reports whether the smart transitions are on: they are,
@@ -128,6 +183,57 @@ func (s settings) glassOn() bool {
 // until the listener says otherwise.
 func (s settings) tabsAutoHide() bool {
 	return s.NPTabsAutoHide == nil || *s.NPTabsAutoHide
+}
+
+// sidebarAutoCollapse reports whether the directory folds to its rail as
+// the pointer leaves it. On until the listener says otherwise.
+func (s settings) sidebarAutoCollapse() bool {
+	return s.SidebarAutoCollapse == nil || *s.SidebarAutoCollapse
+}
+
+// sidebarHome reports whether "为你推荐" should be shown in the sidebar.
+func (s settings) sidebarHome() bool {
+	return s.SidebarHome
+}
+
+// sidebarDaily reports whether "每日推荐" should be shown in the sidebar.
+func (s settings) sidebarDaily() bool {
+	return s.SidebarDaily
+}
+
+// sidebarWeekly reports whether "听歌周报" should be shown in the sidebar.
+func (s settings) sidebarWeekly() bool {
+	return s.SidebarWeekly
+}
+
+// sidebarFM reports whether "私人 FM" should be shown in the sidebar.
+func (s settings) sidebarFM() bool {
+	return s.SidebarFM
+}
+
+// sidebarWeather reports whether "天气电台" should be shown in the sidebar.
+func (s settings) sidebarWeather() bool {
+	return s.SidebarWeather
+}
+
+// sidebarCharts reports whether "排行榜" should be shown in the sidebar.
+func (s settings) sidebarCharts() bool {
+	return s.SidebarCharts
+}
+
+// sidebarPodcasts reports whether "播客" should be shown in the sidebar.
+func (s settings) sidebarPodcasts() bool {
+	return s.SidebarPodcasts
+}
+
+// sidebarDownloads reports whether "下载管理" should be shown in the sidebar.
+func (s settings) sidebarDownloads() bool {
+	return s.SidebarDownloads
+}
+
+// sidebarNewAlbums reports whether "新碟速递" should be shown in the sidebar.
+func (s settings) sidebarNewAlbums() bool {
+	return s.SidebarNewAlbums
 }
 
 // backdropChoice is a backdrop Now Playing may wear: its id in the

@@ -62,6 +62,15 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+      # The 汽水/酷狗 login bridge (sidecar/) is plain Node and ships inside
+      # the bundle via mygo.json's "resources". Its node_modules is gitignored,
+      # so install it here so mygo copies it into every platform's build.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install sidecar dependencies
+        working-directory: sidecar
+        run: npm install --no-audit --no-fund
       - name: Install NSIS, for the Windows installers
         if: matrix.name == 'Windows'
         run: sudo apt-get update && sudo apt-get install -y nsis

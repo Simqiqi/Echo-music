@@ -2,8 +2,9 @@
   "name": "Echo云音乐",
   "identifier": "com.simqiqi.echo",
   "slug": "echo-cloudmusic",
-  "version": "0.3.6",
+  "version": "0.4.0",
   "out": "build",
+  "resources": ["sidecar"],
   "updates": {
     "publicKey": "CP+beYJ4K6Bvks+4e4QBRJ2aCgUv3dJ9rEntJ9W/ujs=",
     "github": "Simqiqi/Echo-music"

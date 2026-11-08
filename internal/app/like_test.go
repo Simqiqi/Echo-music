@@ -325,7 +325,7 @@ func TestSmokeFrames(t *testing.T) {
 	a.pl.Cue([]netease.Track{tr})
 	a.pl.SetLyrics(nil)
 	a.pl.Hold(75 * time.Second)
-	a.settings.Smoke = true
+	a.settings.ProgressBar = true
 	shots := func(name string, dark bool) {
 		tt := ui.NewTester(a.view, 1000, 680)
 		tt.SetDark(dark)

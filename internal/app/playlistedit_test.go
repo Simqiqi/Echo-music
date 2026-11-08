@@ -108,7 +108,7 @@ func TestNoRemovingFromSavedPlaylist(t *testing.T) {
 	}
 }
 
-// The sidebar's plus asks for a name, and Enter makes the playlist so
+// Naming a playlist asks for its name, and Enter makes the playlist so
 // named.
 func TestCreatePlaylist(t *testing.T) {
 	names := make(chan string, 1)
@@ -121,9 +121,7 @@ func TestCreatePlaylist(t *testing.T) {
 	a := editTestApp()
 	tt := ui.NewTester(a.view, 1200, 800)
 	tt.Frame()
-	if err := tt.Click("新建歌单"); err != nil {
-		t.Fatal(err)
-	}
+	a.newPlaylist(nil)
 	tt.Advance(300 * time.Millisecond)
 	tt.Frame()
 	tt.Type("  周末  ")

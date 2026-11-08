@@ -307,11 +307,6 @@ const npTabsHeight = 28
 // behind frost along its rim, without moving the tabs by a pixel.
 func (a *app) npTabsRow(c *ui.Context, w float32) ui.Element {
 	row := ui.Row(c.Key("tabs")).Absolute().Top(topBar(c)).Left(npSideX(w)).Height(npTabsHeight).Gap(6).AlignItems(ui.Center)
-	if a.settings.glassOn() {
-		row.PaddingX(6).Radius(npTabsHeight/2).
-			Material(glass.Glass{Clarity: a.glassClarity(0.45), Tint: ui.RGBA(255, 255, 255, 0.07)}).
-			Shadow(0, 6, 18, -8, ui.RGBA(0, 0, 0, 0.18))
-	}
 	a.npTabRowX = row.LayoutBounds().X
 	// Two seconds after the pointer leaves, the row draws itself in from
 	// the right until only a small dot remains; moving back over where
@@ -344,6 +339,15 @@ func (a *app) npTabsRow(c *ui.Context, w float32) ui.Element {
 				Top(topBar(c)+(npTabsHeight-10)/2).Size(10, 10).Radius(5).
 				Background(a.pal.accent).Opacity(1 - v).PassThrough()
 		}
+	}
+	// The capsule goes in with the row it holds: folded, only the dot is
+	// left, rather than a sliver of glass beside it. Its padding shrinks
+	// with the row too, so nothing of it outlives the labels.
+	if a.settings.glassOn() && a.npTabsV > 0.02 {
+		v := a.npTabsV
+		row.PaddingX(6 * v).Radius(npTabsHeight / 2).
+			Material(glass.Glass{Clarity: a.glassClarity(0.45), Tint: ui.RGBA(255, 255, 255, 0.07*v)}).
+			Shadow(0, 6, 18, -8, ui.RGBA(0, 0, 0, 0.18*v))
 	}
 	// The row takes the press and keeps it, so a choice can be carried
 	// along with the pointer: sliding across picks whatever tab is under

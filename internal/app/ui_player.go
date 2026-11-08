@@ -81,7 +81,7 @@ func (a *app) scrubber(c *ui.Context, st *scrubState, track, fill ui.Color, heig
 	knob = s.AnimateTo("knob", knob, ui.Snappy)
 	// The smoke settles away as the music pauses, and while dragging.
 	smoking := float32(0)
-	if smoke.A > 0 && a.settings.Smoke && pl.Playing() && !pl.Loading() && !st.active {
+	if smoke.A > 0 && pl.Playing() && !pl.Loading() && !st.active {
 		smoking = 1
 	}
 	smoking = s.AnimateTo("smoke", smoking, ui.Animation{Duration: 600 * time.Millisecond})
@@ -495,6 +495,11 @@ func (a *app) playerBar(c *ui.Context) {
 				a.nowPlaying = true
 			}
 			a.likeButton(c.Key("like"), tr, 16, p.muted).Margin(0, 0, 0, 4).Shrink(0)
+			// The room the two leave before the controls: the song's time,
+			// with the smoke of Now Playing's own bar.
+			if a.settings.ProgressBar {
+				a.barProgress(c)
+			}
 		})
 
 		// The controls sit in the middle of the capsule; the progress has
@@ -613,6 +618,18 @@ const (
 	sweepPause = 7 * time.Second
 	sweepLive  = 4 * time.Second
 )
+
+// barProgress is the song's time in the room the player bar leaves on its
+// left, between what plays and the controls: the bar of Now Playing, a
+// comet there, seeking where it is dragged. It takes the room it is given
+// and no more, so that a wide window does not stretch the song's time
+// across it.
+func (a *app) barProgress(c *ui.Context) {
+	p := a.pal
+	a.scrubber(c.Key("bar-line"), &a.barSong, p.hover, p.accent, 22, p.accent).
+		Grow(1).Basis(0).MinWidth(0).MaxWidth(280).AlignSelf(ui.Center).
+		Margin(0, 0, 0, 16).Label("播放进度条")
+}
 
 // sweepAt places an arc of share of the rim that runs it back and forth:
 // at now it has gone this far, with a cosine so that it slows and turns at

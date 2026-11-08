@@ -261,21 +261,74 @@ func (a *app) settingsBody(c *ui.Context, p palette, liquid bool) {
 		})
 	})
 
+	group("侧边栏", func() {
+		// The nine entries of the directory as chips rather than rows:
+		// nine rows would run the card past the foot of a small screen,
+		// where a chip of two dozen points is a press and nothing more.
+		entries := []struct {
+			id    string
+			label string
+			icon  *ui.SVG
+			on    *bool
+		}{
+			{"home", "为你推荐", iconHome, &s.SidebarHome},
+			{"daily", "每日推荐", iconDaily, &s.SidebarDaily},
+			{"weekly", "听歌周报", iconWeekly, &s.SidebarWeekly},
+			{"fm", "私人 FM", iconRadio, &s.SidebarFM},
+			{"weather", "天气电台", iconWeather, &s.SidebarWeather},
+			{"charts", "排行榜", iconCharts, &s.SidebarCharts},
+			{"podcasts", "播客", iconPodcast, &s.SidebarPodcasts},
+			{"downloads", "下载管理", iconDownloads, &s.SidebarDownloads},
+			{"newalbums", "新碟速递", iconNewAlbums, &s.SidebarNewAlbums},
+		}
+		row("动态收缩", "鼠标离开侧边栏时收成一列图标，把宽度让给内容，移回来自动展开；关掉则一直展开", func() {
+			on := s.sidebarAutoCollapse()
+			if ui.Switch(c.Key("sidebar-collapse"), &on).Label("动态收缩").Changed() {
+				s.SidebarAutoCollapse = &on
+				a.changed()
+			}
+		})
+		ui.Row(c).Wrap().Padding(10, 12).Gap(6).Children(func() {
+			for _, it := range entries {
+				on := *it.on
+				b := ui.ButtonBase(c.Key("sb-" + it.id)).Height(26).PaddingX(11).Gap(6).
+					Radius(999).AlignItems(ui.Center).FocusRing(false).Label(it.label)
+				// On: the accent's own light. Off: a hairline and quiet
+				// text, so the two read at a glance.
+				fg, bg, edge := p.muted, ui.Transparent, p.hairline
+				switch {
+				case on:
+					fg, bg, edge = p.accent, p.accent.Alpha(0.14), p.accent.Alpha(0.3)
+				case b.Hovered():
+					bg = p.hover
+				}
+				b.Background(b.AnimateColor("bg", bg, ui.Animation{Duration: 120 * time.Millisecond})).
+					Border(1, edge)
+				if b.Pressed() {
+					b.AnimatePose(ui.Pose{Scale: 0.96}, ui.Snappy)
+				}
+				b.Children(func() {
+					ui.Icon(c, it.icon).Size(13, 13).TextColor(fg)
+					ui.Text(c, it.label).FontSize(12.5).FontWeight(500).TextColor(fg).SingleLine()
+				})
+				if b.Clicked() {
+					*it.on = !on
+					a.changed()
+				}
+			}
+		})
+	})
+
 	group("实验性功能", func() {
-		row("智能过渡", "一首歌播完前缓缓淡出、下一首缓缓淡入；切换页面时新页面也从下方轻轻浮现。关掉则样样干净利落", func() {
+		row("智能过渡", "正在播放的歌快结束时，下一首的开头提前轻轻接入，两首歌自然叠在一起，中间不停不顿；切换页面时新页面也从下方轻轻浮现。关掉则样样干净利落", func() {
 			on := s.transitions()
 			if ui.Switch(c.Key("transition"), &on).Label("智能过渡").Changed() {
 				s.Transition = &on
 				a.changed()
 			}
 		})
-		row("黑胶唱片", "播放页的封面化作缓缓旋转的黑胶唱片，暂停时停在原地；再点封面上的唱片按钮也可开关", func() {
-			if ui.Switch(c.Key("vinyl"), &s.Vinyl).Label("黑胶唱片").Changed() {
-				a.changed()
-			}
-		})
-		row("进度条烟雾特效", "播放时进度条化作拖着烟雾的光点，随音乐起伏；会多用一些电量", func() {
-			if ui.Switch(c.Key("smoke"), &s.Smoke).Label("进度条烟雾特效").Changed() {
+		row("播放进度条", "在播放栏左侧显示一条进度条，播放进度化作拖着烟雾的光点，随音乐起伏；会多用一些电量", func() {
+			if ui.Switch(c.Key("progressbar"), &s.ProgressBar).Label("播放进度条").Changed() {
 				a.changed()
 			}
 		})
@@ -342,7 +395,7 @@ func (a *app) settingsBody(c *ui.Context, p palette, liquid bool) {
 				a.writeFeedback("功能建议")
 			}
 		})
-		row("连接自检", "检查登录、网易云接口、播放地址与更新镜像；失败项会随反馈邮件一起发出", func() {
+		row("连接自检", "检查登录、网易云接口、播放地址、更新镜像与汽水音乐；失败项会随反馈邮件一起发出", func() {
 			label := "开始检查"
 			if a.checking {
 				label = "检查中…"

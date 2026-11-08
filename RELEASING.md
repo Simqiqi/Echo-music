@@ -22,7 +22,7 @@
    gh release delete v0.1.8 --yes
    ```
 
-4. `.github/workflows/release.yml` builds macOS, Windows and Linux and uploads them to a draft release. Wait for every job to pass:
+4. `.github/workflows/release.yml` builds macOS, Windows and Linux and uploads them to a draft release. The 汽水音乐 / 酷狗音乐 login bridge (`sidecar/`) is bundled into every platform automatically: it is listed under `mygo.json`'s `resources`, and the workflow runs `npm install` in `sidecar/` first (its `node_modules` is gitignored). Wait for every job to pass:
 
    ```bash
    gh run watch "$(gh run list --workflow release.yml -L1 --json databaseId -q '.[0].databaseId')" --exit-status

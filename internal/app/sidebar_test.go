@@ -53,7 +53,7 @@ func TestSidebarPlaylistCollapse(t *testing.T) {
 	}
 }
 
-// The plus still opens the naming dialog with both sections collapsed, without expanding either one.
+// Making a playlist still opens the naming dialog with both sections collapsed, without expanding either one.
 func TestNewPlaylistInCollapsedSidebar(t *testing.T) {
 	a := editTestApp()
 	tt := ui.NewTester(a.view, 1200, 1000)
@@ -67,14 +67,12 @@ func TestNewPlaylistInCollapsedSidebar(t *testing.T) {
 	if !a.mineCollapsed || !a.savedCollapsed {
 		t.Fatal("the sections did not collapse independently")
 	}
-	if err := tt.Click("新建歌单"); err != nil {
-		t.Fatal(err)
-	}
+	a.newPlaylist(nil)
 	tt.Frame()
 	if !a.naming.open {
-		t.Error("the plus did not open the naming dialog")
+		t.Error("naming a playlist did not open the naming dialog")
 	}
 	if !a.mineCollapsed || !a.savedCollapsed {
-		t.Error("the plus also toggled a playlist section")
+		t.Error("naming a playlist also toggled a playlist section")
 	}
 }

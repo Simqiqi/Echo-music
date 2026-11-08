@@ -32,32 +32,40 @@ func TestSkipOnError(t *testing.T) {
 }
 
 // A failed URL request used to skip to the next song, so clicking a track in
-// a playlist played one further down the list; only unplayable songs may skip.
+// a playlist played one further down the list; only unplayable songs may skip,
+// and only while the queue goes on by itself, never past a song picked by hand.
 func TestNextOnFailure(t *testing.T) {
 	transient := errors.New("Post: dial tcp: timeout")
 	for _, tc := range []struct {
-		name    string
-		err     error
-		at      int
-		skipped int
-		n       int
-		want    int
-		wantOK  bool
+		name     string
+		err      error
+		at       int
+		skipped  int
+		n        int
+		handOver bool
+		want     int
+		wantOK   bool
 	}{
-		{"transient stays", transient, 3, 0, 10, 3, false},
-		{"wrapped transient stays", fmt.Errorf("open: %w", transient), 3, 0, 10, 3, false},
-		{"unavailable skips", netease.ErrUnavailable, 3, 0, 10, 4, true},
-		{"wrapped unavailable skips", fmt.Errorf("open: %w", netease.ErrUnavailable), 3, 0, 10, 4, true},
-		{"format skips", fmt.Errorf("%w %s", netease.ErrFormat, "ogg"), 3, 0, 10, 4, true},
-		{"wraps at the end", netease.ErrUnavailable, 9, 0, 10, 0, true},
-		{"whole queue tried", netease.ErrUnavailable, 5, 9, 10, 5, false},
-		{"one song only", netease.ErrUnavailable, 0, 0, 1, 0, false},
+		{"transient stays", transient, 3, 0, 10, true, 3, false},
+		{"wrapped transient stays", fmt.Errorf("open: %w", transient), 3, 0, 10, true, 3, false},
+		{"unavailable skips", netease.ErrUnavailable, 3, 0, 10, true, 4, true},
+		{"wrapped unavailable skips", fmt.Errorf("open: %w", netease.ErrUnavailable), 3, 0, 10, true, 4, true},
+		{"format skips", fmt.Errorf("%w %s", netease.ErrFormat, "ogg"), 3, 0, 10, true, 4, true},
+		{"wraps at the end", netease.ErrUnavailable, 9, 0, 10, true, 0, true},
+		{"whole queue tried", netease.ErrUnavailable, 5, 9, 10, true, 5, false},
+		{"one song only", netease.ErrUnavailable, 0, 0, 1, true, 0, false},
+
+		// The listener picked this song: an unplayable one stays, so the
+		// click never quietly plays another.
+		{"picked stays", netease.ErrUnavailable, 3, 0, 10, false, 3, false},
+		{"picked format stays", fmt.Errorf("%w %s", netease.ErrFormat, "ogg"), 3, 0, 10, false, 3, false},
+		{"picked stays at the end", netease.ErrUnavailable, 9, 0, 10, false, 9, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got, ok := nextOnFailure(tc.err, tc.at, tc.skipped, tc.n)
+			got, ok := nextOnFailure(tc.err, tc.at, tc.skipped, tc.n, tc.handOver)
 			if got != tc.want || ok != tc.wantOK {
-				t.Errorf("nextOnFailure(%v, %d, %d, %d) = (%d, %v), want (%d, %v)",
-					tc.err, tc.at, tc.skipped, tc.n, got, ok, tc.want, tc.wantOK)
+				t.Errorf("nextOnFailure(%v, %d, %d, %d, %v) = (%d, %v), want (%d, %v)",
+					tc.err, tc.at, tc.skipped, tc.n, tc.handOver, got, ok, tc.want, tc.wantOK)
 			}
 		})
 	}

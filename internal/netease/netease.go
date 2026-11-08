@@ -465,6 +465,11 @@ type Stream struct {
 	Peak float64 `json:"peak"`
 }
 
+// urlRetryDelay is how long one failed call is left before the same request
+// is asked again: long enough for a stutter, short enough not to be heard as
+// a slow start.
+const urlRetryDelay = 150 * time.Millisecond
+
 // Levels are the stream levels, from the lowest.
 var Levels = []string{"standard", "higher", "exhigh", "lossless", "hires"}
 
@@ -481,8 +486,20 @@ func Lossless(level string) bool { return level == "lossless" || level == "hires
 // the quality asked for.
 func SongURL(id int64, level string) (*Stream, error) {
 	s, err := songURLAt(id, level)
-	if err == nil || level == "standard" || !errors.Is(err, ErrUnavailable) {
-		return s, err
+	if err == nil {
+		return s, nil
+	}
+	// No URL is also what one failed call looks like: asked again a moment
+	// later, the same request usually finds it. A preview is an answer
+	// about the song rather than a failed call, so it is taken as it came.
+	if errors.Is(err, ErrUnavailable) && !errors.Is(err, ErrPreview) {
+		time.Sleep(urlRetryDelay)
+		if again, e := songURLAt(id, level); e == nil {
+			return again, nil
+		}
+	}
+	if level == "standard" || !errors.Is(err, ErrUnavailable) {
+		return nil, err
 	}
 	if lower, e := songURLAt(id, "standard"); e == nil {
 		return lower, nil
@@ -508,6 +525,12 @@ func songURLAt(id int64, level string) (*Stream, error) {
 	data := map[string]any{"ids": fmt.Sprintf("[%d]", id), "level": level, "encodeType": encode}
 	if err := eapiPost("/api/song/enhance/player/url/v1", data, &res); err != nil {
 		return nil, err
+	}
+	// A code that is not 200 is the call failing, not the song being
+	// unavailable: telling them apart keeps the player retrying a request
+	// that stumbled instead of skipping a song it never got an answer for.
+	if res.Code != 200 {
+		return nil, fmt.Errorf("netease: song url: code %d at %s", res.Code, level)
 	}
 	if len(res.Data) == 0 || res.Data[0].URL == "" {
 		return nil, fmt.Errorf("%w: no url at %s", ErrUnavailable, level)
@@ -562,12 +585,24 @@ func Lyrics(id int64) (lrc, translation, yrc string, err error) {
 	return res.Lrc.Lyric, res.Tlyric.Lyric, yrc, nil
 }
 
-// Sized asks the image CDN for a picture of n×n pixels.
+// Sized asks the image CDN for a picture of n×n pixels. It only resizes
+// NetEase's own pictures (host music.126.net): 汽水音乐 and other
+// services carry their own sizing in the URL and reject NetEase's ?param=,
+// so tacking it on would either be ignored or — when the URL already holds a
+// query string — produce a malformed second '?' and fail to load. Those
+// URLs are returned untouched, and a stray '?' on a NetEase pic is joined
+// with '&' rather than a second '?'.
 func Sized(pic string, n int) string {
 	if pic == "" {
 		return ""
 	}
 	pic = strings.Replace(pic, "http://", "https://", 1)
+	if !strings.Contains(pic, "music.126.net") {
+		return pic
+	}
+	if strings.Contains(pic, "?") {
+		return fmt.Sprintf("%s&param=%dy%d", pic, n, n)
+	}
 	return fmt.Sprintf("%s?param=%dy%d", pic, n, n)
 }
 

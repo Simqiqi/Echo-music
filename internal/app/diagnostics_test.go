@@ -71,21 +71,22 @@ func TestFeedbackMailCarriesDiagnostics(t *testing.T) {
 	}
 }
 
-// The four probes are asked together and keep their own results.
+// The five probes are asked together and keep their own results.
 func TestRunChecksGathersProbes(t *testing.T) {
-	pl, pa, ps, pf := probeLogin, probeAPI, probeSong, probeFeed
-	defer func() { probeLogin, probeAPI, probeSong, probeFeed = pl, pa, ps, pf }()
+	pl, pa, ps, pf, pq := probeLogin, probeAPI, probeSong, probeFeed, probeQishui
+	defer func() { probeLogin, probeAPI, probeSong, probeFeed, probeQishui = pl, pa, ps, pf, pq }()
 	probeLogin = func(*app) checkResult { return checkResult{"登录状态", true, "已登录"} }
 	probeAPI = func() checkResult { return checkResult{"网易云接口", false, "timeout"} }
-	probeSong = func(int64) checkResult { return checkResult{"播放地址", true, "已跳过"} }
+	probeSong = func(*app, int64) checkResult { return checkResult{"播放地址", true, "已跳过"} }
 	probeFeed = func() checkResult { return checkResult{"更新镜像", true, "可达"} }
+	probeQishui = func(*app) checkResult { return checkResult{"汽水音乐", true, "未登录，已跳过"} }
 
 	a := newTestApp()
 	got := a.runChecks()
-	if len(got) != 4 {
+	if len(got) != 5 {
 		t.Fatalf("got %d results: %+v", len(got), got)
 	}
-	want := []string{"登录状态", "网易云接口", "播放地址", "更新镜像"}
+	want := []string{"登录状态", "网易云接口", "播放地址", "更新镜像", "汽水音乐"}
 	for i := range want {
 		if got[i].name != want[i] {
 			t.Errorf("result %d is %q, want %q", i, got[i].name, want[i])
@@ -118,19 +119,20 @@ func TestFinishChecksNotesFailures(t *testing.T) {
 // The settings' check button starts a check, with the probes answered in
 // the test so nothing goes out to the network.
 func TestConnectionCheckButton(t *testing.T) {
-	pl, pa, ps, pf := probeLogin, probeAPI, probeSong, probeFeed
+	pl, pa, ps, pf, pq := probeLogin, probeAPI, probeSong, probeFeed, probeQishui
 	defer func() {
 		// startChecks has a goroutine of its own: let it finish before
 		// the probes it reads are put back.
 		time.Sleep(20 * time.Millisecond)
-		probeLogin, probeAPI, probeSong, probeFeed = pl, pa, ps, pf
+		probeLogin, probeAPI, probeSong, probeFeed, probeQishui = pl, pa, ps, pf, pq
 	}()
 	ok := func(name string) func() checkResult {
 		return func() checkResult { return checkResult{name, true, "可达"} }
 	}
 	probeLogin = func(*app) checkResult { return checkResult{"登录状态", true, "已登录"} }
 	probeAPI, probeFeed = ok("网易云接口"), ok("更新镜像")
-	probeSong = func(int64) checkResult { return checkResult{"播放地址", true, "已跳过"} }
+	probeSong = func(*app, int64) checkResult { return checkResult{"播放地址", true, "已跳过"} }
+	probeQishui = func(*app) checkResult { return checkResult{"汽水音乐", true, "未登录，已跳过"} }
 
 	a := newTestApp()
 	a.settings = defaultSettings()

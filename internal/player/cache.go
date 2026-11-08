@@ -80,6 +80,20 @@ func (c *Cache) lookup(id int64, level string) (*download, *netease.Stream, bool
 	return nil, nil, false
 }
 
+// Forget drops the song kept for id at the level st was kept at, so that
+// the next play fetches it again: a file that will not open is worse than
+// none, and left there it fails every time it is played.
+func (c *Cache) Forget(id int64, st *netease.Stream) {
+	if c == nil || st == nil {
+		return
+	}
+	ext := st.Type
+	if ext == "" {
+		ext = "mp3"
+	}
+	c.remove(filepath.Join(c.dir, cacheKey(id, st.Level)+"."+ext))
+}
+
 // download fetches the song of the stream st into a file, to keep once it
 // has all come in; or into memory, if the cache would not keep it.
 func (c *Cache) download(id int64, st *netease.Stream) *download {
@@ -204,6 +218,16 @@ type DownloadEntry struct {
 	Stream netease.Stream // what its sidecar metadata says it is
 }
 
+// IncompleteDownloadEntry represents a download that is in progress or failed.
+type IncompleteDownloadEntry struct {
+	ID        int64     // the song's NetEase id
+	Level     string    // the stream level being downloaded
+	Path      string    // path to the .part file
+	Size      int64     // current downloaded bytes
+	TotalSize int64     // expected total size (0 if unknown)
+	ModTime   time.Time // when the .part file was last modified
+}
+
 // Entries lists the songs kept, with the song id parsed from each file's
 // name and the stream read from its sidecar. They come newest-used first.
 func (c *Cache) Entries() []DownloadEntry {
@@ -244,6 +268,49 @@ func (c *Cache) Entries() []DownloadEntry {
 		out = append(out, ent)
 	}
 	slices.SortFunc(out, func(a, b DownloadEntry) int { return b.Used.Compare(a.Used) })
+	return out
+}
+
+// IncompleteEntries lists the songs that are currently being downloaded or
+// have failed (leftover .part files). They come newest-modified first.
+func (c *Cache) IncompleteEntries() []IncompleteDownloadEntry {
+	if c == nil {
+		return nil
+	}
+	entries, _ := os.ReadDir(c.dir)
+	var out []IncompleteDownloadEntry
+	for _, e := range entries {
+		if filepath.Ext(e.Name()) != ".part" {
+			continue
+		}
+		base := strings.TrimSuffix(e.Name(), ".part")
+		jsonPath := filepath.Join(c.dir, base+".json")
+		var st netease.Stream
+		if b, err := os.ReadFile(jsonPath); err == nil {
+			json.Unmarshal(b, &st)
+		}
+		info, err := e.Info()
+		if err != nil {
+			continue
+		}
+		id := int64(0)
+		level := ""
+		if dash := strings.IndexByte(base, '-'); dash > 0 {
+			if parsedID, err := strconv.ParseInt(base[:dash], 10, 64); err == nil {
+				id = parsedID
+				level = base[dash+1:]
+			}
+		}
+		out = append(out, IncompleteDownloadEntry{
+			ID:        id,
+			Level:     level,
+			Path:      filepath.Join(c.dir, e.Name()),
+			Size:      info.Size(),
+			TotalSize: st.Size,
+			ModTime:   info.ModTime(),
+		})
+	}
+	slices.SortFunc(out, func(a, b IncompleteDownloadEntry) int { return b.ModTime.Compare(a.ModTime) })
 	return out
 }
 

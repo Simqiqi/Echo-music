@@ -25,6 +25,16 @@ func (a *app) songMenu(c *ui.Context, tr *netease.Track, size float32, color ui.
 // it is listed in, if set.
 func (a *app) songItems(tr *netease.Track, pid int64) func(m *ui.Menu) {
 	return func(m *ui.Menu) {
+		if tr.ID < 0 {
+			// A 汽水音乐 song: nothing here reaches NetEase.
+			if m.Item("复制歌名").Chosen() {
+				copyText(tr.Name)
+			}
+			if m.Item("复制歌名和歌手").Chosen() {
+				copyText(tr.Name + " - " + tr.ArtistNames())
+			}
+			return
+		}
 		if tr.ProgramID != 0 {
 			a.programItems(m, tr)
 			return
@@ -55,6 +65,12 @@ func (a *app) songItems(tr *netease.Track, pid int64) func(m *ui.Menu) {
 		if tr.Album.ID != 0 && m.Item("查看专辑："+tr.Album.Name).Chosen() {
 			a.openPage(route{page: pageAlbum, id: tr.Album.ID})
 		}
+
+		// Download option
+		if m.Item("下载歌曲到本地").Chosen() {
+			a.downloadTrack(tr)
+		}
+
 		a.playlistItems(m, tr, pid)
 	}
 }

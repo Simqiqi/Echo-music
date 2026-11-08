@@ -1,7 +1,9 @@
 package player
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"math"
 	"math/rand/v2"
 	"time"
@@ -32,9 +34,20 @@ type Player struct {
 	// Normalize reports whether to even out the loudness of tracks, as
 	// the settings say.
 	Normalize func() bool
-	// Transition reports whether to fade a song out as it ends and the
-	// next one in as it begins, as the settings say.
+	// Transition reports whether the songs hand over to the next ones
+	// under them, before they end, as the settings say.
 	Transition func() bool
+	// Cross, if set, opens the song a handover brings in, as the test of
+	// one plays songs that never open: nil opens them as usual.
+	Cross func(t netease.Track, level string) (*netease.Stream, stream, error)
+	// Source, if set, says where a track of an ID the catalogs here do
+	// not know streams from: the songs of the sidecar providers (汽水
+	// 音乐) the app queues carry negative IDs, and their
+	// streams come through the login bridge.
+	Source func(id int64, level string) (*netease.Stream, error)
+	// BridgeLyrics is where a negative-ID track's lyrics come from, same
+	// shape as NetEase's own: the text, and lrc or yrc for its format.
+	BridgeLyrics func(t netease.Track) (lrc, format string, err error)
 	// Cache keeps the songs played, if set.
 	Cache *Cache
 	// Changed, if set, hears that what plays, where it is or whether it
@@ -75,9 +88,12 @@ type Player struct {
 
 	// pending holds a seek asked for while the track loads.
 	pending time.Duration
-	// tailGen counts the arms of the fade out at the track's end, so that
+	// cross is the song after this one, playing its beginning under it:
+	// the handover the smart transitions make.
+	cross *crossing
+	// crossGen counts the arms of the handover at the track's end, so that
 	// a stale one, of a track left behind, does nothing.
-	tailGen int
+	crossGen int
 	// natural says the track ended by itself, rather than the listener
 	// leaving it: the next one comes in more slowly after.
 	natural bool
@@ -154,6 +170,17 @@ func (p *Player) ended() {
 		p.out.Play()
 		return
 	}
+	// The next one has been playing its beginning under this one, and
+	// takes over as this ends: the music goes on without a break.
+	if c := p.cross; c != nil && c.ready && c.began && c.gen == p.gen {
+		p.adopt(c)
+		return
+	} else if c != nil {
+		debugCross("ended with a crossing not ready: ready=%v began=%v", c.ready, c.began)
+	} else {
+		debugCross("ended with no crossing")
+	}
+	p.cancelCross()
 	if p.at+1 >= len(p.order) && p.feed != nil {
 		p.awaitFeed()
 		return
@@ -180,10 +207,10 @@ func (p *Player) PlayQueue(tracks []netease.Track, start int) {
 	}
 	if p.shuffle {
 		p.shuffleOrder(start)
-		p.load(0)
+		p.loadChosen(0)
 		return
 	}
-	p.load(start)
+	p.loadChosen(start)
 }
 
 // PlayRadio plays tracks in their order, then goes on with those feed
@@ -357,6 +384,52 @@ func (p *Player) Repeat() RepeatMode { return p.repeat }
 // Lyrics returns the current track's lyrics, and whether they have loaded.
 func (p *Player) Lyrics() ([]lyrics.Line, bool) { return p.lyrics, p.lyricsLoaded }
 
+// Download downloads a song by id and level to the cache.
+// It returns the path to the downloaded file, or an error.
+func (p *Player) Download(ctx context.Context, id int64, level string) (string, error) {
+	if p.Cache == nil {
+		return "", fmt.Errorf("cache not available")
+	}
+
+	// Get the stream info for the song
+	info, err := netease.SongURL(id, level)
+	if err != nil {
+		return "", err
+	}
+
+	// Use the cache's download method
+	dl := p.Cache.download(id, info)
+	if dl == nil {
+		return "", fmt.Errorf("download failed")
+	}
+
+	// Wait for download to complete using the condition variable
+	dl.mu.Lock()
+	for !dl.done {
+		waitCh := make(chan struct{})
+		go func() {
+			dl.cond.Wait()
+			close(waitCh)
+		}()
+		dl.mu.Unlock()
+		select {
+		case <-waitCh:
+			dl.mu.Lock()
+		case <-ctx.Done():
+			dl.mu.Unlock()
+			return "", ctx.Err()
+		}
+	}
+	err = dl.err
+	path := dl.part
+	dl.mu.Unlock()
+
+	if err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
 // Downloaded returns the share of the current track downloaded so far, or
 // false before it has started to.
 func (p *Player) Downloaded() (float64, bool) {
@@ -425,11 +498,11 @@ func (p *Player) Prev() {
 	p.load(at)
 }
 
-// Jump plays the queue's track i.
+// Jump plays the queue's track i, as the listener picked it.
 func (p *Player) Jump(i int) {
 	for k, v := range p.order {
 		if v == i {
-			p.load(k)
+			p.loadChosen(k)
 			return
 		}
 	}
@@ -470,13 +543,14 @@ func (p *Player) TogglePlay() {
 			p.playing = !p.playing
 			p.sync()
 		case len(p.order) > 0:
-			p.loadSkipping(max(p.at, 0), 0, true, p.pending)
+			p.loadSkipping(max(p.at, 0), 0, true, p.pending, false)
 		}
 		return
 	}
 	out := p.out
 	if p.playing {
 		p.playing = false
+		p.cancelCross()
 		p.fade.fade(0, fadeOut, func() {
 			p.post(func() {
 				if p.out == out && !p.playing {
@@ -496,7 +570,7 @@ func (p *Player) TogglePlay() {
 		out.Play()
 	}
 	p.fade.fade(1, fadeIn, nil)
-	p.armTail(p.gen)
+	p.armCross(p.gen)
 	p.sync()
 }
 
@@ -506,6 +580,7 @@ func (p *Player) TogglePlay() {
 // evening.
 func (p *Player) FadeOutAndPause(d time.Duration) {
 	p.playing = false
+	p.cancelCross()
 	out := p.out
 	if out == nil {
 		p.sync()
@@ -541,6 +616,9 @@ func (p *Player) Seek(t time.Duration) {
 		p.pending = t
 		return
 	}
+	// Where it lands decides what hands over to it: the arm is set again
+	// once it is there.
+	p.cancelCross()
 	out := p.out
 	// Paused, it jumps at once; but a seek on its way paused it only for
 	// the jump, and this one takes its place, playing on from there.
@@ -584,6 +662,9 @@ func (p *Player) applyGain() {
 		g *= p.gain
 	}
 	p.fade.setGain(g)
+	if c := p.cross; c != nil {
+		c.level.setGain(p.crossGain(c))
+	}
 }
 
 // normPreamp lifts normalized tracks, which NetEase brings to the quiet
@@ -665,6 +746,7 @@ func (p *Player) Levels() ([Bands]float32, bool) {
 }
 
 func (p *Player) stop() {
+	p.cancelCross()
 	if out := p.out; out != nil {
 		// Paused first, it fades out over a few milliseconds, rather than
 		// stopping with a click.
@@ -679,6 +761,7 @@ func (p *Player) stop() {
 // A URL request that failed once often works the next moment. Asking again
 // costs less than playing a song the listener did not choose.
 const openRetryDelay = 250 * time.Millisecond
+const maxOpenRetries = 3 // 网络抖动/临时故障时最多重试 3 次
 
 // skipOnError says a failed open is a song this account cannot play at all.
 // A network, HTTP or decode failure is not one of them: it must not move
@@ -689,9 +772,10 @@ func skipOnError(err error) bool {
 
 // nextOnFailure gives the track to hand over to after a failed open, or
 // false when the player stays on the song it was asked to play. Only songs
-// that cannot play are skipped, and only until the whole queue was tried.
-func nextOnFailure(err error, at, skipped, n int) (int, bool) {
-	if !skipOnError(err) || skipped+1 >= n {
+// that cannot play are skipped, only until the whole queue was tried, and
+// never past a song the listener picked: that one stays, saying why.
+func nextOnFailure(err error, at, skipped, n int, handOver bool) (int, bool) {
+	if !handOver || !skipOnError(err) || skipped+1 >= n {
 		return at, false
 	}
 	next := at + 1
@@ -701,14 +785,22 @@ func nextOnFailure(err error, at, skipped, n int) (int, bool) {
 	return next, true
 }
 
-// load plays the track at order[at], skipping those that cannot play.
+// load plays the track at order[at], skipping those that cannot play: the
+// queue goes on by itself, so a song that cannot play must not stop it.
 func (p *Player) load(at int) {
-	p.loadSkipping(at, 0, true, 0)
+	p.loadSkipping(at, 0, true, 0, true)
+}
+
+// loadChosen plays the track at order[at] as the listener picked it. What
+// cannot play stays on screen with the reason it cannot: a click never
+// quietly plays a different song.
+func (p *Player) loadChosen(at int) {
+	p.loadSkipping(at, 0, true, 0, false)
 }
 
 // loadSkipping loads the track at order[at], to play or not, from from,
-// skipping those that cannot play: skipped of them so far.
-func (p *Player) loadSkipping(at, skipped int, play bool, from time.Duration) {
+// skipping those that cannot play (handOver) : skipped of them so far.
+func (p *Player) loadSkipping(at, skipped int, play bool, from time.Duration, handOver bool) {
 	p.stop()
 	p.gen++
 	gen := p.gen
@@ -722,42 +814,28 @@ func (p *Player) loadSkipping(at, skipped int, play bool, from time.Duration) {
 	p.announce(&t, nil)
 	p.refill()
 
-	go func() {
-		cover, err := netease.Fetch(netease.Sized(t.Album.PicURL, 600))
-		if err == nil {
-			p.post(func() {
-				if gen == p.gen {
-					p.announce(&t, cover)
-				}
-			})
-		}
-	}()
-
-	go func() {
-		lrc, trans, yrc, err := netease.Lyrics(t.ID)
-		var lines []lyrics.Line
-		if err == nil {
-			lines = lyrics.Build(lrc, trans, yrc)
-		}
-		p.post(func() {
-			if gen == p.gen {
-				p.lyrics = lines
-				p.lyricsLoaded = true
-			}
-		})
-	}()
+	p.fetchArt(gen, t)
+	p.fetchLyrics(gen, t)
 	go func() {
 		level := "exhigh"
 		if p.Quality != nil {
 			level = p.Quality()
 		}
-		info, s, err := p.open(t, level)
-		if err != nil && !skipOnError(err) {
-			// A hiccup in the URL request or in the first bytes often
-			// clears at once. Ask for the same song again before letting
-			// a failure be decided on the main thread.
-			time.Sleep(openRetryDelay)
+		var info *netease.Stream
+		var s stream
+		var err error
+		// 最多重试 maxOpenRetries 次，处理网络抖动、Bridge 服务临时不可用等临时故障
+		for attempt := 0; attempt <= maxOpenRetries; attempt++ {
 			info, s, err = p.open(t, level)
+			if err == nil || skipOnError(err) {
+				break // 成功或不可重试的错误（版权/格式问题）
+			}
+			// 最后一次尝试失败，不再重试
+			if attempt == maxOpenRetries {
+				break
+			}
+			// 等待后重试，指数退避：250ms, 500ms, 750ms...
+			time.Sleep(openRetryDelay * time.Duration(attempt+1))
 		}
 		p.post(func() {
 			if gen != p.gen {
@@ -788,15 +866,19 @@ func (p *Player) loadSkipping(at, skipped int, play bool, from time.Duration) {
 				case errors.Is(err, netease.ErrPreview):
 					p.err = "这首歌只能试听，需要购买或开通会员"
 				case t.Fee == 1:
-					p.err = "这首歌需要 VIP 会员才能播放"
+					// The catalogue marks it paid, which is not the same as
+					// the listener not being a subscriber: say what is known,
+					// not who is to blame.
+					p.err = "这首歌暂无可用音源（会员专属或版权受限）"
 				default:
 					p.err = "这首歌暂时没有可用音源（版权受限或已下架）"
 				}
-				// A song that cannot play hands over to the next one. A
-				// network or decode failure stays on the song chosen, so
-				// a click never quietly plays a different one.
-				if next, ok := nextOnFailure(err, at, skipped, len(p.order)); ok {
-					p.loadSkipping(next, skipped+1, p.playing, 0)
+				// A song that cannot play hands over to the next one as
+				// the queue goes on by itself. A song the listener picked
+				// stays where it is: a click never quietly plays another.
+				// A network or decode failure stays on the song either way.
+				if next, ok := nextOnFailure(err, at, skipped, len(p.order), handOver); ok {
+					p.loadSkipping(next, skipped+1, p.playing, 0, handOver)
 					return
 				}
 				if !skipOnError(err) {
@@ -846,7 +928,7 @@ func (p *Player) loadSkipping(at, skipped int, play bool, from time.Duration) {
 			if p.playing {
 				p.out.Play()
 				p.fade.fade(1, among, nil)
-				p.armTail(gen)
+				p.armCross(gen)
 			}
 			p.sync()
 		})
@@ -856,15 +938,32 @@ func (p *Player) loadSkipping(at, skipped int, play bool, from time.Duration) {
 // open opens track t's audio at level: kept in the cache, or else
 // streamed into it, and kept once it has all come in.
 func (p *Player) open(t netease.Track, level string) (*netease.Stream, stream, error) {
-	dl, info, ok := p.Cache.lookup(t.ID, level)
-	if !ok {
-		var err error
-		info, err = netease.SongURL(t.ID, level)
-		if err != nil {
-			return nil, nil, err
+	var dl *download
+	var info *netease.Stream
+	if kept, keptInfo, ok := p.Cache.lookup(t.ID, level); ok {
+		s, err := openStream(kept, t.Duration)
+		if err == nil {
+			return keptInfo, s, nil
 		}
-		dl = p.Cache.download(t.ID, info)
+		// A kept song that will not open is a broken file on the disk: it
+		// fails the same way however many times it is played, which is what
+		// "再点一次试试" never fixes. Drop it and fetch the song again.
+		kept.Close()
+		p.Cache.Forget(t.ID, keptInfo)
 	}
+	var err error
+	if t.ID < 0 {
+		if p.Source == nil {
+			return nil, nil, fmt.Errorf("%w: no source for it", netease.ErrUnavailable)
+		}
+		info, err = p.Source(t.ID, level)
+	} else {
+		info, err = netease.SongURL(t.ID, level)
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	dl = p.Cache.download(t.ID, info)
 	s, err := openStream(dl, t.Duration)
 	if err != nil {
 		dl.Close()
@@ -916,5 +1015,51 @@ func (p *Player) Restore(s Session) {
 	}
 	p.queue, p.order = s.Queue, s.Order
 	p.shuffle, p.repeat = s.Shuffle, s.Repeat%3
-	p.loadSkipping(s.At, 0, false, time.Duration(s.Position)*time.Millisecond)
+	p.loadSkipping(s.At, 0, false, time.Duration(s.Position)*time.Millisecond, false)
+}
+
+// fetchArt brings the track's cover, and shows it, once it has come.
+func (p *Player) fetchArt(gen int, t netease.Track) {
+	go func() {
+		pic := t.Album.PicURL
+		if t.ID >= 0 {
+			pic = netease.Sized(pic, 600) // 网易云的缩放参数第三方 CDN 不认
+		}
+		cover, err := netease.Fetch(pic)
+		if err == nil {
+			p.post(func() {
+				if gen == p.gen {
+					p.announce(&t, cover)
+				}
+			})
+		}
+	}()
+}
+
+// fetchLyrics brings the track's lyrics, once they have come.
+func (p *Player) fetchLyrics(gen int, t netease.Track) {
+	go func() {
+		var lines []lyrics.Line
+		var err error
+		if t.ID < 0 && p.BridgeLyrics != nil {
+			lrc, format, err := p.BridgeLyrics(t)
+			if err == nil && format == "yrc" {
+				lines = lyrics.Build("", "", lrc) // 汽水：逐字，走 YRC 解析
+			} else if err == nil {
+				lines = lyrics.Build(lrc, "", "")
+			}
+		} else {
+			var lrc, trans, yrc string
+			lrc, trans, yrc, err = netease.Lyrics(t.ID)
+			if err == nil {
+				lines = lyrics.Build(lrc, trans, yrc)
+			}
+		}
+		p.post(func() {
+			if gen == p.gen {
+				p.lyrics = lines
+				p.lyricsLoaded = true
+			}
+		})
+	}()
 }

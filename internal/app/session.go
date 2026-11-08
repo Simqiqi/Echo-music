@@ -40,6 +40,7 @@ func (a *app) saveSession() {
 	if os.WriteFile(path+".part", b, 0o600) == nil && os.Rename(path+".part", path) == nil {
 		a.savedSession = string(b)
 	}
+	a.saveBridgeSongs()
 }
 
 // sessionEvery is how long after playback changed, and how often as it
@@ -88,6 +89,9 @@ func (a *app) restoreSession() {
 		return
 	}
 	a.savedSession = string(b)
+	// The queue may hold 汽水音乐 songs: their registry comes back before
+	// the player asks where they stream from.
+	a.restoreBridgeSongs()
 	a.pl.Restore(s)
 	if s.Radio != "" && a.pl.Current() != nil {
 		a.pl.AttachRadio(s.Radio, a.radioFeed(s.Radio))

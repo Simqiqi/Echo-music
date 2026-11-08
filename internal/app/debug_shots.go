@@ -45,8 +45,8 @@ func init() {
 				mygo.RunOnMain(func() {
 					a.win.SetAlwaysOnTop(true)
 					a.win.Show()
-					// NM_SMOKE=0 and NM_NOTCH=0 turn them off, to measure them.
-					a.settings.Smoke = os.Getenv("NM_SMOKE") != "0"
+					// NM_PROGRESS=0 and NM_NOTCH=0 turn them off, to measure them.
+					a.settings.ProgressBar = os.Getenv("NM_PROGRESS") != "0"
 					a.settings.Notch = os.Getenv("NM_NOTCH") != "0"
 					a.notch.setEnabled(a.settings.Notch)
 				})

@@ -14,27 +14,9 @@ const (
 	fadeIn  = 260 * time.Millisecond
 )
 
-// How a song leaves as it ends and the next one arrives, when the
-// listener keeps the smart transitions on: the fade out runs over the
-// last seconds of a long song, a shorter last moment of a short one, and
-// the next comes in slowly after a natural end, at once after a skip.
-const (
-	tailLong       = 3 * time.Second
-	tailShort      = 1200 * time.Millisecond
-	tailShortUnder = 45 * time.Second
-	fadeInNatural  = 900 * time.Millisecond
-	// A fade never takes less than this, or it would be a cut.
-	tailLeast = 300 * time.Millisecond
-)
-
-// tailFor is how long a track of length d fades out at its end: short
-// songs get a shorter farewell, so that they are not all fade.
-func tailFor(d time.Duration) time.Duration {
-	if d < tailShortUnder {
-		return tailShort
-	}
-	return tailLong
-}
+// fadeInNatural is how slowly a song comes in after a natural end, when
+// the handover could not open the next one in time: slower than a skip's.
+const fadeInNatural = 900 * time.Millisecond
 
 // fader sets the volume of the player playing: the listener's volume and
 // the track's normalizing gain, times a level that fades as playback

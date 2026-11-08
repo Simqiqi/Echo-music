@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"runtime"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 
 	"github.com/simqiqi/simqiqi-music/internal/netease"
 	"github.com/simqiqi/simqiqi-music/internal/player"
+	"github.com/simqiqi/simqiqi-music/internal/sidecar"
 )
 
 type pageKind int
@@ -60,37 +62,47 @@ type app struct {
 	rail      bool    // the directory folded into its icon-only rail
 	sideAnimW float32 // the column's width as it glides open or shut
 
-	profile      *netease.Profile
-	mine, saved  []netease.Playlist // the listener's playlists: made, and saved
-	recPlaylists []netease.Playlist // the day's playlists picked for the listener
-	login        loginState
-	accountOpen  bool               // the dropdown of the account row shows
-	naming       nameDialog         // the name of a playlist asked for
-	deleting     deleteDialog       // whether to delete a playlist, asked
-	liked        map[int64]bool     // the songs the listener likes
-	toast        string             // a message to show once
-	saveImage    func([]byte) error // where a lyric card goes: the clipboard, unless a test says
-	checking     bool               // a connection check is out, waiting for its probes
-	checks       []checkResult      // what the last connection check found
-	updatePeek   updatePeek         // the newest release heard of, if newer
-	picked       pickedUp           // the song a login picked up, waiting to play
+	profile         *netease.Profile
+	qishui          *sidecar.Account           // 汽水音乐 登录态，nil 表示未登录
+	bridge          *bridgeStore               // 汽水音乐的歌曲与歌单，负数合成 ID 的注册表
+	bridgeVMs       map[providerID]*bridgeRows // 侧栏的行，只在歌单有变化时重建
+	qishuiLists     []sidecar.BridgePlaylist   // 汽水账号的歌单，侧栏列出
+	qishuiPlErr     string                     // 歌单加载失败的原因
+	qishuiCollapsed bool
+	mine, saved     []netease.Playlist // the listener's playlists: made, and saved
+	recPlaylists    []netease.Playlist // the day's playlists picked for the listener
+	login           loginState
+	topProv         providerID         // 顶栏头像显示哪个账号（最近登录的）
+	accountOpen     bool               // the dropdown of the account row shows
+	naming          nameDialog         // the name of a playlist asked for
+	deleting        deleteDialog       // whether to delete a playlist, asked
+	liked           map[int64]bool     // the songs the listener likes
+	toast           string             // a message to show once
+	saveImage       func([]byte) error // where a lyric card goes: the clipboard, unless a test says
+	checking        bool               // a connection check is out, waiting for its probes
+	checks          []checkResult      // what the last connection check found
+	updatePeek      updatePeek         // the newest release heard of, if newer
+	picked          pickedUp           // the song a login picked up, waiting to play
 
 	// The episodes the listener likes, and doesn't, as far as NetEase has
 	// answered, and those asked about: see ui_like.go.
 	likedPrograms, askedPrograms map[int64]bool
 
-	daily       []netease.Track
-	dailySpin   spinState // the sheen that turns on the daily card's playing disc
-	dailyBars   barState  // the bars on its play button
-	dailyWave   barState  // the wave of sound that crosses the daily card
-	dailyHue    float64   // where the rainbow across the daily card begins
-	dailyHued   bool      // whether a hue has been taken yet
-	npBars      barState  // the spectrum under Now Playing's cover
-	featured    []netease.Playlist
-	charts      []netease.Playlist
-	homeErr     string
-	homeLoading bool
-	homeAt      time.Time // when what the home page shows was asked for
+	daily          []netease.Track
+	dailySpin      spinState   // the sheen that turns on the daily card's playing disc
+	heroBars       barState    // the spectrum along the lead record's foot
+	heroFaces      []albumFace // the albums the listener plays most, over that wave
+	heroFacesAsked bool        // whether those albums have been asked for
+	dailyBars      barState    // the bars on its play button
+	dailyWave      barState    // the wave of sound that crosses the daily card
+	dailyHue       float64     // where the rainbow across the daily card begins
+	dailyHued      bool        // whether a hue has been taken yet
+	npBars         barState    // the spectrum under Now Playing's cover
+	featured       []netease.Playlist
+	charts         []netease.Playlist
+	homeErr        string
+	homeLoading    bool
+	homeAt         time.Time // when what the home page shows was asked for
 
 	playlists  map[int64]*netease.Playlist
 	loadingPl  map[int64]bool
@@ -162,6 +174,7 @@ type app struct {
 	underTop, underBottom bool
 	navTitle              string // the section the capsule over the page names
 	barScrub              scrubState
+	barSong               scrubState // the bar's own progress bar, on its left
 	npScrub               scrubState
 	backdropCache         backdropCache           // the backdrop of Now Playing, as last painted
 	npArt                 *artwork                // the cover whose colors Now Playing shows
@@ -277,6 +290,9 @@ func Run() error {
 		// made, and the view asks the player what plays.
 		a.art = newArtCache(a.post)
 		a.pl = player.New(a.post)
+		a.bridge = newBridgeStore()
+		a.pl.Source = a.bridgeSource
+		a.pl.BridgeLyrics = a.bridgeLyrics
 		a.pl.Quality = func() string { return a.settings.Quality }
 		a.pl.EQ = player.NewEQ()
 		a.applyEq()
@@ -369,8 +385,33 @@ func Run() error {
 		if a.tray != nil {
 			a.tray.Destroy()
 		}
+		// 关掉登录桥接进程，免得它成为孤儿。
+		sidecar.StopShared()
 	})
 	mygo.App.OnWindowAllClosed(func() {})
 	mygo.App.OnActivate(func(bool) { a.showMain() })
 	return mygo.App.Run()
+}
+
+// downloadTrack downloads a track to the local filesystem.
+func (a *app) downloadTrack(tr *netease.Track) {
+	if tr == nil {
+		return
+	}
+	// Show a toast to indicate download started
+	a.toast = "正在下载：" + tr.Name
+	a.redraw()
+
+	go func() {
+		ctx := context.Background()
+		_, err := a.pl.Download(ctx, tr.ID, "standard")
+		a.post(func() {
+			if err != nil {
+				a.toast = "下载失败：" + err.Error()
+			} else {
+				a.toast = "下载完成：" + tr.Name
+			}
+			a.redraw()
+		})
+	}()
 }

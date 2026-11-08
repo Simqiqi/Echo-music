@@ -3,11 +3,14 @@ package app
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"image"
 	"image/color"
+	"image/draw"
 	_ "image/jpeg"
-	_ "image/png"
+	"image/png"
 	"math"
+	"strings"
 	"time"
 
 	"github.com/egoist/mygo"
@@ -68,14 +71,43 @@ func (c *artCache) sweep(now time.Time) {
 
 // get returns the cover at url, or nil while it loads.
 func (c *artCache) get(url string, backdrop bool) *artwork {
-	return c.fetch(url, backdrop)
+	return c.fetch(url, 0, backdrop)
 }
 
-func (c *artCache) fetch(url string, backdrop bool) *artwork {
+// getAt is a cover shown at most side pixels wide, which it is brought
+// down to as it loads: a CDN that takes no size, as 汽水's and 酷狗's
+// don't, serves the picture its own size — 1600×1600, 290 KB, 19 ms to
+// decode — where a sidebar row shows 22 of them, and every row scrolled
+// back into view decodes it again. NetEase's CDN was told the size
+// already, so its covers load as they are.
+func (c *artCache) getAt(url string, side int, backdrop bool) *artwork {
+	return c.fetch(url, side, backdrop)
+}
+
+// artSideCap is the largest picture a cover loads as, whatever size it is
+// asked at: a cover serves the biggest place it shows, and no place in the
+// app shows a picture larger than a full window. 汽水's covers are 1600 px,
+// which the full-window places showing them are close enough to that they
+// load as they are.
+const artSideCap = 2000
+
+func (c *artCache) fetch(url string, side int, backdrop bool) *artwork {
 	if url == "" {
 		return nil
 	}
+	if strings.Contains(url, "param=") {
+		side = 0 // the CDN sized it already, in the URL's param
+	} else if side > 0 {
+		// A cover shown at N pixels is 2N on a retina screen.
+		side *= 2
+		if side > artSideCap {
+			side = artSideCap
+		}
+	}
 	key := url
+	if side > 0 {
+		key = fmt.Sprintf("%s|%d", url, side)
+	}
 	if backdrop {
 		key += "#backdrop"
 	}
@@ -92,7 +124,7 @@ func (c *artCache) fetch(url string, backdrop bool) *artwork {
 	c.busy[key] = true
 	go func() {
 		c.sem <- struct{}{}
-		bmp, img, err := loadArt(url)
+		bmp, img, err := loadArt(url, side)
 		<-c.sem
 		var blurred *image.RGBA
 		var tint ui.Color
@@ -128,26 +160,91 @@ func (c *artCache) fetch(url string, backdrop bool) *artwork {
 const artRelease = 2 * time.Second
 
 // loadArt fetches the cover at url, as a bitmap to draw and an image to
-// measure.
-func loadArt(url string) (*ui.Bitmap, image.Image, error) {
+// measure, brought down to side pixels first when side is set.
+func loadArt(url string, side int) (*ui.Bitmap, image.Image, error) {
 	b, err := netease.Fetch(url)
 	if err != nil {
 		return nil, nil, err
 	}
-	return decodeArt(b)
+	return decodeArtAt(b, side)
 }
 
 // decodeArt decodes a cover twice: as a bitmap, which keeps the data to
 // decode its pixels again after it drops them, and as an image.
 func decodeArt(b []byte) (*ui.Bitmap, image.Image, error) {
+	return decodeArtAt(b, 0)
+}
+
+// decodeArtAt is decodeArt with the picture brought down to fit side
+// pixels: the bitmap keeps the smaller data, so it decodes its pixels
+// again as cheaply, and its texture is far smaller on the GPU.
+func decodeArtAt(b []byte, side int) (*ui.Bitmap, image.Image, error) {
 	b = stillCover(b)
 	img, _, err := image.Decode(bytes.NewReader(b))
 	if err != nil {
 		return nil, nil, err
 	}
+	if small := fitSquare(img, side); small != nil {
+		var buf bytes.Buffer
+		if png.Encode(&buf, small) == nil {
+			img, b = small, buf.Bytes()
+		}
+	}
 	bmp, err := ui.DecodeBitmap(b)
 	return bmp, img, err
 }
+
+// fitSquare returns img averaged down to fit a square of side pixels, or
+// nil if it fits already. Each pixel of the result is the mean of up to
+// 4×4 of the ones it covers, which is smoother than picking one and cheap
+// next to decoding the whole picture.
+func fitSquare(img image.Image, side int) *image.RGBA {
+	if side <= 0 {
+		return nil
+	}
+	b := img.Bounds()
+	w, h := b.Dx(), b.Dy()
+	if w <= side && h <= side {
+		return nil
+	}
+	src, ok := img.(*image.RGBA)
+	if !ok || b.Min != (image.Point{}) {
+		tmp := image.NewRGBA(image.Rect(0, 0, w, h))
+		draw.Draw(tmp, tmp.Bounds(), img, b.Min, draw.Src)
+		src = tmp
+	}
+	tw, th := w, h
+	if w >= h {
+		tw, th = side, max(1, h*side/w)
+	} else {
+		tw, th = max(1, w*side/h), side
+	}
+	out := image.NewRGBA(image.Rect(0, 0, tw, th))
+	for y := range th {
+		y0, y1 := y*h/th, (y+1)*h/th
+		span, ny := max(1, y1-y0), min(fitSamples, max(1, y1-y0))
+		for x := range tw {
+			x0, x1 := x*w/tw, (x+1)*w/tw
+			spanX, nx := max(1, x1-x0), min(fitSamples, max(1, x1-x0))
+			var r, g, bl, n uint32
+			for j := range ny {
+				row := src.Pix[(y0+j*span/ny)*src.Stride:]
+				for i := range nx {
+					p := row[(x0+i*spanX/nx)*4:]
+					r, g, bl, n = r+uint32(p[0]), g+uint32(p[1]), bl+uint32(p[2]), n+1
+				}
+			}
+			o := out.Pix[y*out.Stride+x*4:]
+			o[0], o[1], o[2], o[3] = uint8(r/n), uint8(g/n), uint8(bl/n), 255
+		}
+	}
+	return out
+}
+
+// fitSamples is how many pixels fitSquare reads across each pixel it makes,
+// at most: a cover brought down 70 times still samples the whole of it, and
+// one brought down a little samples that little.
+const fitSamples = 4
 
 func fetchImage(url string) (image.Image, error) {
 	b, err := netease.Fetch(url)

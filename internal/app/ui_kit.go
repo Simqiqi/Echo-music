@@ -25,6 +25,7 @@ type palette struct {
 	accent    ui.Color
 	onAccent  ui.Color
 	cardShade ui.Color
+	success   ui.Color
 }
 
 // paletteFor returns the colors of the app for an appearance, lit with
@@ -47,6 +48,7 @@ func paletteFor(t *ui.Theme, accent string) palette {
 			accent:    ui.Oklch(0.68, 0.19, hue),
 			onAccent:  ui.Hex("#ffffff"),
 			cardShade: ui.RGBA(0, 0, 0, 0.5),
+			success:   ui.Hex("#10b981"),
 		}
 	}
 	// The paper edition: warm stock, ink, and a vermilion the listener
@@ -63,6 +65,7 @@ func paletteFor(t *ui.Theme, accent string) palette {
 		accent:    ui.Oklch(0.61, 0.2, hue),
 		onAccent:  ui.Hex("#ffffff"),
 		cardShade: ui.RGBA(60, 45, 30, 0.18),
+		success:   ui.Hex("#059669"),
 	}
 }
 
@@ -269,7 +272,7 @@ func rowButton(c *ui.Context, key, label string, p palette) ui.Element {
 func (a *app) cover(c *ui.Context, url string, px int, size, radius float32) ui.Element {
 	p := a.pal
 	box := ui.Box(c).Size(size, size).Radius(radius).Center()
-	bmp := bitmap(a.art.get(netease.Sized(url, px), false))
+	bmp := bitmap(a.art.getAt(netease.Sized(url, px), px, false))
 	in := artIn(box, bmp)
 	if in < 1 {
 		box.Background(p.hover)

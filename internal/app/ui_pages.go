@@ -69,10 +69,6 @@ func (a *app) homePage(c *ui.Context) {
 			ui.Box(c).Grow(1).Basis(0).MinWidth(0).Children(func() { a.issuePlaylists(c) })
 		})
 
-		if heard := a.weekly.recent(now, 6); len(heard) > 0 {
-			a.section(c, "最近在听")
-			a.recentRow(c, heard)
-		}
 		if len(a.recPlaylists) > 0 {
 			a.section(c, "今日为你推荐")
 			a.pickGrid(c)
@@ -163,6 +159,14 @@ func (a *app) issueHero(c *ui.Context) {
 	if tr := a.pl.Current(); tr != nil {
 		cover = tr.Album.PicURL
 	}
+	// The wave of what plays, with the albums the listener plays most,
+	// needs room at the card's right; the words keep clear of it.
+	pageW, _ := c.Size()
+	waveRoom := pageW-a.sideWidth()-2*pagePad > 560
+	textRight := float32(22)
+	if waveRoom {
+		textRight = heroWaveW + 46
+	}
 	card := ui.ButtonBase(c.Key("issue-hero")).Height(220).Radius(16).Clip().
 		FocusRing(false).Label(name).Background(base).TextColor(white)
 	// The plate is a dark room for the disc, but not the same dark every
@@ -191,6 +195,11 @@ func (a *app) issueHero(c *ui.Context) {
 		if !a.heroSweep.IsZero() && c.Now().Sub(a.heroSweep) <= time.Second {
 			dr.Clip(r, 16, func() { lightSweep(dr, r, a.heroSweep, c.Now()) })
 			dr.After(time.Second / 40)
+		}
+		// Bars of the music along its foot, and the albums the listener
+		// plays most bobbing over them.
+		if waveRoom && r.W > heroWaveW+220 {
+			dr.Clip(r, 16, func() { a.drawHeroWave(c, dr, r, c.Now()) })
 		}
 	})
 	card.Children(func() {
@@ -223,7 +232,7 @@ func (a *app) issueHero(c *ui.Context) {
 					dr.Fill(ui.Rect{X: cx - 4, Y: cy - 4, W: 8, H: 8}, ui.Hex("#f7f4ed"), 4)
 				})
 		})
-		ui.Column(c).Absolute().Left(206).Top(28).Right(22).Bottom(22).Gap(8).Children(func() {
+		ui.Column(c).Absolute().Left(206).Top(28).Right(textRight).Bottom(22).Gap(8).Children(func() {
 			ui.Text(c, "今 日 首 选").FontSize(11).FontWeight(600).LetterSpacing(2).TextColor(ui.Hex("#e7a58a"))
 			ui.Box(c).Grow(1)
 			ui.Text(c, name).FontSize(23).FontWeight(700).LetterSpacing(-0.4).
@@ -805,7 +814,7 @@ func absf(v float32) float32 {
 // The cover rounds itself rather than its parent clipping it: a clip moved
 // by a transform, as a card lifting under the pointer, is drawn on the CPU.
 func (a *app) coverFill(c *ui.Context, url string, px int, radius float32) {
-	bmp := bitmap(a.art.get(netease.Sized(url, px), false))
+	bmp := bitmap(a.art.getAt(netease.Sized(url, px), px, false))
 	box := ui.Box(c).Absolute().Top(0).Left(0).Right(0).Bottom(0).Radius(radius)
 	in := artIn(box, bmp)
 	if in < 1 {

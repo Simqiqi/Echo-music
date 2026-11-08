@@ -3,3 +3,5 @@
 mygo_windows_*.syso
 /echo-cloudmusic
 /node_modules/
+/sidecar/node_modules/
+/simqiqi-music
