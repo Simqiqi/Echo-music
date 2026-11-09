@@ -32,14 +32,12 @@ func paintSwatch(style string, tint ui.Color) image.Image {
 		swatchFog(s, tint)
 	case "stars":
 		swatchStars(s, tint)
+	case "nebula":
+		swatchNebula(s, tint)
 	case "terrain":
 		swatchTerrain(s, tint)
 	case "ripple":
 		swatchRipple(s, tint)
-	case "vinyl":
-		swatchVinyl(s, tint)
-	case "water":
-		swatchWater(s, tint)
 	default:
 		swatchGradient(s, tint)
 	}
@@ -190,6 +188,39 @@ func swatchStars(s *sheet, tint ui.Color) {
 	}
 }
 
+// swatchNebula is the nebula: the cover's color blown into a slow, turning
+// cloud of light with dust caught in it, the way the field shows it.
+func swatchNebula(s *sheet, tint ui.Color) {
+	deep := blendColor(midnight, tint, 0.22)
+	glow := blendColor(tint, white, 0.12)
+	for y := 0; y < s.h; y++ {
+		v := (float64(y) + 0.5) / float64(s.h)
+		for x := 0; x < s.w; x++ {
+			u := (float64(x) + 0.5) / float64(s.w)
+			dx, dy := u-0.5, v-0.5
+			r := math.Hypot(dx, dy) * 1.7
+			// The whole field turns: the angle winds with the radius, so the
+			// cloud reads as spinning rather than as flat rings.
+			ang := math.Atan2(dy, dx) + r*2.6
+			band := 0.5 + 0.5*math.Sin(r*9-ang*1.4)
+			n := fbm(u*2.4+0.7, v*2.4+3.1, 3)
+			cloud := sstep(0.34, 0.82, n) * (0.4 + 0.7*band) * math.Exp(-r*r*1.15)
+			c := blendColor(deep, glow, cloud*0.95)
+			s.set(x, y, c)
+		}
+	}
+	// Dust, each a grain of light on its own.
+	for _, d := range [][3]float64{{0.42, 0.44, 1}, {0.6, 0.58, 0.8}, {0.5, 0.32, 0.7}, {0.7, 0.4, 0.6}} {
+		cx, cy, br := d[0]*float64(s.w), d[1]*float64(s.h), d[2]
+		for y := int(cy) - 3; y <= int(cy)+3; y++ {
+			for x := int(cx) - 3; x <= int(cx)+3; x++ {
+				dd := math.Hypot(float64(x)+0.5-cx, float64(y)+0.5-cy)
+				s.light(x, y, white, math.Exp(-dd*dd)*0.5*br)
+			}
+		}
+	}
+}
+
 // swatchTerrain is the three ridges: each skyline the cover's color, the
 // hills below it filled into the night, the nearest one boldest.
 func swatchTerrain(s *sheet, tint ui.Color) {
@@ -306,125 +337,6 @@ func swatchRipple(s *sheet, tint ui.Color) {
 			u := (float64(x) + 0.5) / float64(s.w)
 			b := math.Exp(-sq((u*0.7 + v*0.6 - 0.66) / 0.16))
 			s.light(x, y, glow, 0.10*b)
-		}
-	}
-}
-
-// swatchVinyl is the record: a disc turning behind the sleeve, its grooves
-// fine as they are, the light of the room laid across it and the label of
-// the cover's color at its heart.
-func swatchVinyl(s *sheet, tint ui.Color) {
-	deep, glow := fx.NightColors(tint)
-	cx, cy := 0.5*float64(s.w), 0.52*float64(s.h)
-	rad := 0.375 * float64(s.w)
-	// The label, the color of the cover, a little lit.
-	h, sat, _ := hsv(float64(tint.R)/255, float64(tint.G)/255, float64(tint.B)/255)
-	label := hsvColor(h, minf(sat*0.9, 0.8), 0.44)
-	disc := ui.RGB(16, 16, 19)
-	for y := 0; y < s.h; y++ {
-		for x := 0; x < s.w; x++ {
-			u, v := (float64(x)+0.5)/float64(s.w), (float64(y)+0.5)/float64(s.h)
-			// The room: its shade, darker into the corners.
-			c := blendColor(blendColor(deep, midnight, 0.45), deep, 0.5*sstep(0.2, 0.9, 1-v))
-			g := math.Hypot((u-0.5)*1.05, (v-0.5)*1.2)
-			c = blendColor(c, midnight, 0.45*sstep(0.2, 0.95, g))
-			dx, dy := float64(x)+0.5-cx, float64(y)+0.5-cy
-			d := math.Hypot(dx, dy) / rad
-			if d < 1.02 {
-				// The disc, its grooves a hair apart, and the light of the
-				// room across it at an angle.
-				groove := math.Sin(d * rad * 2 * math.Pi / 2.2)
-				proj := (dx*(-0.34) + dy*(-0.94)) / rad
-				sheen := math.Exp(-sq((proj + 0.30) / 0.46))
-				lit := math.Exp(-sq((proj - 0.55) / 0.28))
-				k := 0.060 + 0.15*sheen + 0.09*lit
-				k += math.Max(groove, 0) * 0.05 * (0.25 + 0.75*sheen) * sstep(0.24, 0.4, d)
-				px := ui.RGB(byte(clampF(k*255, 0, 255)), byte(clampF(k*255*1.01, 0, 255)), byte(clampF(k*255*1.06, 0, 255)))
-				// The rim of it, bright where the light leaves it.
-				rim := math.Exp(-sq((d-0.99)/0.032)) * 0.35
-				px = blendColor(px, blendColor(white, glow, 0.5), rim)
-				if d < 0.27 {
-					// The label, with its own faint rings, and the spindle.
-					px = label
-					px = blendColor(px, deep, 0.18*math.Max(math.Sin(d*46), 0))
-					px = blendColor(px, white, 0.10*math.Exp(-sq((d-0.25)/0.02)))
-					if d < 0.055 {
-						px = blendColor(disc, midnight, 0.35)
-					}
-				}
-				// Its edge, over the room.
-				c = blendColor(c, px, sstep(1.02, 0.995, d))
-			}
-			s.set(x, y, c)
-		}
-	}
-	// The shadow the disc lays on the room, at its foot.
-	for y := 0; y < s.h; y++ {
-		for x := 0; x < s.w; x++ {
-			d := math.Hypot(float64(x)+0.5-cx, (float64(y)+0.5-cy)*1.9)
-			if d < rad*1.25 && d > rad*0.9 {
-				s.over(x, y, midnight, 0.20*math.Exp(-sq((d-rad*1.06)/(rad*0.18))))
-			}
-		}
-	}
-}
-
-// swatchWater is the washes: three of the cover's colors wet on dark paper,
-// each with its own edge dried darker than its middle, the grain of the
-// paper showing through.
-func swatchWater(s *sheet, tint ui.Color) {
-	paper, w1, w2, w3 := fx.WaterInks(tint)
-	for y := 0; y < s.h; y++ {
-		for x := 0; x < s.w; x++ {
-			s.set(x, y, paper)
-		}
-	}
-	for _, w := range [4]struct {
-		cx, cy, r, seed, a float64
-		ink                ui.Color
-	}{
-		{0.30, 0.26, 0.40, 1.3, 1.0, w1},
-		{0.74, 0.46, 0.34, 4.7, 0.95, w2},
-		{0.44, 0.80, 0.34, 8.1, 0.9, w3},
-		{0.14, 0.62, 0.18, 11.4, 0.5, w2},
-	} {
-		for y := 0; y < s.h; y++ {
-			v := (float64(y) + 0.5) / float64(s.h)
-			for x := 0; x < s.w; x++ {
-				u := (float64(x) + 0.5) / float64(s.w)
-				// The edge of a wash is not a circle: the paper drinks it
-				// out of round.
-				nx := fbm(u*3.4+w.seed, v*3.4+w.seed*2.7, 3) - 0.5
-				ny := fbm(u*3.4+7.1+w.seed, v*3.4+3.3, 3) - 0.5
-				d := math.Hypot(u+0.24*nx-w.cx, v+0.24*ny-w.cy) / w.r
-				if d > 1.30 {
-					continue
-				}
-				// One color, laid thinner in the middle and pooled at the
-				// edge where the water stopped.
-				core := sstep(1.02, 0.72, d)
-				rim := math.Exp(-sq((d - 0.96) / 0.06))
-				c := blendColor(w.ink, midnight, 0.62)
-				ink := blendColor(w.ink, midnight, 0.12)
-				i := (y*s.w + x) * 3
-				at := ui.RGB(byte(clampF(float64(s.px[i]), 0, 255)),
-					byte(clampF(float64(s.px[i+1]), 0, 255)),
-					byte(clampF(float64(s.px[i+2]), 0, 255)))
-				at = blendColor(at, ink, (0.26*core+0.34*rim)*w.a)
-				at = blendColor(at, c, 0.44*rim*w.a)
-				s.set(x, y, at)
-			}
-		}
-	}
-	// The grain of the paper.
-	for y := 0; y < s.h; y++ {
-		for x := 0; x < s.w; x++ {
-			i := (y*s.w + x) * 3
-			g := (noiseAt(float64(x)*0.85, float64(y)*0.85)*0.6 +
-				noiseAt(float64(x)*0.31, float64(y)*0.31)*0.4 - 0.5) * 6
-			s.px[i] += float32(g)
-			s.px[i+1] += float32(g)
-			s.px[i+2] += float32(g)
 		}
 	}
 }

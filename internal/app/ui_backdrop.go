@@ -16,20 +16,30 @@ func (a *app) backdropPicker(c *ui.Context, tint ui.Color, key string) ui.Elemen
 	chosen := style
 	sel := ui.SelectBase(c.Key(key), &chosen)
 	// As tall as the pane tabs, and their weight, so that the two read
-	// as buttons of one kind.
-	tr := sel.Trigger.Height(npTabsHeight).Padding(0, 9, 0, 12).Gap(6).Radius(999).AlignItems(ui.Center).Label("播放页背景")
-	fill := white.Alpha(0.08)
+	// as buttons of one kind. A little picture of the backdrop it wears
+	// sits before its name, so the pill reads as the choice it is.
+	tr := sel.Trigger.Height(npTabsHeight).Padding(5, 10, 5, 11).Gap(7).Radius(999).AlignItems(ui.Center).Label("播放页背景")
+	fill := white.Alpha(0.10)
 	if tr.Hovered() || sel.Open() {
-		fill = white.Alpha(0.18)
+		fill = white.Alpha(0.20)
 	}
-	tr.Background(tr.AnimateColor("bg", fill, ui.Animation{Duration: 120 * time.Millisecond}))
+	tr.Background(tr.AnimateColor("bg", fill, ui.Animation{Duration: 140 * time.Millisecond})).
+		Border(1, white.Alpha(0.14)).
+		Shadow(0, 4, 16, -4, white.Alpha(0.10))
 	chevron := ui.Pose{}
 	if sel.Open() {
 		chevron.Rotate = 180
 	}
+	pic := a.swatch(style, tint)
 	tr.Children(func() {
-		ui.Text(c, backdropLabel(style)).FontSize(13).FontWeight(600).TextColor(white.Alpha(0.75)).SingleLine()
-		ui.Icon(c, iconDown).Size(11, 11).TextColor(white.Alpha(0.5)).AnimatePose(chevron, ui.Snappy)
+		// The backdrop as it shows in the picker: a small, rounded cut of
+		// it, with a hairline so a dark one still has an edge.
+		ui.Box(c).Size(16, 16).Radius(5).Clip().Draw(func(p *ui.Painter, r ui.Rect) {
+			p.Image(pic, r, ui.FillBox)
+			p.Stroke(ui.Rect{X: r.X + 0.5, Y: r.Y + 0.5, W: r.W - 1, H: r.H - 1}, white.Alpha(0.35), 6.5, 1)
+		})
+		ui.Text(c, backdropLabel(style)).FontSize(13).FontWeight(600).TextColor(white.Alpha(0.9)).SingleLine()
+		ui.Icon(c, iconDown).Size(11, 11).TextColor(white.Alpha(0.6)).AnimatePose(chevron, ui.Snappy)
 	})
 	sel.Popup(func(panel ui.Element) {
 		panel.MinWidth(172).Padding(6).Radius(14).Background(ui.RGBA(24, 24, 28, 0.96)).

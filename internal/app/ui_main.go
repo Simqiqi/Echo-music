@@ -205,6 +205,7 @@ func (a *app) view(c *ui.Context) {
 	// The settings, when open, sit above the page but below a dialog
 	// they may ask for.
 	a.settingsSheet(c)
+	a.sharePicker(c)
 	a.loginDialog(c)
 	a.playlistNameDialog(c)
 	a.deletePlaylistDialog(c)
@@ -398,10 +399,10 @@ func (a *app) railNav(c *ui.Context, top float32) {
 }
 
 type railEntry struct {
-	icon     *ui.SVG
-	label    string
-	r        route
-	visible  bool
+	icon    *ui.SVG
+	label   string
+	r       route
+	visible bool
 }
 
 func (a *app) railItem(c *ui.Context, it *railEntry, index int) {

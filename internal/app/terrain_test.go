@@ -3,7 +3,6 @@ package app
 import (
 	"image"
 	"os"
-	"strconv"
 	"testing"
 	"time"
 
@@ -124,7 +123,7 @@ func TestNowPlayingBackdrops(t *testing.T) {
 			img.Pix[i], img.Pix[i+1], img.Pix[i+2], img.Pix[i+3] = c.R, c.G, c.B, 255
 		}
 	}
-	for _, style := range []string{"terrain", "ripple", "vinyl", "water"} {
+	for _, style := range []string{"terrain", "ripple"} {
 		a, tt := nowPlayingScene(t, style, 1600, 1080)
 		a.art.art[netease.Sized("https://p1.music.126.net/star.jpg", 600)+"#backdrop"] =
 			&artwork{tint: ui.RGB(52, 84, 176), backdrop: ui.NewBitmap(blurImage(img))}
@@ -132,59 +131,6 @@ func TestNowPlayingBackdrops(t *testing.T) {
 		tt.Advance(3 * time.Second)
 		tt.Frame()
 		saveFrame(t, dir, "np-"+style+".png", tt.Image())
-	}
-}
-
-// TestVinylPaints: the record stands out from behind the cover, its
-// grooves turning, and the room is darker than the disc.
-func TestVinylPaints(t *testing.T) {
-	cover := ui.Rect{X: 160, Y: 200, W: 320, H: 320}
-	for _, at := range []float32{0, 2.6} {
-		img := scenePaint(t, 1200, 800, func(p *ui.Painter, r ui.Rect) {
-			fx.DrawVinyl(p, r, r.W, cover, ui.RGB(52, 84, 176), at)
-		})
-		if dir := os.Getenv("NM_SHOTS"); dir != "" {
-			saveFrame(t, dir, "vinyl-"+strconv.Itoa(int(at*10))+".png", img)
-		}
-	}
-	a := scenePaint(t, 1200, 800, func(p *ui.Painter, r ui.Rect) {
-		fx.DrawVinyl(p, r, r.W, cover, ui.RGB(52, 84, 176), 0)
-	})
-	b := scenePaint(t, 1200, 800, func(p *ui.Painter, r ui.Rect) {
-		fx.DrawVinyl(p, r, r.W, cover, ui.RGB(52, 84, 176), 2.6)
-	})
-	// The disc turns: the grooves of one frame are not the other's.
-	same := 0
-	for y := 150; y < 620; y += 5 {
-		r0, _, _, _ := a.At(600, y).RGBA()
-		r1, _, _, _ := b.At(600, y).RGBA()
-		if r0 == r1 {
-			same++
-		}
-	}
-	if same > 90 {
-		t.Errorf("%d of 94 rows are the same two and a half seconds on: the disc does not turn", same)
-	}
-}
-
-// TestWaterPaints: the washes carry the cover's color, and they are not
-// flat: the paper has light and shade of its own.
-func TestWaterPaints(t *testing.T) {
-	img := scenePaint(t, 1200, 800, func(p *ui.Painter, r ui.Rect) {
-		fx.DrawWatercolor(p, r, ui.RGB(52, 84, 176), 5, 0.4)
-	})
-	if dir := os.Getenv("NM_SHOTS"); dir != "" {
-		saveFrame(t, dir, "water.png", img)
-	}
-	seen := map[uint32]bool{}
-	for y := 40; y < 760; y += 23 {
-		for x := 20; x < 1180; x += 31 {
-			r, g, b, _ := img.At(x, y).RGBA()
-			seen[r<<16|g<<8|b] = true
-		}
-	}
-	if len(seen) < 200 {
-		t.Errorf("the paper is %d colors, want a wash of many", len(seen))
 	}
 }
 
@@ -236,45 +182,6 @@ func TestFlowPaints(t *testing.T) {
 	}
 	if same > 900 {
 		t.Errorf("%d of 1272 points are the same four minutes on: the flow does not move", same)
-	}
-}
-
-// TestWaterMoves: the wash is wet, so it runs: frames seconds apart are
-// not the same sheet, and it is still dark enough for the song to read.
-func TestWaterMoves(t *testing.T) {
-	tint := ui.RGB(52, 84, 176)
-	paint := func(at float32) image.Image {
-		return scenePaint(t, 480, 300, func(p *ui.Painter, r ui.Rect) {
-			fx.DrawWatercolor(p, r, tint, at, 0.3)
-		})
-	}
-	a, b := paint(0), paint(4)
-	dif, most := 0, 0
-	for y := 8; y < 292; y += 4 {
-		for x := 8; x < 472; x += 4 {
-			r0, g0, b0, _ := a.At(x, y).RGBA()
-			r1, g1, b1, _ := b.At(x, y).RGBA()
-			d := absI(int(r0>>8)-int(r1>>8)) + absI(int(g0>>8)-int(g1>>8)) + absI(int(b0>>8)-int(b1>>8))
-			if d > 3 {
-				dif++
-			}
-			most = max(most, d)
-		}
-	}
-	if dif < 400 {
-		t.Errorf("four seconds on only %d of 8500 points have moved: the wash is dry", dif)
-	}
-	if most < 12 {
-		t.Errorf("the biggest change over four seconds is %d of 255: the wash barely stirs", most)
-	}
-	// Never so bright that the song would not read over it.
-	for y := 8; y < 292; y += 9 {
-		for x := 8; x < 472; x += 9 {
-			r, g, b, _ := a.At(x, y).RGBA()
-			if l := (int(r>>8) + int(g>>8) + int(b>>8)) / 3; l > 150 {
-				t.Fatalf("the paper is %d bright at %d,%d: it would drown the song", l, x, y)
-			}
-		}
 	}
 }
 

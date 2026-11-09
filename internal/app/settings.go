@@ -147,23 +147,23 @@ type settings struct {
 
 func defaultSettings() settings {
 	return settings{
-		NotchActivity:     true,
-		Quality:           "exhigh",
-		Appearance:        "system",
-		ProgressBar:       true,
-		Volume:            0.8,
-		Normalize:         true,
-		AppIcon:           "dock-and-menubar",
-		CacheMB:           2048,
-		SidebarHome:       true,
-		SidebarDaily:      true,
-		SidebarWeekly:     true,
-		SidebarFM:         true,
-		SidebarWeather:    true,
-		SidebarCharts:     true,
-		SidebarPodcasts:   true,
-		SidebarDownloads:  true,
-		SidebarNewAlbums:  true,
+		NotchActivity:    true,
+		Quality:          "exhigh",
+		Appearance:       "system",
+		ProgressBar:      true,
+		Volume:           0.8,
+		Normalize:        true,
+		AppIcon:          "dock-and-menubar",
+		CacheMB:          2048,
+		SidebarHome:      true,
+		SidebarDaily:     true,
+		SidebarWeekly:    true,
+		SidebarFM:        true,
+		SidebarWeather:   true,
+		SidebarCharts:    true,
+		SidebarPodcasts:  true,
+		SidebarDownloads: true,
+		SidebarNewAlbums: true,
 	}
 }
 
@@ -248,10 +248,9 @@ var backdrops = []backdropChoice{
 	{"", "渐变"},
 	{"fog", "烟雾"},
 	{"stars", "星野"},
+	{"nebula", "星云"},
 	{"terrain", "地形"},
 	{"ripple", "涟漪"},
-	{"vinyl", "唱片"},
-	{"water", "水彩"},
 }
 
 // backdropStyle is what Now Playing's backdrop is: the cover's gradient,
