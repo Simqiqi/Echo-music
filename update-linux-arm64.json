@@ -1,0 +1,42 @@
+{
+  "version": "0.3.8",
+  "notes": "持续优化，修复了部分歌曲评论超出边框的情况、歌词卡片支持自定义歌词。新增了缩回主界面按键、星云背景、万花筒、墨迹歌词。",
+  "date": "2026-11-09T12:46:01Z",
+  "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.8/echo-cloudmusic-0.3.8-linux-arm64.tar.gz",
+  "size": 22000461,
+  "signature": "3ac2EP6FS0fQydhX57rIv6NQv103vWGSVilcrdy0637+4mtxkZB3ofaStuTPUk6Kj2ZafGK2sM/nmatFkI94CQ==",
+  "deltas": [
+    {
+      "from": "0.3.7",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.8/echo-cloudmusic-0.3.7-to-0.3.8-linux-arm64.delta",
+      "size": 12308122,
+      "signature": "4YMB7T7iS1ib2Swa65fvyXMtC9rlHP0LNHwL+p2ULiRM49EQO2WQkRLbBKC43hlTmdstHvMb9WAjTktVw9kCDA=="
+    },
+    {
+      "from": "0.3.6",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.8/echo-cloudmusic-0.3.6-to-0.3.8-linux-arm64.delta",
+      "size": 16100876,
+      "signature": "vpkPhKvQ1UYow6v+XZTG05L4WkjSARzrHrRhuPzV1ayrl5mIC62yWYSHUwxsKfaga4pQ3oKPcXTiJbxT4xrpDg=="
+    },
+    {
+      "from": "0.3.5",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.8/echo-cloudmusic-0.3.5-to-0.3.8-linux-arm64.delta",
+      "size": 16135166,
+      "signature": "DX81EhZ4Gsa6ZuVKbYhBP6gNuyLY/AMGMrJ/Ybs923mYmC9NpHLIi3VfhmFtTEy2V8/edx+zG8PB9Om/E124DQ=="
+    }
+  ],
+  "previous": [
+    {
+      "version": "0.3.7",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.7/echo-cloudmusic-0.3.7-linux-arm64.tar.gz",
+      "size": 10352375,
+      "signature": "k/otyabX28uIcfW9cdWkdOhbQ+ONvgz6t3wZBvjTscWfNdalDQsRCgf2gnIqpalxNJaKZJjOwZyoq39PXsxfAQ=="
+    },
+    {
+      "version": "0.3.6",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.6/echo-cloudmusic-0.3.6-linux-arm64.tar.gz",
+      "size": 7089677,
+      "signature": "xSPm/3u2jZ1h+CkKPrmnf7aOEcwjE9gn5llwgfEByR4p5ey/W0309OpBUDKl/dg9lStE7d5Nwi9v1LNH2gCCAA=="
+    }
+  ]
+}

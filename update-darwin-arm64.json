@@ -1,0 +1,42 @@
+{
+  "version": "0.3.8",
+  "notes": "持续优化，修复了部分歌曲评论超出边框的情况、歌词卡片支持自定义歌词。新增了缩回主界面按键、星云背景、万花筒、墨迹歌词。",
+  "date": "2026-11-09T12:45:58Z",
+  "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.8/echo-cloudmusic-0.3.8-darwin-arm64.tar.gz",
+  "size": 23819300,
+  "signature": "/Zjuwd9KBeyDzYF/mk0eH/JATjEmBpMeueV08nm8XntqUKJgmrhry3hLXwMgL79eBh1QsQ2vW5x7+txkAuVwDg==",
+  "deltas": [
+    {
+      "from": "0.3.7",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.8/echo-cloudmusic-0.3.7-to-0.3.8-darwin-arm64.delta",
+      "size": 12503093,
+      "signature": "3N2JgmkmXiRJQYMx+0YaQf2gyl2awuX4vdGtMraaPOEzMm9ctrUS3EuD5hh6i8aBkhpTV33kagC4qczpJhr0AQ=="
+    },
+    {
+      "from": "0.3.6",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.8/echo-cloudmusic-0.3.6-to-0.3.8-darwin-arm64.delta",
+      "size": 16403431,
+      "signature": "dMOzTkYpDN5s/XpGLozNmKKDIQ3bQAm00cEiR0N+6cPOF3JttkvLmmdXTzwEf1ud6+W8jpW0XnzmgsLjtPL+Aw=="
+    },
+    {
+      "from": "0.3.5",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.8/echo-cloudmusic-0.3.5-to-0.3.8-darwin-arm64.delta",
+      "size": 16434336,
+      "signature": "JKRi0VRScLGWl0Wa6XR2kRMNZHp1B11wi7iowjvXlv5cMIStPNTZgDWzES5qCyYFQ+/oFNnWKW9MhWgMvtrzCA=="
+    }
+  ],
+  "previous": [
+    {
+      "version": "0.3.7",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.7/echo-cloudmusic-0.3.7-darwin-arm64.tar.gz",
+      "size": 12172995,
+      "signature": "e3tTXVuqs0QXzKh3MppzNJXuZ2X7wJi4zgFuq9U9wQ6ZjNbMvNXmd126uQuNDAtit24g0AsdeBvk8FeVPXFEAQ=="
+    },
+    {
+      "version": "0.3.6",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.6/echo-cloudmusic-0.3.6-darwin-arm64.tar.gz",
+      "size": 8702673,
+      "signature": "UmESi0V1VJMSykj11i0clA9vcYb+n06kZm1aQcfPOOcFXXCRaSU7gP9CN4m7x8r6CnhWX4wlfJP72RhWnFZUCg=="
+    }
+  ]
+}

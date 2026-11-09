@@ -1,0 +1,42 @@
+{
+  "version": "0.3.8",
+  "notes": "持续优化，修复了部分歌曲评论超出边框的情况、歌词卡片支持自定义歌词。新增了缩回主界面按键、星云背景、万花筒、墨迹歌词。",
+  "date": "2026-11-09T12:45:15Z",
+  "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.8/echo-cloudmusic-0.3.8-windows-amd64.tar.gz",
+  "size": 22914974,
+  "signature": "qWQGmlHvoyJaIHV8svddKElYuUv93xKlrE3e2So8ZxhO+JFcejzG6KKYjnTNEvfeS7k6KJz9j20tgDjIrumwBg==",
+  "deltas": [
+    {
+      "from": "0.3.7",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.8/echo-cloudmusic-0.3.7-to-0.3.8-windows-amd64.delta",
+      "size": 12487759,
+      "signature": "8lK9yaHhJkpncQUt+83mW2H2qDRPDXdLR7ZFDAUeKC9hA9U/uSDSyD2NPq0MOhztJoPX6O+m0XxvijL5PnF2BA=="
+    },
+    {
+      "from": "0.3.6",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.8/echo-cloudmusic-0.3.6-to-0.3.8-windows-amd64.delta",
+      "size": 16182853,
+      "signature": "OINZE3npE0S9+N17QZev6wZjXHEfrcmX/Ib/sl/raFAAm8Z4nK9gjGiWjSVttKhyhhtz8mmuRTOFYaBi7ydnBg=="
+    },
+    {
+      "from": "0.3.5",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.8/echo-cloudmusic-0.3.5-to-0.3.8-windows-amd64.delta",
+      "size": 16231317,
+      "signature": "06nr9XB21K9fARjLumh7O4UUt299kSmPg0BvqHlAr2krWxy0GHiuQDhiBQPITpDMqigWOtcct6ubT2stVoJ2Aw=="
+    }
+  ],
+  "previous": [
+    {
+      "version": "0.3.7",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.7/echo-cloudmusic-0.3.7-windows-amd64.tar.gz",
+      "size": 11265056,
+      "signature": "9XIXZC7fVVtsq4UpyqVT3ggtcMFVxyAL/7cNZl1cV+Kx37dTZDz5T/Ka+bVq+z+DqtkxdMNEzvcof4o9CzHHBA=="
+    },
+    {
+      "version": "0.3.6",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.6/echo-cloudmusic-0.3.6-windows-amd64.tar.gz",
+      "size": 7998409,
+      "signature": "P0ZWQvPhWIDCCuwaRJTEXYl3J8kygs5wbJ61WgVOehXT/24HDZ/rNdMO6Z27KV4BDVdeKY6cxBo+FrgfsdadAA=="
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "version": "0.3.8",
+  "notes": "持续优化，修复了部分歌曲评论超出边框的情况、歌词卡片支持自定义歌词。新增了缩回主界面按键、星云背景、万花筒、墨迹歌词。",
+  "date": "2026-11-09T12:44:50Z",
+  "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.8/echo-cloudmusic-0.3.8-linux-amd64.tar.gz",
+  "size": 22768666,
+  "signature": "N1GGLvW3VvqUFKGKBXnlJxIBr4yTzjX8CGVioAeM/Vo1qQE00EjEvn3SHHT436s0BEwj4plWa7IZltRq22StBQ==",
+  "deltas": [
+    {
+      "from": "0.3.7",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.8/echo-cloudmusic-0.3.7-to-0.3.8-linux-amd64.delta",
+      "size": 12345734,
+      "signature": "7uaf8lxIxtGIwN7MFMzTIzcyu/iMOIsE8elG19aSOH8siquUkc/d0UttzVPAwhryLHUM9oX4E3ePW8gyQT9GAA=="
+    },
+    {
+      "from": "0.3.6",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.8/echo-cloudmusic-0.3.6-to-0.3.8-linux-amd64.delta",
+      "size": 16145249,
+      "signature": "TBeB4AwP26LF9fAZrq4rk6MMU3gRI0ayZfs6Ze0EA0AU2Opv46W+JXq62cZXXWXSSUB0kqY6p3r6cwXYT2bvCg=="
+    },
+    {
+      "from": "0.3.5",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.8/echo-cloudmusic-0.3.5-to-0.3.8-linux-amd64.delta",
+      "size": 16127512,
+      "signature": "317WTQX+oVaMlALEJ0rtduj6n0BJ6bSkASCvxAMk2DgbvpXSITlPoKrvMJ9xZk9kx3SlKDV1tnukIHjFi3JyCw=="
+    }
+  ],
+  "previous": [
+    {
+      "version": "0.3.7",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.7/echo-cloudmusic-0.3.7-linux-amd64.tar.gz",
+      "size": 11123782,
+      "signature": "tN/lrLNCnGTbo3LsdgHvN6FgIPLsY0XytkGsMNaYXb4s90GzpOvMrWSJX5OjUYmk+PxRpZeMG98FDt+fxCj1DA=="
+    },
+    {
+      "version": "0.3.6",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.6/echo-cloudmusic-0.3.6-linux-amd64.tar.gz",
+      "size": 7852656,
+      "signature": "4nZjTxVsg9+7s+4jPhg5dHLFP4OkK3zr9g6fAtTuuQObbBhPhb2MDCpqNT1V/DavtN6+mWcXPKm1tcm7d0FdAQ=="
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "version": "0.3.8",
+  "notes": "持续优化，修复了部分歌曲评论超出边框的情况、歌词卡片支持自定义歌词。新增了缩回主界面按键、星云背景、万花筒、墨迹歌词。",
+  "date": "2026-11-09T12:47:49Z",
+  "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.8/echo-cloudmusic-0.3.8-darwin-amd64.tar.gz",
+  "size": 24686620,
+  "signature": "3aE02L62ZZxYfukqHU8rLe9vYwYxZql0MWEo+cKJCdOIJxyWa0kBohkrOQg/88fnr4IOsKZqpN5tIPDMskOxAA==",
+  "deltas": [
+    {
+      "from": "0.3.7",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.8/echo-cloudmusic-0.3.7-to-0.3.8-darwin-amd64.delta",
+      "size": 12635734,
+      "signature": "noi/wTdIlbrD3Ogq+jivIRHUMFjV+C9b/nUkxG+J7Rfl9JkQcxO0+CfAQK877Zl88Ys6DWRRgM7kRmNmdY15DQ=="
+    },
+    {
+      "from": "0.3.6",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.8/echo-cloudmusic-0.3.6-to-0.3.8-darwin-amd64.delta",
+      "size": 16552850,
+      "signature": "m1McdZhpo5D+Jp5KuaD7JIM7+QEhQP1Qi5uaXENBaJh7GqWVjhUBS1mtzpephUbFIK0NghkoVVxKc/OBDXyjAw=="
+    },
+    {
+      "from": "0.3.5",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.8/echo-cloudmusic-0.3.5-to-0.3.8-darwin-amd64.delta",
+      "size": 16594202,
+      "signature": "I4NKkVsxhR8EL9x3MSViohTHa073IcZMI1ZDJT2Dl2mqLpPqD55jPGgST6rEBMxe3RkcrViX0KLGS2j9FKhyAg=="
+    }
+  ],
+  "previous": [
+    {
+      "version": "0.3.7",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.7/echo-cloudmusic-0.3.7-darwin-amd64.tar.gz",
+      "size": 13036554,
+      "signature": "EFvrhGVjQpEXEf83VkFe/qBxbc3MAEqkROj36sDFNWWkIjc8pE/boRqGMZD6d6TfmmPnscmXeQZnaq7d/ZgpAA=="
+    },
+    {
+      "version": "0.3.6",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.6/echo-cloudmusic-0.3.6-darwin-amd64.tar.gz",
+      "size": 9564889,
+      "signature": "o4dwofFgD/t504oWzxmkZzmM2eqXDACit5UfUWRXG/22u+cOyYjHYaT5xBR3Lgq8jcO+mIsjYvirH+StTzFECg=="
+    }
+  ]
+}

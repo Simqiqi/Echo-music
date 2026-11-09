@@ -1,0 +1,42 @@
+{
+  "version": "0.3.8",
+  "notes": "持续优化，修复了部分歌曲评论超出边框的情况、歌词卡片支持自定义歌词。新增了缩回主界面按键、星云背景、万花筒、墨迹歌词。",
+  "date": "2026-11-09T12:46:45Z",
+  "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.8/echo-cloudmusic-0.3.8-windows-arm64.tar.gz",
+  "size": 22028151,
+  "signature": "/3bXYDfZ9rca3ntQzGcuCPxke2PV30+kHZtZUA+vQbprtGwFw6twJeGfSNnqSlsV2z7ao6znRxe8pyA9vgjnBw==",
+  "deltas": [
+    {
+      "from": "0.3.7",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.8/echo-cloudmusic-0.3.7-to-0.3.8-windows-arm64.delta",
+      "size": 12360569,
+      "signature": "78zPaUr3fzR00la4xQcR/I4lsr6m1b/Eh55BIrNi5pS0CjPqWx/KvtDjyLgzc8JgJBqJ/r9RnD+1aQr3cvZHBA=="
+    },
+    {
+      "from": "0.3.6",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.8/echo-cloudmusic-0.3.6-to-0.3.8-windows-arm64.delta",
+      "size": 16110128,
+      "signature": "6NiW6NpveU9LNN1ApnVeG5tHpxz2NBXTascBCeScvW40nbuFxiy00jpkgTILrPzi3WQXgbcYj0flij4eSo7gCg=="
+    },
+    {
+      "from": "0.3.5",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.8/echo-cloudmusic-0.3.5-to-0.3.8-windows-arm64.delta",
+      "size": 16149512,
+      "signature": "yIcCFLbqZyVXy2IrCbmQWvmiR33rPGMTOKpunLW9IzStrPdRVKixzpp6L0RK9+bvhCOruZ/KaFLIRh2UoNGxCg=="
+    }
+  ],
+  "previous": [
+    {
+      "version": "0.3.7",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.7/echo-cloudmusic-0.3.7-windows-arm64.tar.gz",
+      "size": 10384663,
+      "signature": "lS786HdIVZGFo7BC24SOVtewxg5Twge0YyVhIiigNiR04imnBV0d/ZYkdSX08pV6T2XW1/mySz/JGTiQQvjiBQ=="
+    },
+    {
+      "version": "0.3.6",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.6/echo-cloudmusic-0.3.6-windows-arm64.tar.gz",
+      "size": 7118493,
+      "signature": "UnjaqCcuGxxlUBdRNf4Xe2bBnH8MwxfsmZWTavXBu9EgYSwVOr7RIzitbqYmfqD5/frNHSO9xu3binLhWEFyDw=="
+    }
+  ]
+}
