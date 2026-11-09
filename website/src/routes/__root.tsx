@@ -5,6 +5,7 @@ import { NotFound } from '../components/NotFound'
 import { site } from '../site'
 import { themeScript } from '../theme'
 import css from '../styles.css?url'
+import redesign from '../redesign.css?url'
 
 export const Route = createRootRoute({
   head: () => ({
@@ -33,6 +34,7 @@ export const Route = createRootRoute({
         href: 'https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;900&display=swap',
       },
       { rel: 'stylesheet', href: css },
+      { rel: 'stylesheet', href: redesign },
     ],
   }),
   shellComponent: RootDocument,
