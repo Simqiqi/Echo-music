@@ -51,7 +51,7 @@ const (
 	wallpaperSway  = 8                      // degrees either side of the angle it opened at
 	wallpaperTide  = 78                     // seconds the sway takes to go and to come back
 	wallpaperGap   = 110                    // seconds the two hues take to draw apart and together
-	wallpaperFrame = 220 * time.Millisecond // how often it is painted as it breathes
+	wallpaperFrame = 1500 * time.Millisecond // how often it is painted as it breathes
 )
 
 // posed is the wallpaper as it stands t seconds after the app opened: its

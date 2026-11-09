@@ -96,9 +96,6 @@ func (a *app) npCover(c *ui.Context, tr *netease.Track, art *artwork, size float
 		cs.off = ui.Point{X: -float32(dir) * far}
 	}
 	wrap := ui.Box(c.Key(coverKey{tr.ID, cs.gen})).Size(size, size).AlignSelf(ui.Start).Label("专辑封面")
-	// Where the cover stands: the record of the backdrop stands off from
-	// it, as a record does from its sleeve.
-	a.npCoverAt = wrap.LayoutBounds()
 	entering := cs.enter != 0
 	if entering {
 		// A new cover's first frame: it shows where it comes in from.

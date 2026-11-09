@@ -159,56 +159,49 @@ func (a *app) issueHero(c *ui.Context) {
 	if tr := a.pl.Current(); tr != nil {
 		cover = tr.Album.PicURL
 	}
-	// The wave of what plays, with the albums the listener plays most,
-	// needs room at the card's right; the words keep clear of it.
+	// The record's angle is kept from build to build: a pause holds it
+	// where it stands, and playing again carries on from there rather
+	// than jumping to wherever the clock says it should be.
+	turning := a.heroSpin.step(c.Now(), a.pl.Playing() && !c.Preferences().ReduceMotion)
+	// The wave of what plays needs room at the card's right; the words
+	// keep clear of it, and the wave takes only what they can spare — in
+	// a narrow window the words keep their line and the wave stands down
+	// rather than crowd them.
 	pageW, _ := c.Size()
-	waveRoom := pageW-a.sideWidth()-2*pagePad > 560
+	heroW := (pageW - a.sideWidth() - 2*pagePad - 18) * 2 / 3
+	waveW := heroWaveWidth(heroW)
 	textRight := float32(22)
-	if waveRoom {
-		textRight = heroWaveW + 46
+	if waveW > 0 {
+		textRight = waveW + heroWaveGap
 	}
 	card := ui.ButtonBase(c.Key("issue-hero")).Height(220).Radius(16).Clip().
 		FocusRing(false).Label(name).Background(base).TextColor(white)
 	// The plate is a dark room for the disc, but not the same dark every
 	// day: it wears a random ground of its own, a hue away from the page's
-	// and from the chart card's, and light crosses it now and then.
+	// and from the chart card's.
 	h := wrapHue(a.wash.hue + 210)
-	if card.Hovered() {
-		if !a.heroHover {
-			a.heroHover = true
-			a.heroSweep = c.Now()
-		}
-	} else {
-		a.heroHover = false
-	}
 	card.Draw(func(dr *ui.Painter, r ui.Rect) {
 		from := ui.Oklch(0.34, 0.10, h)
 		to := ui.Oklch(0.16, 0.06, wrapHue(h+48))
 		dr.FillGradient(r, ui.LinearGradient{From: from, To: to, Angle: a.wash.angle}, 16)
-		// A band of light crosses it on its own every few seconds, and
-		// once more as the pointer comes onto it.
-		pulse := c.Now().Truncate(3200 * time.Millisecond)
-		if c.Now().Sub(pulse) <= time.Second {
-			dr.Clip(r, 16, func() { lightSweep(dr, r, pulse, c.Now()) })
-			dr.After(time.Second / 40)
-		}
-		if !a.heroSweep.IsZero() && c.Now().Sub(a.heroSweep) <= time.Second {
-			dr.Clip(r, 16, func() { lightSweep(dr, r, a.heroSweep, c.Now()) })
-			dr.After(time.Second / 40)
-		}
-		// Bars of the music along its foot, and the albums the listener
-		// plays most bobbing over them.
-		if waveRoom && r.W > heroWaveW+220 {
+		// Bars of the music along the foot of the card.
+		if waveW > 0 {
 			dr.Clip(r, 16, func() { a.drawHeroWave(c, dr, r, c.Now()) })
+		}
+		// Ask for the next frame on the card, which is always drawn, not
+		// on the disc: a child that stops being drawn leaves the page with
+		// no next frame at all, and the record sticks where it stood.
+		// Twelve a second is enough for a revolution every eight seconds.
+		if turning {
+			dr.After(time.Second / 12)
 		}
 	})
 	card.Children(func() {
 		disc := ui.Box(c.Key("issue-vinyl")).Absolute().Left(24).Top(30).
 			Size(160, 160).Radius(80).Clip()
-		if a.pl.Playing() {
-			turn := disc.Loop("issue-vinyl-spin", 8*time.Second, ui.Linear)
-			disc.Rotate(360 * turn)
-		}
+		// Set on every build, playing or not, so a pause freezes the
+		// record at its angle instead of dropping the rotation back to 0.
+		disc.TransformOrigin(0.5, 0.5).Rotate(float32(a.heroSpin.angle))
 		disc.Children(func() {
 			if cover != "" {
 				ui.Box(c).Absolute().Top(2).Left(2).Size(156, 156).Radius(78).Clip().
@@ -257,7 +250,7 @@ func (a *app) issueHero(c *ui.Context) {
 }
 
 // issueCalendar is the small stock card at the hero's right: the day in
-// large type, and the three things the listener keeps, each a way in.
+// large type, and two ways into what the listener hears most.
 func (a *app) issueCalendar(c *ui.Context, now time.Time) {
 	p := a.pal
 	ui.Column(c).Height(220).Radius(16).Background(p.bg).
@@ -272,12 +265,36 @@ func (a *app) issueCalendar(c *ui.Context, now time.Time) {
 			ui.Text(c, weekday(now)+" · "+solarTerm(now)).FontSize(11).TextColor(p.muted).Margin(0, 0, 7, 0)
 		})
 		ui.Box(c).Height(1).Background(p.hairline).Margin(0, 0, 8, 0)
+		// Two ways into what the listener actually listens to, rather
+		// than counts of pages they rarely open. The liked songs' list is
+		// only known once the library answers, so its click looks the ID
+		// up then rather than when the card is built.
+		dailyValue := fmt.Sprintf("%d 首", len(a.daily))
+		if a.homeLoading {
+			dailyValue = "…"
+		}
+		likedValue := "登录查看"
+		if a.profile != nil {
+			likedValue = fmt.Sprintf("%d 首", len(a.liked))
+		}
 		rows := []struct {
 			label, value string
-			r            route
+			open         func()
 		}{
-			{"新碟速递", fmt.Sprintf("%d 张", len(a.newAlbums.albums)), route{page: pageNewAlbums}},
-			{"本地缓存", fmt.Sprintf("%d 首", len(a.downloads.entries)), route{page: pageDownloads}},
+			{"每日推荐", dailyValue, func() { a.open(route{page: pageDaily}) }},
+			{"我喜欢的音乐", likedValue, func() {
+				if a.profile == nil {
+					a.showMain()
+					a.openLogin()
+					return
+				}
+				if pid := a.likedPlaylist(); pid != 0 {
+					a.open(route{page: pagePlaylist, id: pid})
+					return
+				}
+				a.toast = "歌单还在加载，稍后再试"
+				a.redraw()
+			}},
 		}
 		for i := range rows {
 			row := &rows[i]
@@ -294,7 +311,7 @@ func (a *app) issueCalendar(c *ui.Context, now time.Time) {
 				ui.Icon(c, iconForward).Size(11, 11).TextColor(p.faint)
 			})
 			if b.Clicked() {
-				a.open(row.r)
+				row.open()
 			}
 		}
 		ui.Box(c).Grow(1)
@@ -308,17 +325,8 @@ func (a *app) issueCalendar(c *ui.Context, now time.Time) {
 func (a *app) issueRanking(c *ui.Context) {
 	p := a.pal
 	// The card wears one of the wallpaper's two random hues, so the
-	// chart list looks different each time the app opens. A pointer
-	// coming onto it sends one band of light across the card.
+	// chart list looks different each time the app opens.
 	card := ui.Box(c.Key("issue-ranking")).Radius(14).Clip()
-	if card.Hovered() {
-		if !a.rankHover {
-			a.rankHover = true
-			a.rankSweep = c.Now()
-		}
-	} else {
-		a.rankHover = false
-	}
 	// A hue well away from the wallpaper's, so the card reads as its own
 	// random ground rather than melting into the page behind it.
 	h := wrapHue(a.wash.hue + 150)
@@ -334,17 +342,6 @@ func (a *app) issueRanking(c *ui.Context) {
 		dr.FillGradient(r, ui.LinearGradient{
 			From: from.Alpha(alpha), To: to.Alpha(alpha), Angle: a.wash.angle,
 		}, 14)
-		// Light crosses the card on its own every few seconds, and once
-		// more as the pointer comes onto it.
-		pulse := c.Now().Truncate(2600 * time.Millisecond)
-		if c.Now().Sub(pulse) <= time.Second {
-			dr.Clip(r, 14, func() { lightSweep(dr, r, pulse, c.Now()) })
-			dr.After(time.Second / 40)
-		}
-		if !a.rankSweep.IsZero() && c.Now().Sub(a.rankSweep) <= time.Second {
-			dr.Clip(r, 14, func() { lightSweep(dr, r, a.rankSweep, c.Now()) })
-			dr.After(time.Second / 40)
-		}
 	})
 	card.Children(func() {
 		ui.Column(c).Padding(14).Children(func() {
@@ -424,8 +421,9 @@ func (a *app) rankVinyl(c *ui.Context, p palette, hue float32) {
 				dr.Fill(ui.Rect{X: cx - 1.5, Y: cy - 1.5, W: 3, H: 3}, p.bg, 1.5)
 			})
 	})
-	spin := disc.Loop("rank-vinyl-spin", 8*time.Second, ui.Linear)
-	disc.Rotate(360 * spin)
+	// A record of this size lying still reads the same as one turning, and
+	// a turn of its own kept the whole page painting twenty-odd times a
+	// second: the page of charts, still, draws no frames at all.
 }
 
 // issuePlaylists is the right column: three covers in a row, washed in
@@ -1198,4 +1196,38 @@ func (a *app) nowPlayingBars(c *ui.Context) {
 			p.AnimationFrame()
 		}
 	})
+}
+
+// heroTurn keeps the lead record's angle. A turn read straight from the
+// clock jumps ahead over a pause, and a frame that never came leaves the
+// record stuck: this one eases up to speed, glides to a stop, and holds
+// its angle while the music rests.
+type heroTurn struct {
+	angle, speed float64
+	last         time.Time
+}
+
+// heroDegPerSec is a revolution every eight seconds.
+const heroDegPerSec = 360.0 / 8
+
+// step turns the record on to now, its speed easing towards playing, and
+// reports whether it still turns — including the glide to a stop.
+func (s *heroTurn) step(now time.Time, playing bool) bool {
+	dt := now.Sub(s.last).Seconds()
+	// A frame that came late — the window was in the background, or the
+	// page was covered — must not jump the record half a revolution.
+	if s.last.IsZero() || dt > 0.2 {
+		dt = 1.0 / 60
+	}
+	s.last = now
+	to := float64(0)
+	if playing {
+		to = 1
+	}
+	s.speed += (to - s.speed) * min(1, 3*dt)
+	if math.Abs(to-s.speed) < 0.002 {
+		s.speed = to
+	}
+	s.angle = math.Mod(s.angle+s.speed*dt*heroDegPerSec, 360)
+	return s.speed > 0
 }

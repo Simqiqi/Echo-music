@@ -167,6 +167,29 @@ func (a *app) backdrop(c *ui.Context, art *artwork, tint ui.Color) {
 					drawFog(cp, box, tint, float32(bd.drift), bass)
 				case "stars":
 					fx.DrawStars(cp, box, tint, float32(bd.drift), bass)
+				case "nebula":
+					// The same turning cloud the nebula tab and the stage wear,
+					// here behind every pane. Its time is the backdrop's own
+					// drift; the bass swells it and the pointer stirs it, as on
+					// the field. Paused, it glides to a stop like the rest.
+					treble := bd.level.group(player.Bands-12, player.Bands)
+					swirl := float32(0)
+					pointer := [2]float32{box.W / 2, box.H / 2}
+					if a.npPokeSet {
+						swirl = 0.6
+						pointer = [2]float32{a.npPokeX / float32(div), a.npPokeY / float32(div)}
+					}
+					drawNebula(cp, box, visualFrame{
+						t:       float32(bd.drift),
+						bass:    bass,
+						treble:  treble,
+						pulse:   bass,
+						swirl:   swirl,
+						ext:     min(box.W, box.H) * 0.46,
+						cen:     [2]float32{box.W / 2, box.H * 0.48},
+						pointer: pointer,
+						tint:    tint, accent: tint,
+					})
 				case "terrain":
 					fx.DrawTerrain(cp, box, tint, float32(bd.drift), terrainBands(&bd.level), bass)
 				case "ripple":
@@ -177,10 +200,6 @@ func (a *app) backdrop(c *ui.Context, art *artwork, tint ui.Color) {
 					} else {
 						drawBackdrop(cp, box, art, tint)
 					}
-				case "vinyl":
-					fx.DrawVinyl(cp, box, r.W, a.npCoverAt, tint, float32(bd.drift))
-				case "water":
-					fx.DrawWatercolor(cp, box, tint, float32(bd.drift), bass)
 				default:
 					drawBackdrop(cp, box, art, tint)
 				}

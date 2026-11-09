@@ -88,21 +88,20 @@ type app struct {
 	// answered, and those asked about: see ui_like.go.
 	likedPrograms, askedPrograms map[int64]bool
 
-	daily          []netease.Track
-	dailySpin      spinState   // the sheen that turns on the daily card's playing disc
-	heroBars       barState    // the spectrum along the lead record's foot
-	heroFaces      []albumFace // the albums the listener plays most, over that wave
-	heroFacesAsked bool        // whether those albums have been asked for
-	dailyBars      barState    // the bars on its play button
-	dailyWave      barState    // the wave of sound that crosses the daily card
-	dailyHue       float64     // where the rainbow across the daily card begins
-	dailyHued      bool        // whether a hue has been taken yet
-	npBars         barState    // the spectrum under Now Playing's cover
-	featured       []netease.Playlist
-	charts         []netease.Playlist
-	homeErr        string
-	homeLoading    bool
-	homeAt         time.Time // when what the home page shows was asked for
+	daily       []netease.Track
+	dailySpin   spinState // the sheen that turns on the daily card's playing disc
+	heroSpin    heroTurn  // the lead record's angle, held while paused
+	heroBars    barState  // the spectrum along the lead record's foot
+	dailyBars   barState  // the bars on its play button
+	dailyWave   barState  // the wave of sound that crosses the daily card
+	dailyHue    float64   // where the rainbow across the daily card begins
+	dailyHued   bool      // whether a hue has been taken yet
+	npBars      barState  // the spectrum under Now Playing's cover
+	featured    []netease.Playlist
+	charts      []netease.Playlist
+	homeErr     string
+	homeLoading bool
+	homeAt      time.Time // when what the home page shows was asked for
 
 	playlists  map[int64]*netease.Playlist
 	loadingPl  map[int64]bool
@@ -133,19 +132,38 @@ type app struct {
 	npChangedAt time.Time // when it last opened or closed
 	npPane      int       // paneLyrics, paneQueue, paneStage, paneComments or paneProgram
 	npBare      bool      // Tab has put Now Playing's chrome away
+	npPokeAt    time.Time // when the pointer last moved over Now Playing
+	npPokeX     float32   // where it stood when it last moved
+	npPokeY     float32
+	npPokeSet   bool      // whether it has moved there since the view opened
+	npBackUntil time.Time // the countdown the way back was last put on the clock for
 	npTabsLeft  time.Time // when the pointer last left the tab row
 	npTabsV     float32   // how far the tab row is unfolded this frame
-	rankHover   bool      // the pointer is on the home page's chart card
-	rankSweep   time.Time // when its light last began to pass over it
 	heroHover   bool      // the pointer is on the home page's lead record
-	heroSweep   time.Time // when its light last began to pass over it
 	npPaneTop   float32   // how far the cover beside the pane starts below its top
 	// The tabs' boxes of the last build, and whether a press is being
 	// carried across them: a drag chooses whichever tab is under it.
-	npTabBoxes  []ui.Rect
-	npTabPanes  []int
-	npTabRowX   float32
-	npTabDrag   bool
+	npTabBoxes []ui.Rect
+	npTabPanes []int
+	npTabRowX  float32
+	npTabPadX  float32 // the tabs' side padding, eased down on a narrow view
+	npTabDrag  bool
+	// The measured width of the tabs, cached until a label or the view's
+	// width changes: measuring text on every frame would cost the view its
+	// frame budget.
+	npTabWidthKey  string
+	npTabWidthRoom float32
+	npTabWidthVal  float32
+	// The lyric card's own picking: which lines the listener chose, and
+	// the lines as they were when the picker opened, so playback moving on
+	// does not shuffle what is being picked.
+	sharePickOpen  bool
+	sharePickTrack int64
+	shareSel       []bool
+	shareLines     []lyricPick
+	shareScroll    ui.ScrollState
+	// The clock and the smoothed spectrum the three visual panes share.
+	visual      visualState
 	lyricScroll ui.ScrollState
 	lyricGlide  lyricGlide
 	lyricAt     int
@@ -178,7 +196,6 @@ type app struct {
 	npScrub               scrubState
 	backdropCache         backdropCache           // the backdrop of Now Playing, as last painted
 	npArt                 *artwork                // the cover whose colors Now Playing shows
-	npCoverAt             ui.Rect                 // where that cover stands, for the record to stand behind
 	swatches              map[string]*swatchCache // the picker's little pictures of each backdrop
 	homeArtURL            string                  // the cover whose tint the home's background holds
 	homeTint              ui.Color                // the last tint the home's background took
@@ -301,6 +318,10 @@ func Run() error {
 		a.pl.Cache = newSongCache(a.settings.CacheMB)
 		a.pl.Changed = func() {
 			a.keepSession()
+			// A play or pause pressed from a media key or Control Center
+			// has no click to redraw for it: say so, or the home page's
+			// record keeps its last frame until something else moves.
+			a.redraw()
 		}
 		a.pl.Diagnose = noteDiagnostic
 		a.weekly = newWeekly()

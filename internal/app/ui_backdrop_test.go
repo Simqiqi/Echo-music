@@ -118,3 +118,32 @@ func TestBackdropSwatches(t *testing.T) {
 		seen[key] = b.label
 	}
 }
+
+// TestBackdropPickerShownOnBackdropPanes: the choice of backdrop shows only
+// on the pages that read as a backdrop — lyrics, the stage, and the two
+// pickers — and stays hidden on the full-view pages (particles, the
+// kaleidoscope) and on comments, where it would only get in the way.
+func TestBackdropPickerShownOnBackdropPanes(t *testing.T) {
+	// The closed picker names the backdrop it wears; on the pages that hide
+	// it, that name is not drawn at all.
+	shownOn := map[int]bool{
+		paneLyrics:    true,
+		paneStage:     true,
+		paneWall:      true,
+		paneWall3D:    true,
+		paneParticles: false,
+		paneKaleido:   false,
+		paneNeon:      false,
+		paneComments:  false,
+	}
+	for pane, want := range shownOn {
+		a, tt := nowPlayingScene(t, "", 1400, 900)
+		a.npPane = pane
+		tt.Frame()
+		tt.Advance(200 * time.Millisecond)
+		tt.Frame()
+		if got := tt.HasText("渐变"); got != want {
+			t.Errorf("pane %d: picker drawn = %v, want %v", pane, got, want)
+		}
+	}
+}

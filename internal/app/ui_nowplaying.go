@@ -28,6 +28,11 @@ func (a *app) npState(c *ui.Context) (open, settled bool) {
 	now := c.Now()
 	if open != a.npOpen {
 		a.npOpen, a.npChangedAt = open, now
+		if open {
+			// The way back is drawn as the view arrives, and stays
+			// while the pointer has only just moved.
+			a.npPokeAt = now
+		}
 		// A build once it is at rest: to stop painting what it covers, or
 		// itself once gone.
 		c.After(npSettle)
@@ -95,14 +100,27 @@ func (a *app) nowPlayingView(c *ui.Context) {
 	// Without the line, the particles page leans its record after the
 	// pointer, wherever in the window it stands: the root sees every move.
 	root.HandleInput(func(ev ui.InputEvent) bool {
-		if ev.Kind == ui.InputPointerMove && a.npPane == paneParticles {
+		if ev.Kind != ui.InputPointerMove {
+			return false
+		}
+		if a.npPane == paneParticles {
 			a.recTilt.tx = clamp01(ev.X/w)*2 - 1
 			a.recTilt.ty = clamp01(ev.Y/h)*2 - 1
 		}
 		return false
 	})
-	// The pointer is over the view whenever it is in the window.
-	pointerIn := root.Hovered()
+	// Asking for the pointer asks for a frame on every move over the view,
+	// which is what a move means here: it brings the way back out, and puts
+	// its countdown back on the clock. The moves themselves come to the
+	// element under the pointer, not to the root, so they are read here.
+	pointerIn := false
+	if x, y, over := root.PointerPosition(); over {
+		pointerIn = true
+		if !a.npPokeSet || x != a.npPokeX || y != a.npPokeY {
+			a.npPokeX, a.npPokeY, a.npPokeSet = x, y, true
+			a.npPokeAt = c.Now()
+		}
+	}
 	root.Children(func() {
 		a.backdrop(c, shown, tint)
 		// Over the backdrop, which is positioned too: positioned elements
@@ -121,7 +139,14 @@ func (a *app) nowPlayingView(c *ui.Context) {
 					// record has the room.
 					a.particleOptionsMenu(c, tint)
 				}
-				a.backdropPicker(c, tint, "np-backdrop")
+				// The backdrop's own choice lives on the pages that read as
+				// a backdrop — lyrics, the stage, and the two pickers — and
+				// stays out of the way on the full-view pages that paint
+				// over it (particles, the kaleidoscope) and on comments.
+				switch a.npPane {
+				case paneLyrics, paneStage, paneWall, paneWall3D:
+					a.backdropPicker(c, tint, "np-backdrop")
+				}
 			})
 		}
 	})
@@ -134,9 +159,11 @@ func (a *app) nowPlayingBody(c *ui.Context, tr *netease.Track, art *artwork, acc
 	// An episode has what it is about in place of lyrics; a song, lyrics
 	// in place of that.
 	switch program := tr.ProgramID != 0; {
-	case program && (a.npPane == paneWall || a.npPane == paneWall3D || a.npPane == paneParticles):
+	case program && (a.npPane == paneWall || a.npPane == paneWall3D || a.npPane == paneParticles ||
+		a.npPane == paneKaleido):
 		a.npPane = paneProgram
-	case program && (a.npPane == paneLyrics || a.npPane == paneStage):
+	case program && (a.npPane == paneLyrics || a.npPane == paneStage || a.npPane == paneInk ||
+		a.npPane == paneNeon):
 		a.npPane = paneProgram
 	case !program && a.npPane == paneProgram:
 		a.npPane = a.lyricsPaneChosen()
@@ -151,9 +178,34 @@ func (a *app) nowPlayingBody(c *ui.Context, tr *netease.Track, art *artwork, acc
 		a.wall3.track = 0
 	}
 	{
-		// The top strip only drags the window: Esc is the way back to the
-		// page under this one, so no chevron sits over the words.
-		ui.Row(c).Height(topBar(c)).Justify(ui.Center).AlignItems(ui.Center).DragWindow()
+		// The top strip drags the window, and stands the way back in its
+		// middle: a chevron down, drawn while the pointer moves and put
+		// away once it rests, gone altogether while Tab keeps the show
+		// alone. Esc is the way back too, for a keyboard.
+		ui.Row(c).Height(topBar(c)).DragWindow()
+		ui.Row(c).Absolute().Top(6).Left(0).Right(0).Justify(ui.Center).Children(func() {
+			a.npBackButton(c, pointerIn && !tabs && a.npBackDrawn(c))
+		})
+		if a.npPane == paneInk {
+			// The page writes the song out: the tabs above, the foot's
+			// controls below, and between them nothing but the words.
+			reveal(a.npTabsRow(c, w), pointerIn && !tabs).Children(func() { a.paneTabs(c) })
+			a.inkPane(c, tr, accent, w)
+			if !foot {
+				a.stageBar(c, tr, art, accent)
+			}
+			return
+		}
+		if a.npPane == paneNeon {
+			// The page hangs the song up as a sign at night: the tabs
+			// above, the foot's controls below, and between them the tubes.
+			reveal(a.npTabsRow(c, w), pointerIn && !tabs).Children(func() { a.paneTabs(c) })
+			a.neonPane(c, tr, accent, w)
+			if !foot {
+				a.stageBar(c, tr, art, accent)
+			}
+			return
+		}
 		if a.npPane == paneStage {
 			// The stage takes the whole view: the lyrics are the show, the
 			// controls a slim bar at the foot. Tab keeps the show alone.
@@ -182,6 +234,13 @@ func (a *app) nowPlayingBody(c *ui.Context, tr *netease.Track, art *artwork, acc
 			// And so does the record of particles the cover comes apart
 			// into.
 			a.particlePane(c, tr, art, accent, w, h, pointerIn)
+			return
+		}
+		// The visual panes take the whole view as well: one field
+		// of light, with only the words and the tabs over it.
+		switch a.npPane {
+		case paneKaleido:
+			a.visualPane(c, tr, art, accent, w, h, pointerIn, drawKaleido)
 			return
 		}
 
@@ -299,6 +358,51 @@ func npSideX(w float32) float32 {
 // under it to start below it.
 const npTabsHeight = 28
 
+// npTabsWidth measures the row as it is drawn: every label at 13pt semibold,
+// its padding on either side, the gap between them and the glass capsule's
+// own padding. The comments' count changes with each song — "评论 32.2万"
+// is far wider than "评论" — so a fixed width used to crop the last tab as
+// the count grew. Measuring keeps the capsule, the hover probe and the clip
+// all wide enough, and on a narrow view the tabs' padding gives way first so
+// nothing is cut.
+func (a *app) npTabsWidth(c *ui.Context, w float32) float32 {
+	const gap = float32(6)
+	const capsule = float32(12) // PaddingX(6) at both ends
+	// A little air for the counter's rolled glyphs and font rounding.
+	const spare = float32(8)
+	labels := make([]string, 0, len(a.npTabs()))
+	key := ""
+	for _, t := range a.npTabs() {
+		label := t.label
+		if t.pane == paneComments {
+			label = a.commentsTab()
+		}
+		labels = append(labels, label)
+		key += label + "\x00"
+	}
+	room := max(float32(200), w-2*npSideX(w)-16)
+	if key == a.npTabWidthKey && room == a.npTabWidthRoom {
+		return a.npTabWidthVal
+	}
+	textW := float32(0)
+	for _, label := range labels {
+		tw, _ := c.MeasureText(0, ui.Span{Text: label, Size: 13, Weight: 600})
+		textW += tw
+	}
+	measure := func(padX float32) float32 {
+		return capsule + textW + 2*padX*float32(len(labels)) +
+			gap*float32(max(0, len(labels)-1)) + spare
+	}
+	padX := float32(14)
+	for padX > 8 && measure(padX) > room {
+		padX -= 2
+	}
+	a.npTabPadX = padX
+	a.npTabWidthKey, a.npTabWidthRoom = key, room
+	a.npTabWidthVal = min(measure(padX), room)
+	return a.npTabWidthVal
+}
+
 // npTabsRow is the row of Now Playing's tabs, in the same place for every
 // pane, so that they stay put going from one to another: at the top, level
 // with the cover's left. They start from the left, so that only the last,
@@ -314,7 +418,7 @@ func (a *app) npTabsRow(c *ui.Context, w float32) ui.Element {
 	// the tabs where they are to click them. Folded, the labels are not
 	// built at all, so not so much as a character peeks out of the dot.
 	a.npTabsV = 1
-	const tabsFullW = 400
+	tabsFullW := a.npTabsWidth(c, w)
 	if a.win != nil && a.settings.tabsAutoHide() && !a.npBare {
 		probe := ui.Box(c.Key("tabs-probe")).Absolute().Top(topBar(c) - 10).
 			Left(npSideX(w) - 10).Width(tabsFullW + 20).Height(npTabsHeight + 20).PassThrough()
@@ -345,7 +449,7 @@ func (a *app) npTabsRow(c *ui.Context, w float32) ui.Element {
 	// with the row too, so nothing of it outlives the labels.
 	if a.settings.glassOn() && a.npTabsV > 0.02 {
 		v := a.npTabsV
-		row.PaddingX(6 * v).Radius(npTabsHeight / 2).
+		row.PaddingX(6*v).Radius(npTabsHeight/2).
 			Material(glass.Glass{Clarity: a.glassClarity(0.45), Tint: ui.RGBA(255, 255, 255, 0.07*v)}).
 			Shadow(0, 6, 18, -8, ui.RGBA(0, 0, 0, 0.18*v))
 	}
@@ -404,6 +508,66 @@ func reveal(e ui.Element, shown bool) ui.Element {
 	return e.AnimatePose(pose, ui.Animation{Duration: 200 * time.Millisecond})
 }
 
+// npBackIdle is how long the way back stays drawn once the pointer stops
+// moving.
+const npBackIdle = 2 * time.Second
+
+// npBackDrawn says whether the way back is out this build: while the
+// pointer moves over the view, and a moment after it rests. The countdown
+// puts one build on the clock, the one that puts it away: a build for
+// every frame of the countdown would be frames the view does not need.
+func (a *app) npBackDrawn(c *ui.Context) bool {
+	if a.npPokeAt.IsZero() {
+		return false
+	}
+	now := c.Now()
+	until := a.npPokeAt.Add(npBackIdle)
+	if !now.Before(until) {
+		return false
+	}
+	if a.npBackUntil != until {
+		a.npBackUntil = until
+		c.After(until.Sub(now))
+	}
+	return true
+}
+
+// npBackButton is Now Playing's way back to the page under it: a chevron
+// down at the middle of the top strip, a bead of glass over the words. It
+// goes where it came from by itself: away once the pointer rests, and
+// under Tab with the rest of the chrome. Faded out, the clicks pass
+// through it, so the strip still drags the window there.
+func (a *app) npBackButton(c *ui.Context, drawn bool) {
+	b := ui.ButtonBase(c.Key("np-back")).Size(36, 36).Center().Radius(999).Label("返回")
+	// A press holds it out until it is let go: the click it carries would
+	// go with it if it went away under the button.
+	if b.Pressed() {
+		drawn = true
+	}
+	fill := white.Alpha(0.10)
+	if b.Hovered() {
+		fill = white.Alpha(0.20)
+	}
+	b.Background(b.AnimateColor("bg", fill, ui.Animation{Duration: 130 * time.Millisecond}))
+	pose := ui.Pose{Fade: 1}
+	if drawn {
+		pose = ui.Pose{}
+	}
+	if b.Pressed() {
+		pose.Scale = 0.9
+	}
+	b.AnimatePose(pose, ui.Animation{Duration: 200 * time.Millisecond})
+	if !drawn {
+		b.PassThrough()
+	}
+	// The icon lets the pointer through to the button it stands on, which
+	// is what hears the click; faded out, both let it through.
+	b.Children(func() { ui.Icon(c, iconDown).Size(18, 18).TextColor(white.Alpha(0.92)).PassThrough() })
+	if b.Clicked() {
+		a.nowPlaying = false
+	}
+}
+
 // lyricsPaneChosen is the pane of lyrics the listener chose last: what
 // the app starts on, before the player is made. Now Playing shows an
 // episode's in place of either.
@@ -424,6 +588,12 @@ const (
 	paneWall
 	paneWall3D
 	paneParticles
+	// The shader-painted visual pane.
+	paneKaleido
+	// The lyrics written out as ink.
+	paneInk
+	// The lyrics hung up as a neon sign.
+	paneNeon
 )
 
 // npTab is a tab of Now Playing: its pane, and what it says.
@@ -438,8 +608,11 @@ func (a *app) npTabs() []npTab {
 	if tr := a.pl.Current(); tr != nil && tr.ProgramID != 0 {
 		return []npTab{{paneProgram, "简介"}, {paneComments, "评论"}}
 	}
-	return []npTab{{paneLyrics, "歌词"}, {paneStage, "动态"}, {paneWall, "选歌"},
-		{paneWall3D, "海报墙"}, {paneParticles, "粒子"}, {paneComments, "评论"}}
+	return []npTab{{paneLyrics, "歌词"}, {paneStage, "动态"}, {paneInk, "墨迹"},
+		{paneNeon, "霓虹"},
+		{paneWall, "选歌"}, {paneWall3D, "海报墙"}, {paneParticles, "粒子"},
+		{paneKaleido, "万花筒"},
+		{paneComments, "评论"}}
 }
 
 // npBareParts says what Tab has put away on this pane. The row of tabs
@@ -451,7 +624,7 @@ func (a *app) npBareParts() (tabs, corner, foot, line bool) {
 		return false, false, false, false
 	}
 	switch a.npPane {
-	case paneStage, paneWall, paneParticles:
+	case paneStage, paneInk, paneNeon, paneWall, paneParticles:
 		return true, true, true, false
 	case paneWall3D:
 		return true, true, true, true
@@ -558,7 +731,11 @@ func (a *app) stageBar(c *ui.Context, tr *netease.Track, art *artwork, accent ui
 }
 
 func (a *app) paneTab(c *ui.Context, i int, label string) {
-	b := ui.ButtonBase(c.Key(i)).Padding(6, 14).Radius(999).FocusRing(false).Label(label)
+	padX := a.npTabPadX
+	if padX <= 0 {
+		padX = 14
+	}
+	b := ui.ButtonBase(c.Key(i)).Padding(6, padX).Radius(999).FocusRing(false).Label(label)
 	bg, fg := ui.Transparent, white.Alpha(0.55)
 	if a.npPane == i {
 		bg, fg = white.Alpha(0.14), white
