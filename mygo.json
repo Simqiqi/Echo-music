@@ -2,7 +2,7 @@
   "name": "Echo云音乐",
   "identifier": "com.simqiqi.echo",
   "slug": "echo-cloudmusic",
-  "version": "0.3.7",
+  "version": "0.3.8",
   "out": "build",
   "resources": [
     "sidecar"
