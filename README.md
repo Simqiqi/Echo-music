@@ -1,6 +1,50 @@
-# Echo云音乐
+<div align="center">
 
-一个 macOS 上的音乐桌面客户端。添加了自己的东西：液态玻璃、黑胶唱机、逐字歌词、听歌周报、天气电台、下载管理与新碟速递。
+# Echo 云音乐
+
+### Music Reimagined // 回声新境
+
+简体中文 | [English](#)
+
+<br>
+
+![release](https://img.shields.io/badge/release-v0.3.7-blue?style=for-the-badge)
+![license](https://img.shields.io/badge/license-AGPL--3.0-orange?style=for-the-badge)
+![stars](https://img.shields.io/github/stars/Simqiqi/Echo-music?style=for-the-badge&color=yellow)
+
+<br>
+
+![go](https://img.shields.io/badge/Go-%3E%3D1.27-00ADD8?style=for-the-badge&logo=go&logoColor=white)
+![platform](https://img.shields.io/badge/platform-macOS-black?style=for-the-badge&logo=apple&logoColor=white)
+![contributors](https://img.shields.io/badge/contributors-1-orange?style=for-the-badge)
+
+<br>
+
+[获取方式](#获取方式) · [使用指南](#使用指南) · [技术说明](#技术说明) · [致谢与声明](#致谢与声明)
+
+</div>
+
+---
+
+## 项目简介
+
+一个 macOS 上的音乐桌面客户端。在 [mygo-cloudmusic](https://github.com/egoist/mygo-cloudmusic) 基础上独立演进，加入了自己的理解：**液态玻璃**、**黑胶唱机**、**逐字歌词**、**听歌周报**、**天气电台**、**下载管理**与**新碟速递**。
+
+<div align="center">
+
+<br>
+
+<img src="./resources/screenshots/home.png" alt="首页 · 每日推荐" width="90%">
+
+*首页 · 每日推荐与飙升榜*
+
+<br>
+
+<img src="./resources/screenshots/now-playing.png" alt="正在播放 · 黑胶唱机模式" width="90%">
+
+*正在播放 · 黑胶唱机模式与逐字歌词*
+
+</div>
 
 ## 这一版做了什么
 
@@ -16,7 +60,7 @@
 - **换曲转场**：旧封面缩小淡出，新封面弹簧放大进场。
 - **频谱条**：正在播放页 24 频段实时频谱，宽度与专辑封面左右对齐。
 
-## 功能
+## 完整功能
 
 - 扫码登录，登录态保存在系统凭据存储中
 - 每日推荐、推荐歌单、排行榜、我的歌单
@@ -31,7 +75,21 @@
 - 喜欢歌曲、播放队列、随机与循环播放
 - 浅色 / 深色 / 跟随系统
 
-## 代码在哪
+## 获取方式
+
+前往 [Releases](https://github.com/Simqiqi/Echo-music/releases) 页面下载最新版本，解压后拖入「应用程序」即可使用。
+
+> 要求 macOS 系统，Apple Silicon 与 Intel 芯片均已支持。
+
+## 使用指南
+
+首次打开需扫码登录网易云音乐账号，登录态由系统钥匙串安全存储。登录后即可浏览每日推荐、搜索歌曲、创建歌单。
+
+更多细节见 [CHANGELOG.md](CHANGELOG.md)。
+
+## 技术说明
+
+### 目录结构
 
 | 目录 | 放什么 |
 |---|---|
@@ -42,9 +100,9 @@
 | `internal/netease/` | 接口：eapi 加密、扫码登录、目录与搜索、动态与新碟、播放地址 |
 | `internal/lyrics/` | 歌词解析（含逐字与翻译） |
 
-## 构建
+### 从源码构建
 
-需要 Go 1.27+ 与 macOS。
+需要 **Go 1.27+** 与 macOS 环境。
 
 ```bash
 go tool mygo dev     # 开发模式运行
@@ -52,21 +110,23 @@ go tool mygo build   # 打包到 build/
 go test ./...        # 运行测试
 ```
 
-## 演进方向
+### 演进方向
 
 本仓库自 2026 年 11 月起独立演进，不再合并原项目的提交。界面与功能的改动集中在 `internal/app/`，特效在 `internal/fx/`，播放器的扩展在 `internal/player/`（`eq.go`、`transition.go`）。
 
-## 来源与修改声明
+## 致谢与声明
 
-本项目基于 [egoist/mygo-cloudmusic](https://github.com/egoist/mygo-cloudmusic)（AGPL-3.0）二次开发。原项目及其全部贡献者的著作权归其各自作者所有；本仓库保留原始许可证与版权声明，并按 AGPL-3.0 第 5 条注明：本仓库自 2026 年 10 月起对界面布局、播放动效、应用标识与代码结构做了修改，具体版本记录见 [CHANGELOG](CHANGELOG.md)。
-
-## 致谢
+### 致谢
 
 - [mygo-cloudmusic](https://github.com/egoist/mygo-cloudmusic)：本项目的起点，客户端主体功能由其实现
 - [MyGo](https://github.com/egoist/mygo)：原生 UI 与应用框架
 - [Remix Icon](https://remixicon.com/)：应用内图标（[Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0)）
 - [NeteaseCloudMusicApi](https://github.com/Binaryify/NeteaseCloudMusicApi)：eapi 加密与登录流程的参考
 - [folia-major](https://github.com/chthollyphile/folia-major)：歌词动画效果的参考
+
+### 来源与修改声明
+
+本项目基于 [egoist/mygo-cloudmusic](https://github.com/egoist/mygo-cloudmusic)（AGPL-3.0）二次开发。原项目及其全部贡献者的著作权归其各自作者所有；本仓库保留原始许可证与版权声明，并按 AGPL-3.0 第 5 条注明：本仓库自 2026 年 10 月起对界面布局、播放动效、应用标识与代码结构做了修改，具体版本记录见 [CHANGELOG](CHANGELOG.md)。
 
 本项目与网易云音乐官方无关，音乐版权归各权利人所有。
 
