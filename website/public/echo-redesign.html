@@ -1,0 +1,1508 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Echo云音乐 — 关上网页，打开另一个世界</title>
+<meta name="description" content="用 Go 与 MyGo 写成的第三方网易云音乐桌面客户端。原生界面，没有 WebView；边下边播，无损与 Hi-Res，逐字歌词与「律动」，刘海播放器。">
+<meta name="theme-color" content="#12100f">
+<meta property="og:title" content="Echo云音乐 — 原生的网易云音乐桌面客户端">
+<meta property="og:description" content="原生界面，冷启动不到一秒。Hi-Res 边下边播，逐字歌词跟着人声浮起。">
+<link rel="icon" href="/icon.png" type="image/png">
+<link rel="preconnect" href="https://miaoda.feishu.cn">
+<link rel="preconnect" href="https://sf3-scmcdn-cn.feishucdn.com" crossorigin>
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Serif+SC:wght@600;700;900&display=swap">
+<style>
+/* ===== 01. 基础与令牌 ===== */
+:root{
+  --mast-h:60px;
+  --gutter:22px;
+  --maxw:1240px;
+  --pad:clamp(64px,9vw,124px);
+
+  --stage:#12100f;
+  --stage-2:#191413;
+  --cream:#f4ead9;
+  --cream-2:rgba(244,234,217,.64);
+  --cream-3:rgba(244,234,217,.34);
+  --stage-line:rgba(244,234,217,.14);
+
+  --paper:#f7ede1;
+  --paper-2:#efe1d2;
+  --paper-3:#e3d1bd;
+  --ink:#181210;
+  --ink-2:rgba(24,18,16,.7);
+  --ink-3:rgba(24,18,16,.46);
+  --paper-line:rgba(24,18,16,.15);
+
+  --red:#ff3a52;
+  --red-deep:#bb1f30;
+
+  --serif:"Noto Serif SC","Songti SC","STSong","Source Han Serif SC","Noto Serif CJK SC","SimSun",serif;
+  --sans:-apple-system,BlinkMacSystemFont,"PingFang SC","HarmonyOS Sans SC","Microsoft YaHei","Noto Sans SC",sans-serif;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,"Cascadia Mono","Roboto Mono",monospace;
+  --ease:cubic-bezier(.22,1,.36,1);
+}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{
+  margin:0;background:var(--stage);color:var(--cream);
+  font-family:var(--sans);font-size:16px;line-height:1.7;
+  letter-spacing:.01em;-webkit-font-smoothing:antialiased;overflow-x:hidden;
+}
+body[data-ground="paper"]{color:var(--ink)}
+img{max-width:100%;height:auto;display:block}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+input{font:inherit}
+h1,h2,h3,p,dl,dd,figure{margin:0}
+ul,ol{margin:0;padding:0;list-style:none}
+:focus-visible{outline:2px solid var(--red);outline-offset:3px;border-radius:3px}
+::selection{background:var(--red);color:#fff}
+.wrap{width:100%;max-width:var(--maxw);margin-inline:auto;padding-inline:var(--gutter)}
+.sheet{background:var(--paper);color:var(--ink)}
+.stage-g{background:var(--stage);color:var(--cream)}
+section{scroll-margin-top:calc(var(--mast-h) + 12px)}
+
+/* ===== 02. 字体层级 ===== */
+.serif{font-family:var(--serif)}
+.kick{display:inline-flex;align-items:center;gap:9px;font-size:12px;letter-spacing:.14em;color:var(--cream-2)}
+.kick i{width:6px;height:6px;border-radius:50%;background:var(--red);display:block;flex:none;animation:beat 2.6s ease-in-out infinite}
+.h2{font-family:var(--serif);font-weight:700;font-size:clamp(30px,4.4vw,50px);line-height:1.16;letter-spacing:-.01em;text-wrap:balance}
+.lede{font-size:clamp(14px,1.5vw,16.5px);line-height:1.9;color:var(--cream-2);max-width:38em}
+.on-paper .lede,.lede.ink{color:var(--ink-2)}
+.h2 + .lede{margin-top:16px}
+
+/* ===== 03. 按钮 ===== */
+.cta{
+  display:inline-flex;align-items:center;justify-content:center;gap:10px;
+  min-height:46px;padding:0 22px;border-radius:999px;background:var(--red);color:#fff;
+  font-size:15px;font-weight:600;letter-spacing:.02em;
+  transition:background .25s var(--ease),transform .25s var(--ease),box-shadow .25s var(--ease);
+}
+.cta:hover{background:#e82b45;transform:translateY(-2px);box-shadow:0 14px 28px -16px rgba(255,58,82,.8)}
+.cta svg{width:14px;height:14px;flex:none}
+.ghost{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  min-height:46px;padding:0 18px;border-radius:999px;border:1px solid var(--stage-line);
+  color:var(--cream-2);font-size:14px;transition:color .25s,border-color .25s,background .25s;
+}
+.ghost:hover{color:var(--cream);border-color:rgba(244,234,217,.34);background:rgba(244,234,217,.04)}
+.mini{
+  display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:0 14px;
+  border:1px solid var(--paper-line);border-radius:8px;font-size:12.5px;color:var(--ink-2);
+  transition:color .2s,border-color .2s,background .2s;
+}
+.mini:hover{color:var(--ink);border-color:var(--ink-3);background:rgba(24,18,16,.03)}
+
+/* ===== 04. 顶栏 · 进度线 · 颗粒 ===== */
+.mast{
+  position:fixed;inset:0 0 auto;z-index:50;height:var(--mast-h);
+  display:flex;align-items:center;gap:14px;padding-inline:var(--gutter);
+  border-bottom:1px solid transparent;
+  transition:background-color .45s var(--ease),color .45s var(--ease),border-color .45s var(--ease);
+}
+body[data-ground="dark"] .mast{background:var(--stage);color:var(--cream);border-bottom-color:var(--stage-line)}
+body[data-ground="paper"] .mast{background:var(--paper);color:var(--ink);border-bottom-color:var(--paper-line)}
+.brand{display:inline-flex;align-items:center;gap:9px;min-height:44px;flex:none}
+.brand img{width:24px;height:24px;border-radius:7px}
+.brand b{font-family:var(--serif);font-weight:700;font-size:15px;letter-spacing:.02em}
+.brand b em{font-style:normal;font-weight:600;font-size:12px;letter-spacing:.06em;opacity:.6;margin-left:2px}
+.brand span{font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;opacity:.5;padding:2px 5px;border:1px solid currentColor;border-radius:4px}
+.nav{display:none;gap:26px;margin-left:auto;font-size:13.5px}
+.nav a{position:relative;padding:6px 0;min-height:32px;display:inline-flex;align-items:center;color:inherit;opacity:.66;transition:opacity .2s}
+.nav a:hover{opacity:1}
+.nav a::after{content:"";position:absolute;left:0;right:100%;bottom:2px;height:1px;background:var(--red);transition:right .3s var(--ease)}
+.nav a:hover::after{right:0}
+.mast .cta{margin-left:auto;min-height:38px;padding:0 16px;font-size:13px;border-radius:999px}
+.progress{position:fixed;left:0;right:0;top:var(--mast-h);height:2px;z-index:51;pointer-events:none;background:transparent}
+.progress i{display:block;height:100%;background:var(--red);transform-origin:0 50%;transform:scaleX(0);opacity:.9}
+.grain{
+  position:fixed;inset:0;z-index:60;pointer-events:none;opacity:.3;mix-blend-mode:soft-light;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E");
+  background-size:140px 140px;
+}
+
+/* ===== 05. 首屏 ===== */
+.hero{
+  position:relative;min-height:100svh;display:flex;flex-direction:column;justify-content:center;
+  padding-top:calc(var(--mast-h) + 40px);padding-bottom:26px;overflow:clip;isolation:isolate;
+}
+.hero-glow{
+  position:absolute;z-index:-1;inset:-20% -30% auto;height:78%;
+  background:
+    radial-gradient(58% 62% at 78% 12%,rgba(255,58,82,.17),transparent 68%),
+    radial-gradient(50% 54% at 12% 4%,rgba(232,160,90,.12),transparent 72%);
+  filter:blur(16px);pointer-events:none;animation:drift 22s ease-in-out infinite alternate;
+}
+.hero-web{position:absolute;inset:0;display:block;width:100%;height:100%;z-index:0;pointer-events:none}
+.hero-in{position:relative;z-index:1;width:100%}
+.h1{
+  font-family:var(--serif);font-weight:900;letter-spacing:-.012em;line-height:1.02;
+  font-size:clamp(42px,min(9.4vw,13.4vh),118px);margin-top:16px;color:var(--cream);
+}
+.h1 .ln{display:block;overflow:hidden;padding-bottom:.05em}
+.h1 .ln > span{display:block;transform:translateY(108%);animation:rise .95s var(--ease) forwards}
+.h1 .ln:nth-child(1) > span{animation-delay:.06s}
+.h1 .ln:nth-child(2) > span{animation-delay:.16s}
+.h1 .ln:nth-child(3) > span{animation-delay:.26s}
+.h1 .outline{color:transparent;-webkit-text-stroke:1.6px rgba(244,234,217,.86);text-stroke:1.6px rgba(244,234,217,.86)}
+.hero-lede{margin-top:20px;max-width:40em;opacity:0;animation:fade 1s var(--ease) .55s forwards}
+.hero-lede a{color:var(--cream);border-bottom:1px solid rgba(244,234,217,.34);transition:border-color .2s}
+.hero-lede a:hover{border-color:var(--red)}
+.hero-top{display:grid}
+.hero-aside{display:none}
+@media (min-width:1000px){
+  .hero-top{grid-template-columns:minmax(0,1fr) 214px;column-gap:52px}
+  .hero-aside{display:block;margin-top:8px;border-top:1px solid var(--stage-line)}
+  .hero-aside p{display:flex;justify-content:space-between;gap:14px;font-family:var(--mono);font-size:10.5px;letter-spacing:.02em;
+    color:var(--cream-2);padding:10px 0;border-bottom:1px solid rgba(244,234,217,.07)}
+  .hero-aside p span{color:rgba(244,234,217,.52);flex:none}
+}
+
+/* 逐字歌词（首屏） */
+.now{margin-top:clamp(20px,3.4vh,36px);max-width:900px;opacity:0;animation:fade 1s var(--ease) .62s forwards}
+.now-ly{
+  font-family:var(--serif);font-weight:600;font-size:clamp(25px,4.3vw,42px);line-height:1.32;letter-spacing:.005em;
+  color:var(--cream);min-height:1.35em;transition:opacity .38s var(--ease);
+}
+.now-sub{display:flex;align-items:baseline;gap:12px;margin-top:6px;min-height:1.3em}
+.now-tr{font-family:var(--sans);font-size:12.5px;letter-spacing:.03em;color:var(--cream-3);min-height:1.3em;transition:opacity .5s var(--ease)}
+.now-tag{font-family:var(--mono);font-size:9.5px;letter-spacing:.09em;color:rgba(244,234,217,.45);flex:none;white-space:nowrap}
+.ch{display:inline-block;opacity:.24;transform:translateY(.16em);filter:blur(2.4px);
+  transition:opacity .36s var(--ease),transform .36s var(--ease),filter .36s var(--ease)}
+.ch.on{opacity:1;transform:none;filter:none}
+.ch.cur{position:relative}
+.ch.cur::after{content:"";position:absolute;left:0;right:0;bottom:-3px;height:2px;background:var(--red);
+  animation:swell .26s var(--ease) both}
+.h1 .line-now{display:none}
+
+/* 播放条 */
+.deck{
+  margin-top:clamp(14px,2.4vh,24px);padding-top:12px;border-top:1px solid var(--stage-line);
+  display:grid;grid-template-columns:40px auto minmax(0,1fr) auto 40px;align-items:center;gap:10px;
+  opacity:0;animation:fade 1s var(--ease) .82s forwards;
+}
+.ibtn{
+  width:40px;height:40px;border-radius:50%;border:1px solid var(--stage-line);display:grid;place-items:center;
+  color:var(--cream-2);transition:border-color .2s,color .2s,background .2s;
+}
+.ibtn:hover{color:var(--cream);border-color:rgba(244,234,217,.36);background:rgba(244,234,217,.05)}
+.ibtn svg{width:13px;height:13px}
+.tc{font-family:var(--mono);font-size:11px;letter-spacing:.03em;color:var(--cream-3);font-feature-settings:'tnum'}
+.wave-wrap{position:relative;height:52px;min-width:0;cursor:pointer;touch-action:pan-y}
+.wave-wrap canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.hero-foot{
+  display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:clamp(16px,2.6vh,26px);
+  opacity:0;animation:fade 1s var(--ease) 1s forwards;
+}
+.hero-meta{font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;color:var(--cream-3);margin-right:auto;line-height:1.9}
+
+/* ===== 06. 真机 ===== */
+.shot{padding-block:var(--pad)}
+.shot-grid{display:grid;gap:26px}
+.shot-note .kick{color:var(--red-deep)}
+.shot-note .kick i{animation:none}
+.shot-figure{position:relative;margin:0;perspective:1600px}
+.shot-plane{
+  position:relative;
+  transform:perspective(1600px) rotateX(var(--rx,5deg)) rotateY(var(--ry,-8deg)) scale(.975);
+  transition:transform .55s var(--ease);
+  will-change:transform;
+}
+@media (max-width:899px){.shot-plane{transform:none}}
+.shot-figure img{
+  width:100%;border-radius:9px;border:1px solid var(--paper-line);
+  box-shadow:0 52px 84px -46px rgba(72,34,14,.62),0 14px 30px -22px rgba(72,34,14,.34);
+}
+.pin{
+  position:absolute;left:var(--x);top:var(--y);width:22px;height:22px;border-radius:50%;
+  display:grid;place-items:center;transform:translate(-50%,-50%) scale(.4);opacity:0;
+  background:var(--red);color:#fff;font-family:var(--mono);font-size:9.5px;font-weight:600;
+  box-shadow:0 0 0 3px rgba(247,237,225,.92),0 4px 10px rgba(120,20,30,.28);
+  transition:transform .5s var(--ease),opacity .5s var(--ease);pointer-events:none;
+}
+.pin.seen{transform:translate(-50%,-50%) scale(1);opacity:1}
+.pin.seen::before{
+  content:"";position:absolute;inset:-1px;border-radius:50%;box-shadow:0 0 0 2px rgba(255,58,82,.55);
+  animation:ring 2.4s ease-out infinite;
+}
+.shot-cap{position:absolute;left:0;top:100%;margin-top:8px;font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;color:var(--ink-3)}
+@media (min-width:900px){.shot-cap{margin-top:44px;left:2%}}
+.shot-key{display:grid;gap:12px;margin-top:24px}
+.shot-key li{display:grid;grid-template-columns:22px 1fr;gap:10px;font-size:13.5px;line-height:1.7;color:var(--ink-2)}
+.shot-key li b{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--red);color:#fff;
+  font-family:var(--mono);font-size:9.5px;font-weight:600;align-self:start;margin-top:2px}
+
+/* ===== 07. 规格 ===== */
+.spec{padding-bottom:var(--pad)}
+.spec-head{display:grid;gap:14px;max-width:none}
+.spec-plate{display:grid;margin-top:clamp(30px,4vw,48px);border-top:1px solid var(--paper-line)}
+.spec-item{padding:24px 0;border-bottom:1px solid var(--paper-line)}
+.spec-item dt{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;color:var(--red-deep);margin-bottom:10px}
+.spec-num{
+  font-family:var(--mono);font-weight:600;font-size:clamp(40px,7.2vw,66px);line-height:.98;
+  letter-spacing:-.045em;font-feature-settings:'tnum';display:block;color:var(--ink);
+}
+.spec-num em{font-style:normal;font-size:.32em;letter-spacing:.01em;color:var(--ink-3);margin-left:8px;vertical-align:.16em}
+.spec-note{display:block;font-size:13px;line-height:1.75;color:var(--ink-2);margin-top:10px;max-width:26em}
+
+/* ===== 08. 能力清单 ===== */
+.caps{padding-block:var(--pad)}
+.caps-grid{display:grid;gap:30px}
+.caps-side .lede{margin-top:14px;max-width:24em}
+.caps-hint{display:inline-flex;align-items:center;gap:8px;font-size:12px;letter-spacing:.05em;color:var(--ink-3);margin-top:20px}
+.caps-hint svg{width:12px;height:12px}
+.cap{border-top:1px solid var(--paper-line)}
+.cap:last-child{border-bottom:1px solid var(--paper-line)}
+.cap-head{display:grid;grid-template-columns:30px minmax(0,1fr) 20px;align-items:baseline;gap:10px;width:100%;padding:17px 0;text-align:left}
+.cap-no{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--ink-3);align-self:center}
+.cap-ttl{font-family:var(--serif);font-weight:600;font-size:clamp(17px,2.1vw,21px);line-height:1.45;transition:color .2s}
+.cap-pl{font-family:var(--mono);font-size:15px;color:var(--ink-3);justify-self:end;align-self:center;line-height:1;
+  transition:transform .35s var(--ease),color .25s}
+.cap-head:hover .cap-ttl{color:var(--red-deep)}
+.cap.is-open .cap-pl{transform:rotate(45deg);color:var(--red-deep)}
+.cap-body{display:grid;grid-template-rows:0fr;visibility:hidden;transition:grid-template-rows .5s var(--ease),visibility .4s}
+.cap.is-open .cap-body{grid-template-rows:1fr;visibility:visible}
+.cap-inner{overflow:hidden}
+.cap-p{font-size:14.5px;line-height:1.85;color:var(--ink-2);max-width:34em;padding-right:6px}
+.cap-pad{padding-bottom:20px}
+
+/* 演示盘 */
+.demo{background:#fff;border:1px solid var(--paper-line);border-radius:11px;padding:16px;margin-top:16px}
+.demo-h{font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:var(--ink-3);margin-bottom:12px}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{
+  font-size:12px;min-height:34px;padding:0 12px;border:1px solid var(--paper-line);border-radius:999px;color:var(--ink-2);
+  transition:color .2s,background .2s,border-color .2s;
+}
+.seg button:hover{border-color:var(--ink-3);color:var(--ink)}
+.seg button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.readout{font-family:var(--mono);font-size:11.5px;letter-spacing:.02em;color:var(--ink-2);margin-top:14px;min-height:1.5em;font-feature-settings:'tnum'}
+.readout b{color:var(--ink);font-weight:600}
+
+/* 刘海 */
+.notch-stage{height:132px;border-radius:11px;border:1px solid var(--paper-line);
+  background:radial-gradient(120% 120% at 50% 0,#fdf4e7,#f2dfca);position:relative;overflow:hidden;display:grid;place-items:start center}
+.notch{
+  margin-top:0;width:112px;height:28px;padding:0 12px;border-radius:0 0 14px 14px;background:#0b0908;
+  color:var(--cream);display:flex;align-items:center;justify-content:center;gap:8px;overflow:hidden;cursor:pointer;
+  transition:width .5s var(--ease),height .5s var(--ease),border-radius .5s var(--ease),justify-content .3s;
+}
+.notch:hover,.notch:focus-visible,.notch.is-open{width:min(330px,94%);height:56px;border-radius:0 0 18px 18px;justify-content:flex-start}
+.notch-dot{width:5px;height:5px;border-radius:50%;background:var(--red);flex:none}
+.notch-txt{font-size:10px;letter-spacing:.04em;opacity:0;white-space:nowrap;transition:opacity .35s .12s;display:flex;align-items:center;gap:9px}
+.notch:hover .notch-txt,.notch:focus-visible .notch-txt,.notch.is-open .notch-txt{opacity:1}
+.notch-txt b{font-weight:600;font-size:11px}
+.notch-txt i{font-style:normal;font-family:var(--mono);font-size:9.5px;opacity:.55}
+.notch-txt span{font-family:var(--mono);font-size:9.5px;opacity:.5;margin-left:auto}
+.notch-hint{position:absolute;bottom:14px;left:0;right:0;text-align:center;font-size:11px;color:var(--ink-3)}
+
+/* 歌词写法 */
+.ly-screen{position:relative;border-radius:11px;padding:18px 16px 16px;background:#141110;border:1px solid rgba(244,234,217,.12);overflow:hidden}
+.ly-screen .style-row{display:flex;gap:6px}
+.ly-screen .seg button{border-color:rgba(244,234,217,.18);color:rgba(244,234,217,.6)}
+.ly-screen .seg button:hover{border-color:rgba(244,234,217,.4);color:var(--cream)}
+.ly-screen .seg button[aria-pressed="true"]{background:var(--cream);border-color:var(--cream);color:#141110}
+.ly-demo{font-family:var(--serif);font-weight:600;font-size:clamp(17px,2.4vw,21px);line-height:1.5;color:var(--cream);margin-top:22px;min-height:1.5em;transition:opacity .38s var(--ease)}
+.ly-demo-tr{font-size:11px;letter-spacing:.03em;color:rgba(244,234,217,.4);margin-top:6px;min-height:1.2em}
+.is-neon .ch.on{color:#fff6f0;text-shadow:0 0 9px rgba(255,58,82,.75),0 0 26px rgba(255,58,82,.4)}
+.is-ink .ch.on{color:#fffaf1}
+.is-kale .ch.on{filter:hue-rotate(calc(var(--i) * 24deg)) saturate(1.35);transform:scale(1.02)}
+.is-kale .ch.on:nth-child(3n){transform:translateY(-.04em) scale(1.03)}
+
+/* 音量 */
+.vol-row{display:flex;align-items:baseline;justify-content:space-between;gap:12px;font-size:12px;color:var(--ink-2)}
+.vol-row b{font-family:var(--mono);font-size:13px;color:var(--ink);font-feature-settings:'tnum'}
+.range{width:100%;margin:12px 0 4px;height:26px;appearance:none;background:transparent}
+.range::-webkit-slider-runnable-track{height:2px;background:rgba(24,18,16,.22);border-radius:2px}
+.range::-webkit-slider-thumb{appearance:none;width:16px;height:16px;margin-top:-7px;border-radius:50%;background:var(--red);border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.18)}
+.range::-moz-range-track{height:2px;background:rgba(24,18,16,.22);border-radius:2px}
+.range::-moz-range-thumb{width:14px;height:14px;border:2px solid #fff;border-radius:50%;background:var(--red)}
+.meters{display:flex;align-items:flex-end;gap:4px;height:42px;margin-top:10px}
+.meters i{flex:1;height:calc(var(--h,20) * 1%);background:linear-gradient(180deg,var(--red),rgba(255,58,82,.35));border-radius:2px;transition:height .16s linear;min-height:2px}
+.meters.is-fading i{height:3%;transition:height .55s var(--ease)}
+
+/* 主题 */
+.mini-win{height:150px;border-radius:11px;overflow:hidden;display:grid;grid-template-columns:37% 1fr;
+  border:1px solid rgba(24,18,16,.14);background:var(--w-bg);color:var(--w-ink);transition:background .45s,color .45s}
+.mini-win[data-th="light"]{--w-bg:#fff;--w-side:#f2f2f4;--w-ink:#1d1d1f;--w-mute:rgba(29,29,31,.42);--w-fill:rgba(0,0,0,.06)}
+.mini-win[data-th="dark"]{--w-bg:#141416;--w-side:#1c1c1f;--w-ink:#f5f5f7;--w-mute:rgba(245,245,247,.45);--w-fill:rgba(255,255,255,.08)}
+.mw-side{background:var(--w-side);padding:12px 10px;display:grid;gap:8px;align-content:start;transition:background .45s}
+.mw-side i{display:block;height:7px;border-radius:4px;background:var(--w-fill);transition:background .45s}
+.mw-side i:nth-child(1){width:70%}.mw-side i:nth-child(2){width:54%}.mw-side i:nth-child(3){width:62%}.mw-side i:nth-child(4){width:48%}
+.mw-main{padding:12px;display:grid;gap:8px;align-content:start;background:var(--w-bg);transition:background .45s}
+.mw-banner{height:46px;border-radius:7px;background:linear-gradient(100deg,#e8a464,#d2606a 58%,#7a4a86)}
+.mw-title{font-size:11px;font-weight:600;color:var(--w-ink);letter-spacing:.02em}
+.mw-lines{display:grid;gap:5px}
+.mw-lines i{display:block;height:5px;border-radius:3px;background:var(--w-fill)}
+.mw-lines i:nth-child(1){width:80%}.mw-lines i:nth-child(2){width:58%}
+
+/* ===== 09. 律动（滚动驱动的歌词台） ===== */
+.ls{position:relative;height:190svh;background:var(--stage);color:var(--cream)}
+.ls-sticky{position:sticky;top:0;height:100svh;display:flex;flex-direction:column;justify-content:center;
+  padding-top:calc(var(--mast-h) + 24px);padding-bottom:40px;overflow:hidden}
+.ls-head{display:grid;gap:16px;margin-bottom:clamp(24px,5vh,54px)}
+.ls-head .h2{font-size:clamp(26px,3.6vw,40px)}
+.ls-head .kick{color:var(--cream-3)}
+.ls-style{display:flex;gap:6px;flex-wrap:wrap}
+.ls-style button{
+  font-size:12px;min-height:34px;padding:0 13px;border:1px solid rgba(244,234,217,.2);border-radius:999px;
+  color:rgba(244,234,217,.6);transition:color .2s,border-color .2s,background .2s;
+}
+.ls-style button:hover{color:var(--cream);border-color:rgba(244,234,217,.4)}
+.ls-style button[aria-pressed="true"]{background:var(--cream);border-color:var(--cream);color:#12100f}
+.ls-lines{position:relative}
+.ls-line{font-family:var(--serif);font-weight:600;font-size:clamp(27px,5.4vw,56px);line-height:1.32;letter-spacing:.01em;
+  color:var(--cream);margin-bottom:6px}
+.ls-line.is-live{opacity:1}
+.ls-tr{font-size:11.5px;letter-spacing:.04em;color:var(--cream-3);margin-bottom:clamp(14px,3vh,26px);opacity:.2;transition:opacity .5s}
+.ls-tr.is-live{opacity:.8}
+.ls-foot{display:flex;align-items:center;gap:10px;margin-top:clamp(18px,4vh,34px);font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--cream-3)}
+.ls-foot .bar{width:64px;height:1px;background:rgba(244,234,217,.2);position:relative;overflow:hidden}
+.ls-foot .bar i{position:absolute;inset:0;background:var(--red);transform-origin:0 50%;transform:scaleX(0)}
+
+/* ===== 10. 下载 ===== */
+.dl{position:relative;padding-block:var(--pad) 0;overflow:clip;isolation:isolate;border-top:1px solid var(--stage-line)}
+.dl-glow{position:absolute;z-index:-1;right:-20%;top:-10%;width:70%;height:60%;
+  background:radial-gradient(50% 50% at 50% 50%,rgba(255,58,82,.16),transparent 70%);filter:blur(20px);pointer-events:none}
+.dl-top{display:grid;gap:26px}
+.dl-icon{width:84px;height:84px;border-radius:20px;box-shadow:0 22px 44px -20px rgba(255,58,82,.7);animation:bob 7s ease-in-out infinite alternate}
+.dl-sub{margin-top:12px;font-size:12.5px;color:var(--cream-3);font-family:var(--mono);letter-spacing:.02em}
+.dl-cta-row{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:26px}
+.plat{display:grid;border-top:1px solid var(--stage-line);margin-top:clamp(38px,6vw,64px)}
+.plat-col{padding:22px 0;border-bottom:1px solid var(--stage-line)}
+.plat-col h3{font-family:var(--serif);font-size:15px;font-weight:700;letter-spacing:.02em;display:flex;align-items:baseline;gap:9px}
+.plat-col h3 em{font-style:normal;font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:var(--cream-3)}
+.plat-list{margin-top:12px;display:grid;gap:2px}
+.plat-link{display:flex;align-items:baseline;gap:8px;min-height:38px;padding:6px 8px;margin-inline:-8px;border-radius:6px;
+  font-size:13px;color:var(--cream-2);transition:background .2s,color .2s}
+.plat-link:hover{background:rgba(244,234,217,.06);color:var(--cream)}
+.plat-link span{font-family:var(--mono);font-size:11px;color:var(--cream-3);margin-left:auto;font-feature-settings:'tnum'}
+.plat-link svg{width:10px;height:10px;opacity:0;transition:opacity .2s;color:var(--red)}
+.plat-link:hover svg{opacity:1}
+.cmd{margin-top:clamp(30px,5vw,46px);border:1px solid var(--stage-line);border-radius:12px;padding:16px}
+.cmd-h{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13px;color:var(--cream-2)}
+.cmd-row{display:flex;align-items:center;gap:8px;background:#0a0807;border:1px solid rgba(244,234,217,.08);border-radius:7px;padding:9px 10px;margin-top:10px}
+.cmd-row code{flex:1;min-width:0;overflow-x:auto;font-family:var(--mono);font-size:11.5px;color:var(--cream-2);white-space:nowrap;scrollbar-width:none}
+.cmd-row code::-webkit-scrollbar{display:none}
+.copy{flex:none;min-height:30px;padding:0 10px;border:1px solid var(--stage-line);border-radius:5px;font-size:11px;color:var(--cream-2);transition:color .2s,border-color .2s}
+.copy:hover{color:var(--cream);border-color:rgba(244,234,217,.34)}
+.cmd details{margin-top:10px}
+.cmd summary{cursor:pointer;font-size:12px;color:var(--cream-3);min-height:30px;display:flex;align-items:center;gap:6px}
+.cmd summary:hover{color:var(--cream-2)}
+.foot{display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;justify-content:space-between;
+  border-top:1px solid var(--stage-line);margin-top:clamp(40px,7vw,70px);padding-block:22px}
+.foot p{font-family:var(--mono);font-size:10.5px;letter-spacing:.03em;color:var(--cream-3)}
+.foot a{color:var(--cream-2);border-bottom:1px solid transparent;transition:border-color .2s}
+.foot a:hover{border-color:var(--red)}
+
+/* ===== 11. 提示与显现 ===== */
+.toast{
+  position:fixed;left:50%;bottom:28px;transform:translate(-50%,16px);z-index:70;
+  background:var(--ink);color:var(--paper);font-size:12.5px;padding:10px 16px;border-radius:999px;
+  opacity:0;pointer-events:none;transition:opacity .3s var(--ease),transform .3s var(--ease);
+  box-shadow:0 12px 30px -12px rgba(0,0,0,.6);
+}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.rv{opacity:0;transform:translateY(20px);transition:opacity .9s var(--ease),transform .9s var(--ease)}
+.rv.seen{opacity:1;transform:none}
+
+/* ===== 12. 关键帧 ===== */
+@keyframes rise{from{transform:translateY(108%)}to{transform:none}}
+@keyframes fade{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes drift{from{transform:translate3d(-1.4%,0,0) scale(1)}to{transform:translate3d(1.6%,2%,0) scale(1.04)}}
+@keyframes beat{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.7);opacity:.45}}
+@keyframes ring{0%{box-shadow:0 0 0 2px rgba(255,58,82,.5);opacity:1}70%{box-shadow:0 0 0 9px rgba(255,58,82,0);opacity:0}100%{opacity:0}}
+@keyframes swell{from{transform:scaleX(0);opacity:0}to{transform:none;opacity:1}}
+@keyframes bob{from{transform:translateY(0)}to{transform:translateY(-9px)}}
+
+/* ===== 17. 独立下载页 ===== */
+.dlpage{
+  position:fixed;inset:0;z-index:80;overflow-y:auto;overscroll-behavior:contain;
+  background:var(--stage);color:var(--cream);
+}
+html.dl-open{overflow:hidden}
+.dlpage-bar{
+  position:sticky;top:0;z-index:3;display:flex;align-items:center;gap:14px;
+  min-height:var(--mast-h);padding-inline:var(--gutter);
+  background:var(--stage);border-bottom:1px solid var(--stage-line);
+}
+.dlpage-back{
+  margin-left:auto;min-height:38px;padding:0 16px;border-radius:999px;
+  border:1px solid rgba(244,234,217,.32);background:transparent;color:var(--cream);
+  font-size:13px;cursor:pointer;transition:border-color .2s,background-color .2s;
+}
+.dlpage-back:hover{border-color:var(--red);background:rgba(255,58,82,.1)}
+.dlpage-in{max-width:1080px;margin:0 auto;padding:clamp(36px,5.6vw,80px) var(--gutter) clamp(56px,8vw,110px)}
+.dlpage-kick{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;color:var(--red)}
+.dlpage-h1{
+  font-family:var(--serif);font-weight:900;font-size:clamp(32px,6vw,68px);line-height:1.06;
+  letter-spacing:-.01em;margin-top:14px;
+}
+.dlpage-sub{margin-top:16px;font-family:var(--mono);font-size:11.5px;letter-spacing:.03em;color:rgba(244,234,217,.56)}
+.dlpage-note{
+  margin-top:clamp(24px,4vw,40px);max-width:760px;font-size:12.5px;line-height:1.95;
+  color:rgba(244,234,217,.54);
+}
+
+/* ===== 13. 断点 ===== */
+@media (min-width:560px){
+  :root{--gutter:32px}
+  .deck{grid-template-columns:44px auto minmax(0,1fr) auto 44px;gap:12px}
+  .ibtn{width:44px;height:44px}
+  .wave-wrap{height:58px}
+  .shot-key{grid-template-columns:1fr 1fr;gap:12px 22px}
+}
+@media (min-width:760px){
+  :root{--mast-h:64px;--gutter:40px}
+  .nav{display:flex}
+  .mast .cta{margin-left:0}
+  .hero{padding-bottom:34px}
+  .spec-plate{grid-template-columns:repeat(3,1fr)}
+  .spec-item{padding:26px 0 30px;border-bottom:0;padding-right:26px}
+  .spec-item + .spec-item{border-left:1px solid var(--paper-line);padding-left:26px;padding-right:26px}
+  .spec-item:first-child{padding-left:0}
+  .plat{grid-template-columns:repeat(3,1fr)}
+  .plat-col{padding:26px 0 26px;border-bottom:0;padding-right:24px}
+  .plat-col + .plat-col{border-left:1px solid var(--stage-line);padding-left:24px}
+  .plat-col:first-child{padding-left:0}
+  .cmd{padding:20px 22px}
+  .dl-top{grid-template-columns:1fr 120px;align-items:start}
+  .dl-icon{width:96px;height:96px;justify-self:end;margin-top:6px}
+}
+@media (min-width:900px){
+  .shot-grid{grid-template-columns:minmax(0,.44fr) minmax(0,1fr);gap:54px;align-items:start}
+  .shot-note{position:sticky;top:calc(var(--mast-h) + 34px)}
+  .shot-key{grid-template-columns:1fr;margin-top:26px}
+  .caps-grid{grid-template-columns:minmax(0,.38fr) minmax(0,1fr);gap:64px}
+  .caps-side{position:sticky;top:calc(var(--mast-h) + 34px);align-self:start}
+  .cap-head{padding:19px 0}
+}
+@media (min-width:1024px){
+  .now{margin-top:clamp(24px,3.6vh,40px)}
+  .hero-foot{gap:16px}
+  .dl-top{grid-template-columns:1fr 160px}
+}
+@media (min-width:1200px){
+  :root{--gutter:48px}
+  .h1{font-size:clamp(84px,8.4vw,124px)}
+}
+
+/* ===== 15. 可读性与次序微调 ===== */
+.hero-meta,.dl-sub,.foot p{color:rgba(244,234,217,.56)}
+.tc{color:rgba(244,234,217,.5)}
+.plat-link span,.ls-foot{color:rgba(244,234,217,.52)}
+.shot-cap,.caps-hint,.cap-no,.demo-h{color:rgba(24,18,16,.58)}
+.dl-icon{order:-1;justify-self:start}
+.dl-cta-row .tc{color:rgba(244,234,217,.5)}
+@media (min-width:760px){
+  .dl-icon{order:0;justify-self:end}
+}
+
+/* ===== 14. 低动效 ===== */
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{animation-duration:.001ms!important;animation-delay:0s!important;transition-duration:.001ms!important}
+  .h1 .ln > span,.lede,.now,.deck,.hero-foot,.rv{opacity:1!important;transform:none!important}
+  .ch{opacity:1;transform:none;filter:none}
+  .grain{display:none}
+}
+</style>
+</head>
+<body data-ground="dark">
+<div class="grain" aria-hidden="true"></div>
+
+<header class="mast">
+  <a class="brand" href="#top" aria-label="Echo云音乐，回到开头">
+    <img src="/icon.png" alt="" width="24" height="24">
+    <b>Echo<em>云音乐</em></b>
+    <span>0.3.8</span>
+  </a>
+  <nav class="nav" aria-label="站点导航">
+    <a href="#shot">真机</a>
+    <a href="#spec">规格</a>
+    <a href="#caps">能力</a>
+    <a href="#lyric">律动</a>
+  </nav>
+</header>
+<div class="progress" aria-hidden="true"><i></i></div>
+
+<!-- ===== 视图：首屏 ===== -->
+<section class="hero" id="top" data-ground="dark">
+  <div class="hero-glow" aria-hidden="true"></div>
+  <canvas class="hero-web" id="heroWeb" aria-hidden="true"></canvas>
+  <div class="wrap hero-in">
+    <div class="hero-top">
+      <div>
+        <h1 class="h1">
+          <span class="ln"><span>关上网页，</span></span>
+          <span class="ln"><span>打开另一个</span></span>
+          <span class="ln"><span class="outline">世界。</span></span>
+        </h1>
+        <p class="lede hero-lede">把情绪，从拥挤的浏览器里打捞出来。它是原生桌面里的一个隐形结界，接住你所有的深夜时刻；Hi-Res 过滤掉嘈杂，逐字歌词陪着你，它就安静地待在 Dock 栏角落。</p>
+      </div>
+      <aside class="hero-aside" aria-label="规格速记">
+        <p><span>版本</span>0.3.8</p>
+        <p><span>最高取样</span>192 kHz / 24 bit</p>
+        <p><span>安装包</span>17.9–21.7 MB</p>
+        <p><span>平台</span>macOS · Windows · Linux</p>
+      </aside>
+    </div>
+    <div class="now" aria-label="逐字歌词演示">
+      <div class="now-ly" id="heroLyric"></div>
+      <div class="now-sub">
+        <span class="now-tr" id="heroTr"></span>
+        <span class="now-tag">逐字歌词 · 演示</span>
+      </div>
+    </div>
+    <div class="hero-foot">
+      <p class="hero-meta">0.3.8 · 2026-11-09 · 免费 · 与网易云音乐官方无关</p>
+      <a class="ghost" href="#shot">先看真机</a>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 视图：真机 ===== -->
+<section class="shot sheet" id="shot" data-ground="paper">
+  <div class="wrap shot-grid">
+    <div class="shot-note">
+      <p class="kick"><i aria-hidden="true"></i>真机 · 未裁切</p>
+      <h2 class="h2" style="margin-top:14px">下面这一屏，<br>就是它本身。</h2>
+      <p class="lede">截自正在运行的那一份：登录、推荐、播放器都在，连正在播的那首歌都是真的。图上的四个点，是这一屏里最常被用到的地方。</p>
+      <ol class="shot-key">
+        <li><b>1</b><span>搜索框。搜歌、歌手、播客，输入即出结果。</span></li>
+        <li><b>2</b><span>侧栏。为你推荐、每日推荐、私人 FM、排行榜，都挂在左边。</span></li>
+        <li><b>3</b><span>每日推荐。每天 6:00 更新，按你的口味挑出 30 首。</span></li>
+        <li><b>4</b><span>播放条。音质、歌词、音量、心动模式，都收在这一条里。</span></li>
+      </ol>
+    </div>
+    <figure class="shot-figure rv">
+      <div class="shot-plane" id="shotPlane">
+        <img src="/app.jpg" width="1440" height="900" loading="lazy" decoding="async"
+             alt="Echo云音乐真机截图：深绿主题的「为你推荐」页，左侧是图标侧栏，中间是今日首选横幅与飙升榜，右侧是音乐日历，底部播放条正在播林俊杰《美人鱼》。">
+        <span class="pin" style="--x:2.2%;--y:6.4%" data-pin>1</span>
+        <span class="pin" style="--x:2%;--y:21.8%" data-pin>2</span>
+        <span class="pin" style="--x:68.9%;--y:29.7%" data-pin>3</span>
+        <span class="pin" style="--x:46%;--y:94.6%" data-pin>4</span>
+      </div>
+      <figcaption class="shot-cap">2880 × 1800 · 真机截屏 · 未裁切</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ===== 视图：规格 ===== -->
+<section class="spec sheet" id="spec" data-ground="paper">
+  <div class="wrap">
+    <h2 class="h2" style="max-width:15em">没有浏览器内核，<br>所以它这么快，这么小。</h2>
+    <dl class="spec-plate rv">
+      <div class="spec-item">
+        <dt>冷启动</dt>
+        <dd>
+          <span class="spec-num">&lt;1<em>秒</em></span>
+          <span class="spec-note">从点击到出声，多数机器在半秒到一秒之间。不等内核，也不等首屏框架。</span>
+        </dd>
+      </div>
+      <div class="spec-item">
+        <dt>最高取样率</dt>
+        <dd>
+          <span class="spec-num">192<em>kHz · 24 bit</em></span>
+          <span class="spec-note">Hi-Res 与无损（FLAC）都边下边播，不必等整首下载完。</span>
+        </dd>
+      </div>
+      <div class="spec-item">
+        <dt>安装包</dt>
+        <dd>
+          <span class="spec-num">≈20<em>MB</em></span>
+          <span class="spec-note">按平台 17.9–21.7 MB。没有浏览器内核要一起带上，所以只有这么大。</span>
+        </dd>
+      </div>
+    </dl>
+  </div>
+</section>
+
+<!-- ===== 视图：能力 ===== -->
+<section class="caps sheet" id="caps" data-ground="paper">
+  <div class="wrap caps-grid">
+    <div class="caps-side">
+      <h2 class="h2">该有的，<br>都在。</h2>
+      <p class="lede">从发现到播放，每一处都为桌面重新做过。喜欢、队列、随机与循环，一样不少。</p>
+      <p class="caps-hint">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
+        点任意一条，展开看细节
+      </p>
+    </div>
+    <div class="caps-list">
+
+      <article class="cap is-open" data-cap>
+        <h3><button class="cap-head" aria-expanded="true" aria-controls="capB1">
+          <span class="cap-no">01</span><span class="cap-ttl">边下边播，直到 Hi-Res</span><span class="cap-pl" aria-hidden="true">+</span>
+        </button></h3>
+        <div class="cap-body" id="capB1">
+          <div class="cap-inner"><div class="cap-pad">
+            <p class="cap-p">不必等整首下载完。标准、较高、极高、无损（FLAC）与 Hi-Res，按耳朵和网速选。</p>
+            <div class="demo">
+              <p class="demo-h">音质 · 点一下换一档</p>
+              <div class="seg" data-qseg role="group" aria-label="音质档位">
+                <button type="button" data-q="std" aria-pressed="false">标准</button>
+                <button type="button" data-q="mid" aria-pressed="false">较高</button>
+                <button type="button" data-q="high" aria-pressed="false">极高</button>
+                <button type="button" data-q="loss" aria-pressed="false">无损</button>
+                <button type="button" data-q="hires" aria-pressed="true">Hi-Res</button>
+              </div>
+              <p class="readout" id="qRead" aria-live="polite"><b>Hi-Res</b> · 192 kHz · 24 bit · FLAC</p>
+            </div>
+          </div></div>
+        </div>
+      </article>
+
+      <article class="cap" data-cap>
+        <h3><button class="cap-head" aria-expanded="false" aria-controls="capB2">
+          <span class="cap-no">02</span><span class="cap-ttl">刘海播放器</span><span class="cap-pl" aria-hidden="true">+</span>
+        </button></h3>
+        <div class="cap-body" id="capB2">
+          <div class="cap-inner"><div class="cap-pad">
+            <p class="cap-p">在屏幕顶部的刘海处显示迷你播放器，指针移过去就展开；合上时，它只是刘海的一小段。</p>
+            <div class="demo">
+              <p class="demo-h">指针移到刘海上</p>
+              <div class="notch-stage">
+                <button class="notch" type="button" data-notch aria-expanded="false" aria-label="展开刘海播放器">
+                  <span class="notch-dot" aria-hidden="true"></span>
+                  <span class="notch-txt"><b>不将就</b><i>李荣浩</i><span>02:41 / 05:12</span></span>
+                </button>
+                <p class="notch-hint">真机上，它就长在刘海的位置</p>
+              </div>
+            </div>
+          </div></div>
+        </div>
+      </article>
+
+      <article class="cap" data-cap>
+        <h3><button class="cap-head" aria-expanded="false" aria-controls="capB3">
+          <span class="cap-no">03</span><span class="cap-ttl">逐字歌词与「律动」</span><span class="cap-pl" aria-hidden="true">+</span>
+        </button></h3>
+        <div class="cap-body" id="capB3">
+          <div class="cap-inner"><div class="cap-pad">
+            <p class="cap-p">每个字随演唱浮起、发光、落定，原文与翻译同屏；点一句，就跳过去。</p>
+            <div class="ly-screen" style="margin-top:16px">
+              <div class="style-row seg" data-lyric-style role="group" aria-label="歌词写法">
+                <button type="button" data-st="ink" aria-pressed="true">墨迹</button>
+                <button type="button" data-st="neon" aria-pressed="false">霓虹</button>
+                <button type="button" data-st="kale" aria-pressed="false">万花筒</button>
+              </div>
+              <div class="ly-demo is-ink" id="demoLyric"></div>
+              <div class="ly-demo-tr" id="demoTr"></div>
+            </div>
+          </div></div>
+        </div>
+      </article>
+
+      <article class="cap" data-cap>
+        <h3><button class="cap-head" aria-expanded="false" aria-controls="capB4">
+          <span class="cap-no">04</span><span class="cap-ttl">温柔的音量</span><span class="cap-pl" aria-hidden="true">+</span>
+        </button></h3>
+        <div class="cap-body" id="capB4">
+          <div class="cap-inner"><div class="cap-pad">
+            <p class="cap-p">音量均衡，暂停与继续时淡出淡入，不给耳朵一记硬刹车。</p>
+            <div class="demo">
+              <div class="vol-row"><label for="vol">音量</label><b id="volNum">38</b></div>
+              <input class="range" id="vol" type="range" min="0" max="100" value="38" aria-label="音量">
+              <div class="meters" id="meters" aria-hidden="true"></div>
+              <button class="mini" id="fadeBtn" type="button">暂停，看淡出</button>
+            </div>
+          </div></div>
+        </div>
+      </article>
+
+      <article class="cap" data-cap>
+        <h3><button class="cap-head" aria-expanded="false" aria-controls="capB5">
+          <span class="cap-no">05</span><span class="cap-ttl">听过的，存在本机</span><span class="cap-pl" aria-hidden="true">+</span>
+        </button></h3>
+        <div class="cap-body" id="capB5">
+          <div class="cap-inner"><div class="cap-pad">
+            <p class="cap-p">听过的歌缓存在本机，再次播放无需等待。</p>
+          </div></div>
+        </div>
+      </article>
+
+      <article class="cap" data-cap>
+        <h3><button class="cap-head" aria-expanded="false" aria-controls="capB6">
+          <span class="cap-no">06</span><span class="cap-ttl">从上次停下的地方</span><span class="cap-pl" aria-hidden="true">+</span>
+        </button></h3>
+        <div class="cap-body" id="capB6">
+          <div class="cap-inner"><div class="cap-pad">
+            <p class="cap-p">退出后再打开，接着上次的队列与进度，不用重新找那首歌。</p>
+          </div></div>
+        </div>
+      </article>
+
+      <article class="cap" data-cap>
+        <h3><button class="cap-head" aria-expanded="false" aria-controls="capB7">
+          <span class="cap-no">07</span><span class="cap-ttl">私人 FM 与心动模式</span><span class="cap-pl" aria-hidden="true">+</span>
+        </button></h3>
+        <div class="cap-body" id="capB7">
+          <div class="cap-inner"><div class="cap-pad">
+            <p class="cap-p">推荐、熟悉、探索三种口味；或者从你喜欢的那首歌出发，一首接一首。</p>
+          </div></div>
+        </div>
+      </article>
+
+      <article class="cap" data-cap>
+        <h3><button class="cap-head" aria-expanded="false" aria-controls="capB8">
+          <span class="cap-no">08</span><span class="cap-ttl">每日推荐</span><span class="cap-pl" aria-hidden="true">+</span>
+        </button></h3>
+        <div class="cap-body" id="capB8">
+          <div class="cap-inner"><div class="cap-pad">
+            <p class="cap-p">每天 6:00 更新。推荐歌单、排行榜与天气电台，都在同一个侧栏里。</p>
+          </div></div>
+        </div>
+      </article>
+
+      <article class="cap" data-cap>
+        <h3><button class="cap-head" aria-expanded="false" aria-controls="capB9">
+          <span class="cap-no">09</span><span class="cap-ttl">扫码登录</span><span class="cap-pl" aria-hidden="true">+</span>
+        </button></h3>
+        <div class="cap-body" id="capB9">
+          <div class="cap-inner"><div class="cap-pad">
+            <p class="cap-p">用网易云音乐 App 扫一扫就能登录，登录态存在系统凭据里。</p>
+          </div></div>
+        </div>
+      </article>
+
+      <article class="cap" data-cap>
+        <h3><button class="cap-head" aria-expanded="false" aria-controls="capB10">
+          <span class="cap-no">10</span><span class="cap-ttl">浅色、深色、跟随系统</span><span class="cap-pl" aria-hidden="true">+</span>
+        </button></h3>
+        <div class="cap-body" id="capB10">
+          <div class="cap-inner"><div class="cap-pad">
+            <p class="cap-p">三种都在，切换即时生效；「跟随系统」会跟着你的桌面一起换。</p>
+            <div class="demo">
+              <p class="demo-h">点一下换外观</p>
+              <div class="seg" data-theme role="group" aria-label="外观">
+                <button type="button" data-th="light" aria-pressed="true">浅色</button>
+                <button type="button" data-th="dark" aria-pressed="false">深色</button>
+                <button type="button" data-th="auto" aria-pressed="false">跟随系统</button>
+              </div>
+              <div class="mini-win" id="miniWin" data-th="light" style="margin-top:14px">
+                <div class="mw-side" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+                <div class="mw-main" aria-hidden="true">
+                  <div class="mw-banner"></div>
+                  <p class="mw-title">每日推荐</p>
+                  <div class="mw-lines"><i></i><i></i></div>
+                </div>
+              </div>
+            </div>
+          </div></div>
+        </div>
+      </article>
+
+    </div>
+  </div>
+</section>
+
+<!-- ===== 视图：律动 ===== -->
+<section class="ls" id="lyric" data-ground="dark">
+  <div class="ls-sticky">
+    <div class="wrap">
+      <div class="ls-head">
+        <p class="kick"><i aria-hidden="true"></i>律动 · 往下滚，字会跟着走</p>
+        <h2 class="h2">逐字歌词，<br>和它的三种写法。</h2>
+        <div class="ls-style" data-lyric-style role="group" aria-label="歌词写法">
+          <button type="button" data-st="ink" aria-pressed="true">墨迹</button>
+          <button type="button" data-st="neon" aria-pressed="false">霓虹</button>
+          <button type="button" data-st="kale" aria-pressed="false">万花筒</button>
+        </div>
+      </div>
+      <div class="ls-lines" id="lsLines" aria-label="逐字歌词演示">
+        <p class="ls-line" data-line="0">一个字，跟着人声浮起来。</p>
+        <p class="ls-tr" data-tr="0">one character, rising with the voice</p>
+        <p class="ls-line" data-line="1">落在它该落的那一拍。</p>
+        <p class="ls-tr" data-tr="1">landing on the beat it belongs to</p>
+        <p class="ls-line" data-line="2">唱完，它自己安静下去。</p>
+        <p class="ls-tr" data-tr="2">and when it is over, it goes quiet</p>
+      </div>
+      <div class="ls-foot">
+        <span>SCROLL</span>
+        <span class="bar" aria-hidden="true"><i id="lsBar"></i></span>
+        <span id="lsPct">00</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 视图：下载 ===== -->
+<section class="dl stage-g" id="dl" data-ground="dark">
+  <div class="dl-glow" aria-hidden="true"></div>
+  <div class="wrap">
+    <div class="dl-top">
+      <div>
+        <h2 class="h2">现在，<br>把它放进 Dock。</h2>
+        <p class="dl-sub">Echo云音乐 0.3.8 · 2026-11-09 发布 · 免费</p>
+        <div class="dl-cta-row">
+          <a class="cta" href="#download" data-open-dl>
+            下载 Echo云音乐
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 21h16"/></svg>
+          </a>
+          <span class="tc">macOS 13 或更新 · Windows · Linux</span>
+        </div>
+      </div>
+      <img class="dl-icon" src="/icon.png" width="96" height="96" alt="Echo云音乐的应用图标：红底黑猫">
+    </div>
+
+    <div class="plat">
+      <div class="plat-col">
+        <h3>macOS <em>13 或更新</em></h3>
+        <div class="plat-list">
+          <a class="plat-link" href="#download" data-open-dl>Apple 芯片 .dmg <span>19.6 MB</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>
+          <a class="plat-link" href="#download" data-open-dl>Intel .dmg <span>20.8 MB</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>
+        </div>
+      </div>
+      <div class="plat-col">
+        <h3>Windows <em>安装到当前用户</em></h3>
+        <div class="plat-list">
+          <a class="plat-link" href="#download" data-open-dl>x64 安装程序 <span>18.8 MB</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>
+          <a class="plat-link" href="#download" data-open-dl>ARM64 安装程序 <span>17.9 MB</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>
+        </div>
+      </div>
+      <div class="plat-col">
+        <h3>Linux <em>Debian / Ubuntu</em></h3>
+        <div class="plat-list">
+          <a class="plat-link" href="#download" data-open-dl>x64 .deb <span>21.7 MB</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>
+          <a class="plat-link" href="#download" data-open-dl>ARM64 .deb <span>20.9 MB</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>
+          <a class="plat-link" href="#download" data-open-dl>x64 .tar.gz <span>21.7 MB</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>
+          <a class="plat-link" href="#download" data-open-dl>ARM64 .tar.gz <span>21.0 MB</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>
+        </div>
+      </div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-h"><span>用一行命令装到用户目录，之后自动更新</span></div>
+      <div class="cmd-row">
+        <code id="cmdUnix">curl -fsSL https://simqiqiecho.dpdns.org/install.sh | sh</code>
+        <button class="copy" type="button" data-copy="curl -fsSL https://simqiqiecho.dpdns.org/install.sh | sh">拷贝</button>
+      </div>
+      <details>
+        <summary>Windows · PowerShell</summary>
+        <div class="cmd-row">
+          <code id="cmdWin">irm https://simqiqiecho.dpdns.org/install.ps1 | iex</code>
+          <button class="copy" type="button" data-copy="irm https://simqiqiecho.dpdns.org/install.ps1 | iex">拷贝</button>
+        </div>
+      </details>
+    </div>
+
+    <footer class="foot">
+      <p>Echo云音乐 · 第三方客户端 · 与网易云音乐官方无关</p>
+      <p>0.3.8 · 2026-11-09 · <a href="https://simqiqiecho.dpdns.org" target="_blank" rel="noopener">simqiqiecho.dpdns.org</a></p>
+    </footer>
+  </div>
+</section>
+
+<!-- ===== 视图：下载页 ===== -->
+<section class="dlpage" id="download" aria-label="下载 Echo云音乐" hidden>
+  <div class="dlpage-bar">
+    <a class="brand" href="#top" data-close-dl aria-label="回到首页">
+      <img src="/icon.png" alt="" width="24" height="24">
+      <b>Echo<em>云音乐</em></b>
+      <span>0.3.8</span>
+    </a>
+    <button class="dlpage-back" type="button" data-close-dl>返回首页</button>
+  </div>
+  <div class="dlpage-in">
+    <p class="dlpage-kick">全平台安装包</p>
+    <h1 class="dlpage-h1">挑一个，<br>装进你的系统。</h1>
+    <p class="dlpage-sub">0.3.8 · 2026-11-09 发布 · 免费 · 与网易云音乐官方无关</p>
+
+    <div class="plat">
+      <div class="plat-col">
+        <h3>macOS <em>13 或更新</em></h3>
+        <div class="plat-list">
+          <a class="plat-link" href="/dl/v0.3.8/echo-cloudmusic-0.3.8-arm64.dmg" target="_blank" rel="noopener">Apple 芯片 .dmg <span>19.6 MB</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>
+          <a class="plat-link" href="/dl/v0.3.8/echo-cloudmusic-0.3.8-amd64.dmg" target="_blank" rel="noopener">Intel .dmg <span>20.8 MB</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>
+        </div>
+      </div>
+      <div class="plat-col">
+        <h3>Windows <em>安装到当前用户</em></h3>
+        <div class="plat-list">
+          <a class="plat-link" href="/dl/v0.3.8/echo-cloudmusic-setup-0.3.8-amd64.exe" target="_blank" rel="noopener">x64 安装程序 <span>18.8 MB</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>
+          <a class="plat-link" href="/dl/v0.3.8/echo-cloudmusic-setup-0.3.8-arm64.exe" target="_blank" rel="noopener">ARM64 安装程序 <span>17.9 MB</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>
+        </div>
+      </div>
+      <div class="plat-col">
+        <h3>Linux <em>Debian / Ubuntu</em></h3>
+        <div class="plat-list">
+          <a class="plat-link" href="/dl/v0.3.8/echo-cloudmusic_0.3.8_amd64.deb" target="_blank" rel="noopener">x64 .deb <span>21.7 MB</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>
+          <a class="plat-link" href="/dl/v0.3.8/echo-cloudmusic_0.3.8_arm64.deb" target="_blank" rel="noopener">ARM64 .deb <span>20.9 MB</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>
+          <a class="plat-link" href="/dl/v0.3.8/echo-cloudmusic-0.3.8-linux-amd64.tar.gz" target="_blank" rel="noopener">x64 .tar.gz <span>21.7 MB</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>
+          <a class="plat-link" href="/dl/v0.3.8/echo-cloudmusic-0.3.8-linux-arm64.tar.gz" target="_blank" rel="noopener">ARM64 .tar.gz <span>21.0 MB</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>
+        </div>
+      </div>
+    </div>
+
+    <div class="cmd">
+      <div class="cmd-h"><span>或者用一行命令，装到用户目录</span></div>
+      <div class="cmd-row"><code>curl -fsSL https://simqiqiecho.dpdns.org/install.sh | sh</code><button class="copy" type="button" data-copy="curl -fsSL https://simqiqiecho.dpdns.org/install.sh | sh">拷贝</button></div>
+      <div class="cmd-row"><code>irm https://simqiqiecho.dpdns.org/install.ps1 | iex</code><button class="copy" type="button" data-copy="irm https://simqiqiecho.dpdns.org/install.ps1 | iex">拷贝</button></div>
+    </div>
+
+    <p class="dlpage-note">安装包由本站边缘节点中转，国内下载比直连 GitHub 快三十多倍，边下边缓存；原始文件在 GitHub Releases 可对照。安装包没有签名。macOS 首次打开若提示“无法验证开发者”，去「系统设置 → 隐私与安全性」点“仍要打开”，或在终端执行 xattr -dr com.apple.quarantine "/Applications/Echo云音乐.app"；Windows 被 SmartScreen 拦下时点“更多信息 → 仍要运行”。</p>
+  </div>
+</section>
+
+<audio id="bgm" src="/bgm.mp3" preload="auto" autoplay loop playsinline></audio>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+  const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const $ = (s, el = document) => el.querySelector(s);
+  const $$ = (s, el = document) => Array.prototype.slice.call(el.querySelectorAll(s));
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+
+  /* ---------- 提示条 ---------- */
+  let toastTimer;
+  function toast(msg) {
+    const t = $('#toast');
+    t.textContent = msg;
+    t.classList.add('on');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('on'), 1900);
+  }
+
+  /* ---------- 滚动进度与顶栏地色 ---------- */
+  const fill = $('.progress i');
+  const grounds = $$('section[data-ground]');
+  let scrollQueued = false;
+  function onScroll() {
+    scrollQueued = false;
+    const y = window.scrollY || window.pageYOffset;
+    const total = document.documentElement.scrollHeight - window.innerHeight;
+    fill.style.transform = 'scaleX(' + (total > 0 ? clamp(y / total, 0, 1) : 0) + ')';
+    const probe = y + 32;
+    let g = 'dark';
+    for (const s of grounds) {
+      if (s.offsetTop <= probe && s.offsetTop + s.offsetHeight > probe) g = s.dataset.ground;
+    }
+    if (document.body.dataset.ground !== g) document.body.dataset.ground = g;
+    updateLS();
+  }
+  function queueScroll() {
+    if (scrollQueued) return;
+    scrollQueued = true;
+    requestAnimationFrame(onScroll);
+  }
+  window.addEventListener('scroll', queueScroll, { passive: true });
+
+  /* ---------- 渐入与截图上的编号 ---------- */
+  const pins = $$('.pin');
+  function lightPins() {
+    pins.forEach((p, i) => setTimeout(() => p.classList.add('seen'), RM ? 0 : 260 + i * 170));
+  }
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (!e.isIntersecting) return;
+      e.target.classList.add('seen');
+      if (e.target.classList.contains('shot-figure')) lightPins();
+      io.unobserve(e.target);
+    });
+  }, { threshold: 0.14, rootMargin: '0px 0px -8% 0px' });
+  $$('.rv').forEach(el => io.observe(el));
+
+  /* ---------- 真机截图的 3D 倾斜 ---------- */
+  const plane = $('#shotPlane');
+  const shotFig = plane ? plane.closest('.shot-figure') : null;
+  if (plane && shotFig && !RM && window.matchMedia('(hover:hover)').matches) {
+    let tfQueued = false;
+    shotFig.addEventListener('pointermove', e => {
+      const r = shotFig.getBoundingClientRect();
+      const px = (e.clientX - r.left) / r.width - 0.5;
+      const py = (e.clientY - r.top) / r.height - 0.5;
+      if (tfQueued) return;
+      tfQueued = true;
+      requestAnimationFrame(() => {
+        tfQueued = false;
+        plane.style.setProperty('--ry', (-8 - px * 12).toFixed(2) + 'deg');
+        plane.style.setProperty('--rx', (5 + py * 10).toFixed(2) + 'deg');
+      });
+    });
+    shotFig.addEventListener('pointerleave', () => {
+      plane.style.setProperty('--ry', '-8deg');
+      plane.style.setProperty('--rx', '5deg');
+    });
+  }
+
+  /* ---------- 逐字歌词 ---------- */
+  function buildChars(el, text) {
+    el.textContent = '';
+    const arr = [];
+    Array.from(text).forEach((ch, i) => {
+      const s = document.createElement('span');
+      s.className = 'ch';
+      s.style.setProperty('--i', i);
+      s.textContent = ch;
+      el.appendChild(s);
+      arr.push(s);
+    });
+    return arr;
+  }
+
+  function lyricRun(cfg) {
+    const el = cfg.el, trEl = cfg.trEl, lines = cfg.lines;
+    const cps = cfg.cps || 105, hold = cfg.hold || 1300, fade = 380;
+    let stopped = false, timers = [];
+    function stopTimers() { timers.forEach(clearTimeout); timers = []; }
+    function cycle(n) {
+      if (stopped) return;
+      const line = lines[n % lines.length];
+      const chars = buildChars(el, line.text);
+      el.style.opacity = 1;
+      let k = 0;
+      function step() {
+        if (stopped) return;
+        if (k < chars.length) {
+          if (k > 0) chars[k - 1].classList.remove('cur');
+          chars[k].classList.add('on');
+          chars[k].classList.add('cur');
+          k += 1;
+          timers.push(setTimeout(step, cps));
+        } else {
+          if (chars.length) chars[chars.length - 1].classList.remove('cur');
+          if (trEl) { trEl.textContent = line.tr; trEl.style.opacity = 1; }
+          timers.push(setTimeout(() => {
+            if (stopped) return;
+            el.style.opacity = 0;
+            if (trEl) trEl.style.opacity = 0;
+            timers.push(setTimeout(() => cycle(n + 1), fade));
+          }, hold));
+        }
+      }
+      timers.push(setTimeout(step, 0));
+    }
+    if (RM) {
+      const line = lines[0];
+      buildChars(el, line.text).forEach(c => c.classList.add('on'));
+      if (trEl) { trEl.textContent = line.tr; trEl.style.opacity = 1; }
+    } else {
+      timers.push(setTimeout(() => cycle(0), cfg.delay || 0));
+    }
+    return { stop() { stopped = true; stopTimers(); } };
+  }
+
+  lyricRun({
+    el: $('#heroLyric'),
+    trEl: $('#heroTr'),
+    lines: [
+      { text: '每个字，都落在拍子上', tr: 'every syllable, right on the beat' },
+      { text: '灯一暗，声音就先到了', tr: 'the sound arrives before the light' },
+      { text: '一首歌，从第一个字开始', tr: 'a song begins at its first word' }
+    ],
+    cps: 112, hold: 1250, delay: 800
+  });
+
+  lyricRun({
+    el: $('#demoLyric'),
+    trEl: $('#demoTr'),
+    lines: [{ text: '唱到哪一句，就亮到哪一句。', tr: 'it lights up as the voice arrives' }],
+    cps: 130, hold: 1500, delay: 400
+  });
+
+  /* ---------- 三种写法 ---------- */
+  const styleGroups = $$('[data-lyric-style]');
+  const styleTargets = [$('#demoLyric'), $('#lsLines')];
+  function setStyle(st) {
+    styleGroups.forEach(g => $$('button', g).forEach(b => {
+      b.setAttribute('aria-pressed', String(b.dataset.st === st));
+    }));
+    styleTargets.forEach(t => {
+      if (!t) return;
+      t.classList.remove('is-ink', 'is-neon', 'is-kale');
+      t.classList.add('is-' + st);
+    });
+  }
+  styleGroups.forEach(g => $$('button', g).forEach(b => {
+    b.addEventListener('click', () => setStyle(b.dataset.st));
+  }));
+  setStyle('ink');
+
+  /* ---------- 能力清单 ---------- */
+  $$('[data-cap]').forEach(cap => {
+    const head = $('.cap-head', cap);
+    head.addEventListener('click', () => {
+      const willOpen = !cap.classList.contains('is-open');
+      $$('[data-cap]').forEach(c => {
+        c.classList.remove('is-open');
+        $('.cap-head', c).setAttribute('aria-expanded', 'false');
+      });
+      if (willOpen) {
+        cap.classList.add('is-open');
+        head.setAttribute('aria-expanded', 'true');
+      }
+    });
+  });
+
+  /* ---------- 音质档位 ---------- */
+  const Q = {
+    std: ['标准', '128 kbps · 44.1 kHz · MP3'],
+    mid: ['较高', '192 kbps · 44.1 kHz · MP3'],
+    high: ['极高', '320 kbps · 44.1 kHz · MP3'],
+    loss: ['无损', '48 kHz · 16 bit · FLAC'],
+    hires: ['Hi-Res', '192 kHz · 24 bit · FLAC']
+  };
+  const qRead = $('#qRead');
+  $$('[data-q]').forEach(b => {
+    b.addEventListener('click', () => {
+      $$('[data-q]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+      const q = Q[b.dataset.q];
+      qRead.innerHTML = '<b>' + q[0] + '</b> · ' + q[1];
+    });
+  });
+
+  /* ---------- 音量与淡出 ---------- */
+  const meters = $('#meters');
+  const vol = $('#vol');
+  const volNum = $('#volNum');
+  const bars = [];
+  const shape = [];
+  for (let i = 0; i < 16; i++) {
+    const b = document.createElement('i');
+    meters.appendChild(b);
+    bars.push(b);
+    shape.push(0.28 + 0.62 * Math.abs(Math.sin(i * 1.15 + 0.4)) * (0.7 + 0.3 * Math.sin(i * 0.42)));
+  }
+  function paintVol() {
+    const v = Number(vol.value);
+    volNum.textContent = String(v);
+    bars.forEach((b, i) => {
+      b.style.setProperty('--h', String(Math.max(3, Math.round(shape[i] * v))));
+    });
+  }
+  vol.addEventListener('input', paintVol);
+  paintVol();
+  const fadeBtn = $('#fadeBtn');
+  let fading = false;
+  fadeBtn.addEventListener('click', () => {
+    if (fading) return;
+    fading = true;
+    fadeBtn.textContent = '淡出中';
+    meters.classList.add('is-fading');
+    setTimeout(() => {
+      fadeBtn.textContent = '淡入中';
+      meters.classList.remove('is-fading');
+      setTimeout(() => { fadeBtn.textContent = '暂停，看淡出'; fading = false; }, 620);
+    }, 900);
+  });
+
+  /* ---------- 外观 ---------- */
+  const miniWin = $('#miniWin');
+  const sysDark = matchMedia('(prefers-color-scheme: dark)');
+  let themeChoice = 'light';
+  function applyTheme(th) {
+    themeChoice = th;
+    const resolved = th === 'auto' ? (sysDark.matches ? 'dark' : 'light') : th;
+    if (miniWin) miniWin.dataset.th = resolved;
+  }
+  $$('.seg[data-theme] button').forEach(b => {
+    b.addEventListener('click', () => {
+      $$('.seg[data-theme] button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+      applyTheme(b.dataset.th);
+    });
+  });
+  if (sysDark.addEventListener) {
+    sysDark.addEventListener('change', () => { if (themeChoice === 'auto') applyTheme('auto'); });
+  }
+
+  /* ---------- 刘海 ---------- */
+  $$('[data-notch]').forEach(n => {
+    n.addEventListener('click', () => {
+      const open = !n.classList.contains('is-open');
+      n.classList.toggle('is-open', open);
+      n.setAttribute('aria-expanded', String(open));
+    });
+  });
+
+  /* ---------- 拷贝 ---------- */
+  $$('.copy').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const text = btn.dataset.copy;
+      const done = () => {
+        btn.textContent = '已拷贝';
+        toast('命令行已复制');
+        setTimeout(() => { btn.textContent = '拷贝'; }, 1700);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(fallbackSelect);
+      } else {
+        fallbackSelect();
+      }
+      function fallbackSelect() {
+        const code = btn.parentElement.querySelector('code');
+        const range = document.createRange();
+        range.selectNodeContents(code);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        toast('已选中，按 ⌘C 或 Ctrl+C 复制');
+      }
+    });
+  });
+
+  /* ---------- 背景音乐：全站贯穿，一直循环 ---------- */
+  const audio = document.getElementById('bgm');
+  audio.loop = true;
+  audio.volume = 1;
+  let bgmOff = false;
+  let bgmHinted = false;
+
+  function bgmPlay() {
+    if (bgmOff) return;
+    const p = audio.play();
+    if (!p || !p.then) return;
+    p.catch(() => {
+      if (bgmHinted) return;
+      bgmHinted = true;
+      setTimeout(() => { if (audio.paused && !bgmOff) toast('点一下页面，背景音乐就会响'); }, 700);
+    });
+  }
+
+  bgmPlay();
+  let bgmTries = 0;
+  const bgmRetry = () => {
+    if (bgmOff || bgmTries > 24) return;
+    bgmTries += 1;
+    bgmPlay();
+    setTimeout(bgmRetry, 2500);
+  };
+  setTimeout(bgmRetry, 600);
+
+  function bgmKick(e) {
+    if (bgmOff) return;
+    const t = e && e.target;
+    const a = t && t.closest ? t.closest('a') : null;
+    if (a) {
+      const h = a.getAttribute('href') || '';
+      if (h.indexOf('/download') > -1 || h.indexOf('/dl/') > -1) return;
+    }
+    if (audio.paused) bgmPlay();
+  }
+  ['pointerdown', 'keydown', 'wheel', 'touchstart', 'touchmove'].forEach(ev => {
+    window.addEventListener(ev, bgmKick, { passive: true });
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && !bgmOff && audio.paused) bgmPlay();
+  });
+  audio.addEventListener('ended', () => {
+    audio.currentTime = 0;
+    bgmPlay();
+  });
+
+  // 真正开始下载文件后静音
+  $$('a[href*="/download"], a[href*="/dl/"]').forEach(a => {
+    a.addEventListener('click', () => {
+      bgmOff = true;
+      audio.pause();
+    });
+  });
+
+  /* ---------- 独立下载页 ---------- */
+  const dlPage = $('#download');
+  let dlPrevY = 0;
+  function openDL() {
+    if (!dlPage || !dlPage.hidden) return;
+    dlPrevY = window.scrollY;
+    dlPage.hidden = false;
+    document.documentElement.classList.add('dl-open');
+    dlPage.scrollTop = 0;
+    try { history.replaceState(null, '', '#download'); } catch (e) {}
+  }
+  function closeDL() {
+    if (!dlPage || dlPage.hidden) return;
+    dlPage.hidden = true;
+    document.documentElement.classList.remove('dl-open');
+    try { history.replaceState(null, '', '#top'); } catch (e) {}
+    window.scrollTo(0, dlPrevY);
+  }
+  $$('[data-open-dl]').forEach(el => el.addEventListener('click', e => { e.preventDefault(); openDL(); }));
+  $$('[data-close-dl]').forEach(el => el.addEventListener('click', e => { e.preventDefault(); closeDL(); }));
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && dlPage && !dlPage.hidden) closeDL();
+  });
+  if (location.hash === '#download') openDL();
+
+
+  let resizeQueued = false;
+  window.addEventListener('resize', () => {
+    if (resizeQueued) return;
+    resizeQueued = true;
+    requestAnimationFrame(() => { resizeQueued = false; sizeWeb(); updateLS(); onScroll(); });
+  });
+
+  /* ---------- 律动：滚动驱动 ---------- */
+  const LS = [
+    { text: '一个字，跟着人声浮起来。', tr: 'one character, rising with the voice' },
+    { text: '落在它该落的那一拍。', tr: 'landing on the beat it belongs to' },
+    { text: '唱完，它自己安静下去。', tr: 'and when it is over, it goes quiet' }
+  ];
+  const lsSection = $('#lyric');
+  const lsBar = $('#lsBar');
+  const lsPct = $('#lsPct');
+  const lsLineEls = $$('.ls-line');
+  const lsTrEls = $$('.ls-tr');
+  const lsChars = [];
+  let lsTotal = 0;
+  lsLineEls.forEach((el, i) => {
+    const chars = buildChars(el, LS[i].text);
+    chars.forEach(c => {
+      lsChars.push(c);
+      lsTotal += 1;
+      c.dataset.line = String(i);
+    });
+  });
+  if (RM) {
+    lsChars.forEach(c => c.classList.add('on'));
+    lsLineEls.forEach(l => l.classList.add('is-live'));
+    lsTrEls.forEach(t => t.classList.add('is-live'));
+  }
+
+  function updateLS() {
+    if (!lsSection) return;
+    const vh = window.innerHeight;
+    const top = lsSection.offsetTop;
+    const span = lsSection.offsetHeight - vh;
+    const p = span > 0 ? clamp((window.scrollY - top) / span, 0, 1) : 0;
+    if (lsBar) lsBar.style.transform = 'scaleX(' + p + ')';
+    if (lsPct) lsPct.textContent = String(Math.round(p * 100)).padStart(2, '0');
+    if (RM) return;
+    if (p <= 0 && window.scrollY < top - vh) return;
+    const lit = Math.min(lsTotal, Math.floor(p * (lsTotal + 1.9)));
+    const liveLine = lit > 0 ? Number(lsChars[lit - 1].dataset.line) : 0;
+    lsChars.forEach((c, i) => {
+      c.classList.toggle('on', i < lit);
+      c.classList.toggle('cur', i === lit - 1);
+    });
+    lsLineEls.forEach((l, i) => l.classList.toggle('is-live', i === liveLine && lit > 0));
+    lsTrEls.forEach((t, i) => t.classList.toggle('is-live', i === liveLine && lit > 0));
+  }
+
+  /* ---------- 首屏蛛网 ---------- */
+  const heroWeb = $('#heroWeb');
+  const heroBox = heroWeb ? heroWeb.parentElement : null;
+  const NOTE_GLYPHS = ['♪', '♫', '♩', '♬', '♭', '♯'];
+  const notes = [];
+  let wctx = null, ww = 0, wh = 0, webT = 0, webLast = 0, webAlive = true;
+
+  function sizeWeb() {
+    if (!heroWeb || !heroBox) return;
+    wctx = wctx || heroWeb.getContext('2d');
+    const box = heroBox.getBoundingClientRect();
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    ww = Math.max(320, box.width);
+    wh = Math.max(320, box.height);
+    heroWeb.width = Math.round(ww * dpr);
+    heroWeb.height = Math.round(wh * dpr);
+    wctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    seedNotes();
+    if (RM) drawWeb(0.6, 0);
+  }
+
+  function makeNote(anywhere) {
+    return {
+      g: NOTE_GLYPHS[Math.floor(Math.random() * NOTE_GLYPHS.length)],
+      x: ww * (0.06 + Math.random() * 0.94),
+      y: anywhere ? Math.random() * wh : wh + 60 + Math.random() * 50,
+      size: 16 + Math.random() * 18,
+      spd: 18 + Math.random() * 24,
+      sway: 3 + Math.random() * 15,
+      phase: Math.random() * Math.PI * 2,
+      rot: (Math.random() - 0.5) * 0.42,
+      a: 0.1 + Math.random() * 0.13,
+      red: Math.random() < 0.22
+    };
+  }
+
+  function seedNotes() {
+    notes.length = 0;
+    const count = Math.round(clamp(ww / 66, 12, 30));
+    for (let i = 0; i < count; i++) notes.push(makeNote(true));
+  }
+
+  function drawWeb(t, dt) {
+    if (!wctx) return;
+    wctx.clearRect(0, 0, ww, wh);
+    if (!notes.length) seedNotes();
+    const beat = Math.pow(Math.max(0, 1 - ((t * 1.08) % 1)), 4);
+    for (let i = 0; i < notes.length; i++) {
+      const n = notes[i];
+      const inA = clamp((wh + 40 - n.y) / 80, 0, 1);
+      const outA = clamp(n.y / (wh * 0.24), 0, 1);
+      const a = n.a * inA * outA * (0.7 + 0.3 * beat);
+      if (a > 0.004) {
+        wctx.save();
+        wctx.translate(n.x + Math.sin(t * 0.55 + n.phase) * n.sway, n.y - 8 * beat);
+        wctx.rotate(n.rot + Math.sin(t * 0.4 + n.phase) * 0.05);
+        const s = 1 + 0.12 * beat;
+        wctx.scale(s, s);
+        wctx.font = '600 ' + n.size.toFixed(1) + 'px "Noto Serif SC","Songti SC","Apple Symbols","Segoe UI Symbol",serif';
+        wctx.textAlign = 'center';
+        wctx.textBaseline = 'middle';
+        wctx.fillStyle = n.red
+          ? 'rgba(255,88,104,' + a.toFixed(3) + ')'
+          : 'rgba(244,234,217,' + a.toFixed(3) + ')';
+        wctx.fillText(n.g, 0, 0);
+        wctx.restore();
+      }
+      if (dt) {
+        n.y -= n.spd * dt;
+        if (n.y < -60) notes[i] = makeNote(false);
+      }
+    }
+  }
+
+  function webLoop(ts) {
+    if (RM) return;
+    if (!webLast) webLast = ts;
+    const dt = Math.min(0.06, (ts - webLast) / 1000);
+    webLast = ts;
+    if (webAlive) {
+      webT += dt;
+      drawWeb(webT, dt);
+    }
+    requestAnimationFrame(webLoop);
+  }
+
+  if (heroWeb) {
+    sizeWeb();
+    if (!RM) {
+      drawWeb(0, 0);
+      requestAnimationFrame(webLoop);
+    }
+    if (heroBox && 'IntersectionObserver' in window) {
+      new IntersectionObserver(function (es) {
+        webAlive = es[0].isIntersecting;
+        webLast = 0;
+      }, { threshold: 0.06 }).observe(heroBox);
+    }
+  }
+
+  /* ---------- 首帧 ---------- */
+  onScroll();
+  updateLS();
+  setTimeout(updateLS, 500);
+})();
+</script>
+</body>
+</html>

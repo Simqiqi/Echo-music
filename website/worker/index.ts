@@ -49,6 +49,12 @@ export default {
       return relay(`${upstream}/releases/latest/download${pathname}`, pathname.slice(1), request)
     }
 
+    // 改版首页：/ 与 /download 都由静态文件 /echo-redesign.html 提供。
+    // 这个文件在 website/public 下，随构建一起进 dist/client。
+    if (pathname === '/' || pathname === '/download') {
+      return env.ASSETS.fetch(new URL('/echo-redesign.html', request.url).toString())
+    }
+
     return env.ASSETS.fetch(request)
   },
 }
