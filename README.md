@@ -28,7 +28,7 @@
 
 ## 项目简介
 
-一个 macOS 上的音乐桌面客户端。在 [mygo-cloudmusic](https://github.com/egoist/mygo-cloudmusic) 基础上独立演进，加入了自己的理解：**液态玻璃**、**黑胶唱机**、**逐字歌词**、**听歌周报**、**天气电台**、**下载管理**与**新碟速递**。
+一个在桌面端上的音乐桌面客户端。在 [mygo-cloudmusic](https://github.com/egoist/mygo-cloudmusic) 基础上独立演进，加入了自己的理解：**液态玻璃**、**黑胶唱机**、**逐字歌词**、**听歌周报**、**天气电台**、**下载管理**与**新碟速递**。
 
 <div align="center">
 
@@ -79,8 +79,8 @@
 
 前往 [Releases](https://github.com/Simqiqi/Echo-music/releases) 页面下载最新版本，解压后拖入「应用程序」即可使用。
 
-> 要求 macOS 系统，Apple Silicon 与 Intel 芯片均已支持。
-
+>  macOS 系统，Apple Silicon 与 Intel 芯片均已支持。
+>  win系统全量支持。
 ## 使用指南
 
 首次打开需扫码登录网易云音乐账号，登录态由系统钥匙串安全存储。登录后即可浏览每日推荐、搜索歌曲、创建歌单。
