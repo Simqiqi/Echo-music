@@ -1,11 +1,12 @@
 import { Link, createFileRoute } from '@tanstack/solid-router'
 import { For, createSignal, onCleanup, onMount, type JSX } from 'solid-js'
 import { Layout } from '../components/Layout'
-import { Stage } from '../components/Stage'
-import { LyricStage } from '../components/LyricStage'
+import { Ink } from '../components/Ink'
+import { Ribbon } from '../components/Ribbon'
 import { Listen } from '../components/Listen'
 import { Icon, type IconName } from '../components/Icon'
 import { ThemeSwitch, flipTone } from '../theme'
+import { aloud, audible, blocked, tap } from '../music'
 import { mygo, release, site } from '../site'
 
 export const Route = createFileRoute('/')({
@@ -14,50 +15,54 @@ export const Route = createFileRoute('/')({
 
 const version = release.tag_name.replace(/^v/, '')
 
+const installSize = (() => {
+  const dmg = release.assets.find((a) => /darwin-arm64\.dmg$/.test(a.name))
+  return dmg ? Math.round(dmg.size / 1048576) : 21
+})()
+
 function Home() {
-  useScrollReveal()
+  useReveal()
   return (
     <Layout>
       <Hero />
-      <Ticker />
-      <Desk />
-      <Lyric />
+      <Marquee />
+      <Stats />
+      <Showcase />
+      <Ribbon />
       <Bento />
       <Closing />
     </Layout>
   )
 }
 
-// Sections fade up as they arrive, but only when the visitor hasn't asked
-// the system for less motion. The hidden state is added here, so a page
-// without JavaScript still reads fine.
-function useScrollReveal() {
+// Sections arrive as they are reached: a short lift and a fade, and nothing
+// at all for a visitor who asked the system for less motion.
+function useReveal() {
   onMount(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
     const targets = Array.from(document.querySelectorAll<HTMLElement>('[data-reveal]'))
     if (!targets.length) return
-    for (const el of targets) el.classList.add('will-reveal')
+    for (const el of targets) el.classList.add('v2-waiting')
     const watcher = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
           if (!entry.isIntersecting) continue
-          entry.target.classList.add('shown')
+          entry.target.classList.add('v2-here')
           watcher.unobserve(entry.target)
         }
       },
-      { rootMargin: '0px 0px -10% 0px', threshold: 0.1 },
+      { rootMargin: '0px 0px -12% 0px', threshold: 0.08 },
     )
     for (const el of targets) watcher.observe(el)
     onCleanup(() => watcher.disconnect())
   })
 }
 
-// One character per span, so each can arrive on its own beat.
 function Chars(props: { text: string; from?: number }) {
   return (
     <>
       {Array.from(props.text).map((ch, i) => (
-        <span class="lp-ch" style={{ '--i': `${(props.from ?? 0) + i}` }}>
+        <span class="v2-ch" style={{ '--i': `${(props.from ?? 0) + i}` }}>
           {ch}
         </span>
       ))}
@@ -65,50 +70,79 @@ function Chars(props: { text: string; from?: number }) {
   )
 }
 
+function SoundChip() {
+  return (
+    <button
+      type="button"
+      class="v2-sound"
+      classList={{ on: audible() }}
+      onClick={() => (blocked() ? aloud() : tap())}
+      aria-pressed={audible()}
+    >
+      <span class="v2-sound-eq" aria-hidden="true">
+        <i />
+        <i />
+        <i />
+        <i />
+      </span>
+      <span>{audible() ? '背景音乐 · 开着' : blocked() ? '轻点，让它响起来' : '背景音乐 · 已关'}</span>
+    </button>
+  )
+}
+
 function Hero() {
   return (
-    <section class="lp-hero">
-      <Stage />
-      <div class="lp-hero-inner">
-        <p class="lp-eyebrow">
-          <i class="lp-dot" aria-hidden="true" />
-          原生 · 轻量 · 没有 WebView
-        </p>
-        <h1 class="lp-title">
-          <span class="lp-line">
+    <section class="v2-hero">
+      <Ink />
+      <div class="v2-hero-fade" aria-hidden="true" />
+      <div class="v2-hero-inner">
+        <div class="v2-hero-top">
+          <p class="v2-eyebrow">
+            <i class="v2-dot" aria-hidden="true" />
+            原生 · 轻量 · 没有 WebView
+          </p>
+          <SoundChip />
+        </div>
+        <h1 class="v2-title">
+          <span class="v2-title-line">
             <Chars text="声音，" />
           </span>
-          <span class="lp-line lp-line-accent">
+          <span class="v2-title-line v2-title-accent">
             <Chars text="不该住在浏览器里" from={3} />
           </span>
         </h1>
-        <p class="lp-lede">
-          用 Go 与 <a href={mygo}>MyGo</a>{' '}
-          写成的第三方网易云音乐客户端。原生界面，冷启动不到一秒；Hi-Res 边下边播，逐字歌词跟着人声浮起，闲下来就安静地待在 Dock 里。
-        </p>
-        <div class="lp-actions">
-          <Link class="btn btn-primary lp-btn" to="/download">
-            <Icon name="download" size={17} />
-            下载
-          </Link>
-          <button class="btn btn-ghost lp-btn" type="button" onClick={(e) => flipTone(e)}>
-            <Icon name="sparkle" size={17} />
-            换个主题
-          </button>
+        <div class="v2-hero-foot">
+          <p class="v2-lede">
+            用 Go 与 <a href={mygo}>MyGo</a>{' '}
+            写成的第三方网易云音乐客户端。原生界面，冷启动不到一秒；Hi-Res 边下边播，逐字歌词跟着人声浮起，闲下来就安静地待在
+            Dock 里。
+          </p>
+          <div class="v2-actions">
+            <Link class="btn btn-primary v2-btn" to="/download">
+              <Icon name="download" size={17} />
+              下载
+            </Link>
+            <button
+              class="btn btn-ghost v2-btn"
+              type="button"
+              onClick={(e) => flipTone(e)}
+            >
+              <Icon name="sparkle" size={17} />
+              换个主题
+            </button>
+          </div>
         </div>
-        <p class="lp-fine">
-          版本 {version} · 免费 · 与网易云音乐官方无关
-        </p>
+        <p class="v2-fine">版本 {version} · 免费 · 与网易云音乐官方无关</p>
       </div>
-      <div class="lp-scroll" aria-hidden="true">
-        <span>向下</span>
+      <div class="v2-cue" aria-hidden="true">
+        <span>把光标放进光里，再往下</span>
         <i />
       </div>
     </section>
   )
 }
 
-const ticker = [
+const marquee = [
   '逐字歌词',
   'Hi-Res 无损',
   '边下边播',
@@ -119,15 +153,17 @@ const ticker = [
   '扫码登录',
   '每日推荐',
   '律动视图',
+  '墨迹歌词',
+  '万花筒',
 ]
 
-function Ticker() {
+function Marquee() {
   return (
-    <section class="lp-ticker" aria-hidden="true">
-      <div class="lp-ticker-track">
-        <For each={[...ticker, ...ticker]}>
+    <section class="v2-marquee" aria-hidden="true">
+      <div class="v2-marquee-track">
+        <For each={[...marquee, ...marquee]}>
           {(word) => (
-            <span class="lp-ticker-item">
+            <span class="v2-marquee-item">
               {word}
               <i />
             </span>
@@ -138,8 +174,74 @@ function Ticker() {
   )
 }
 
+// Numbers that count themselves up the first time they are seen.
+function Count(props: { to: number; decimals?: number; suffix?: string }) {
+  const [n, setN] = createSignal(0)
+  let node: HTMLSpanElement | undefined
+
+  onMount(() => {
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (reduce) {
+      setN(props.to)
+      return
+    }
+    const watcher = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((e) => e.isIntersecting)) return
+        watcher.disconnect()
+        const began = performance.now()
+        const step = (now: number) => {
+          const k = Math.min(1, (now - began) / 1100)
+          const eased = 1 - (1 - k) ** 3
+          setN(props.to * eased)
+          if (k < 1) requestAnimationFrame(step)
+        }
+        requestAnimationFrame(step)
+      },
+      { threshold: 0.4 },
+    )
+    if (node) watcher.observe(node)
+    onCleanup(() => watcher.disconnect())
+  })
+
+  return (
+    <span ref={node}>
+      {n().toFixed(props.decimals ?? 0)}
+      {props.suffix}
+    </span>
+  )
+}
+
+function Stats() {
+  return (
+    <section class="v2-stats" data-reveal>
+      <div class="v2-stat">
+        <b>
+          <Count to={0.9} decimals={1} suffix="s" />
+        </b>
+        <span>冷启动</span>
+        <p>从点击到出声，多数机器在半秒到一秒之间。</p>
+      </div>
+      <div class="v2-stat">
+        <b>
+          <Count to={192} suffix="kHz" />
+        </b>
+        <span>最高取样率</span>
+        <p>Hi-Res 24 bit / 192 kHz，边下边播，不必等整首。</p>
+      </div>
+      <div class="v2-stat">
+        <b>
+          <Count to={installSize} suffix="MB" />
+        </b>
+        <span>安装包</span>
+        <p>没有浏览器内核要一起带上，所以只有这么大。</p>
+      </div>
+    </section>
+  )
+}
+
 // The app window, tilted a few degrees toward the pointer.
-function Desk() {
+function Showcase() {
   let frame: HTMLDivElement | undefined
 
   const move = (e: PointerEvent) => {
@@ -147,8 +249,8 @@ function Desk() {
     const box = frame.getBoundingClientRect()
     const x = (e.clientX - box.left) / box.width - 0.5
     const y = (e.clientY - box.top) / box.height - 0.5
-    frame.style.setProperty('--ry', `${x * 4.5}deg`)
-    frame.style.setProperty('--rx', `${-y * 3.2}deg`)
+    frame.style.setProperty('--ry', `${x * 5}deg`)
+    frame.style.setProperty('--rx', `${-y * 3.6}deg`)
     frame.style.setProperty('--mx', `${(x + 0.5) * 100}%`)
     frame.style.setProperty('--my', `${(y + 0.5) * 100}%`)
   }
@@ -159,27 +261,27 @@ function Desk() {
   }
 
   return (
-    <section id="demo" class="lp-desk" data-reveal>
-      <div class="lp-desk-head">
-        <p class="eyebrow">真机截图</p>
-        <h2 class="display">
-          <span>下面这一屏，</span>
-          <span>就是它本身。</span>
+    <section id="demo" class="v2-show" data-reveal>
+      <div class="v2-show-head">
+        <p class="v2-eyebrow">真机截图</p>
+        <h2 class="v2-h2">
+          下面这一屏，
+          <em>就是它本身。</em>
         </h2>
-        <p class="lede">
-          截自正在运行的那一份：登录、推荐、播放器都在，连正在播的那首歌都是真的。
+        <p class="v2-lede">
+          截自正在运行的那一份：登录、推荐、播放器都在，连正在播的那首歌都是真的——下面这条，就是那首歌。
         </p>
       </div>
       <div
-        class="lp-desk-frame"
+        class="v2-shot-frame"
         ref={frame}
         onPointerMove={move}
         onPointerLeave={rest}
         style={{ '--rx': '0deg', '--ry': '0deg' }}
       >
-        <div class="lp-desk-glow" aria-hidden="true" />
+        <div class="v2-shot-glow" aria-hidden="true" />
         <img
-          class="lp-shot"
+          class="v2-shot"
           src="/app.png"
           width={1680}
           height={1160}
@@ -189,35 +291,34 @@ function Desk() {
         />
       </div>
       <Listen />
-      <p class="lp-desk-hint">光标移过去，它会轻轻迎向你</p>
-    </section>
-  )
-}
-
-function Lyric() {
-  return (
-    <section id="lyric" class="lp-lyric" data-reveal>
-      <div class="lp-lyric-copy">
-        <p class="eyebrow">律动</p>
-        <h2 class="display">
-          <span>每个字，</span>
-          <span>都跟着唱。</span>
-        </h2>
-        <p class="lede">
-          逐字高亮与翻译同屏，长句也不会跳字。切到「律动」视图，每个字随演唱浮起、发光、落定，像声音在纸上被写了一遍。
-        </p>
-        <ul class="lp-notes">
-          <li>逐字时间轴，跟唱不抢拍</li>
-          <li>原文与翻译同屏对照</li>
-          <li>点一句歌词，直接跳过去</li>
+      <div class="v2-bgm">
+        <p class="v2-bgm-title">关于这段音乐</p>
+        <ul>
+          <li>
+            <b>一进站就会响。</b>
+            声音先起，页面才被听见。浏览器不让自动发声时，它先静音开始，等你轻点页面任意处再补上。
+          </li>
+          <li>
+            <b>它会自己让位。</b>
+            页面里任何播放器一响——上面那首，或者一段视频——背景就退到后面；唱完，它再回来。
+          </li>
+          <li>
+            <b>它记得你的选择。</b>
+            关掉之后，下一次打开不会再自己响；想听，点顶栏的喇叭，或左上角那个开关。
+          </li>
         </ul>
       </div>
-      <LyricStage />
     </section>
   )
 }
 
-type Feature = { icon: IconName; title: string; body: string; span?: number; extra?: () => JSX.Element }
+type Feature = {
+  icon: IconName
+  title: string
+  body: string
+  span?: number
+  extra?: () => JSX.Element
+}
 
 const features: Feature[] = [
   {
@@ -236,7 +337,7 @@ const features: Feature[] = [
   {
     icon: 'lyrics',
     title: '逐字歌词与「律动」',
-    body: '每个字随演唱浮起、发光、落定。还能读这首歌的评论。',
+    body: '每个字随演唱浮起、发光、落定。还有墨迹、霓虹与万花筒几种写法。',
     span: 3,
   },
   {
@@ -275,32 +376,31 @@ const features: Feature[] = [
     icon: 'sun',
     title: '浅色、深色、跟随系统',
     body: '和这个网站一样——现在就试试。',
-    extra: () => <ThemeSwitch labels class="lp-theme" />,
+    extra: () => <ThemeSwitch labels class="v2-theme" />,
   },
 ]
 
 function Bento() {
   return (
-    <section id="features" class="lp-bento" data-reveal>
-      <div class="lp-bento-head">
-        <p class="eyebrow">功能</p>
-        <h2 class="display">
-          <span>该有的，</span>
-          <span>都在。</span>
+    <section id="features" class="v2-bento" data-reveal>
+      <div class="v2-bento-head">
+        <p class="v2-eyebrow">功能</p>
+        <h2 class="v2-h2">
+          该有的，
+          <em>都在。</em>
         </h2>
-        <p class="lede">从发现到播放，每一处都为桌面重新做过。喜欢、队列、随机与循环，一样不少。</p>
+        <p class="v2-lede">
+          从发现到播放，每一处都为桌面重新做过。喜欢、队列、随机与循环，一样不少。
+        </p>
       </div>
-      <div class="lp-grid">
-        <For each={features}>
-          {(f) => <Cell feature={f} />}
-        </For>
+      <div class="v2-grid">
+        <For each={features}>{(f, i) => <Cell feature={f} index={i()} />}</For>
       </div>
     </section>
   )
 }
 
-// Each card carries the pointer position as --mx/--my for its own light.
-function Cell(props: { feature: Feature }) {
+function Cell(props: { feature: Feature; index: number }) {
   let card: HTMLElement | undefined
   const move = (e: PointerEvent) => {
     if (!card) return
@@ -310,15 +410,18 @@ function Cell(props: { feature: Feature }) {
   }
   return (
     <article
-      class="lp-cell"
+      class="v2-cell"
       classList={{
-        'lp-cell-mid': props.feature.span === 3,
-        'lp-cell-wide': props.feature.span === 4,
+        'v2-cell-mid': props.feature.span === 3,
+        'v2-cell-wide': props.feature.span === 4,
       }}
       ref={card}
       onPointerMove={move}
     >
-      <div class="lp-cell-icon">
+      <span class="v2-cell-n" aria-hidden="true">
+        {String(props.index + 1).padStart(2, '0')}
+      </span>
+      <div class="v2-cell-icon">
         <Icon name={props.feature.icon} size={20} />
       </div>
       <h3>{props.feature.title}</h3>
@@ -336,7 +439,6 @@ const qualities = [
   { name: 'Hi-Res', spec: '最高 192 kHz / 24 bit · FLAC' },
 ]
 
-// The app's own quality picker, working.
 function Quality() {
   const [q, setQ] = createSignal(3)
   return (
@@ -361,7 +463,6 @@ function Quality() {
   )
 }
 
-// A wave fading out at a pause and back in, drawn.
 function Fade() {
   const bars = Array.from({ length: 44 }, (_, i) => {
     const env = i < 16 ? 1 : i < 22 ? 1 - (i - 16) / 6 : i < 26 ? 0 : Math.min((i - 26) / 6, 1)
@@ -377,21 +478,27 @@ function Fade() {
 
 function Closing() {
   return (
-    <section id="get" class="lp-closing" data-reveal>
-      <div class="lp-closing-glow" aria-hidden="true" />
-      <p class="eyebrow">准备好了</p>
-      <h2 class="lp-closing-title">
+    <section id="get" class="v2-close" data-reveal>
+      <div class="v2-close-light" aria-hidden="true" />
+      <p class="v2-eyebrow">准备好了</p>
+      <h2 class="v2-close-title">
         现在，
         <br />
         把它放进 Dock。
       </h2>
-      <div class="lp-actions">
-        <Link class="btn btn-primary lp-btn" to="/download">
+      <div class="v2-actions">
+        <Link class="btn btn-primary v2-btn" to="/download">
           <Icon name="download" size={17} />
           下载 {site.name}
         </Link>
+        <button class="btn btn-ghost v2-btn" type="button" onClick={(e) => flipTone(e)}>
+          <Icon name="sparkle" size={17} />
+          换个主题看看
+        </button>
       </div>
-      <p class="lp-fine">macOS · Windows · Linux · {version}</p>
+      <p class="v2-fine">
+        macOS · Windows · Linux · {version} · 安装包 {installSize}MB
+      </p>
     </section>
   )
 }
