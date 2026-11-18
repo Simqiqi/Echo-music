@@ -52,6 +52,10 @@ jobs:
       APPLE_ID: ${{ secrets.APPLE_ID }}
     strategy:
       fail-fast: false
+      # 三平台的构建与上传串行执行：各平台都会上传同名的 SHA256SUMS 与
+      # install.sh，`gh release upload --clobber` 并发覆盖同名资产时会互相
+      # 删到对方的 asset id，删不存在的资产就让整个 job 以 404 失败。
+      max-parallel: 1
       matrix:
         include:
           - { name: macOS, os: macos-latest, targets: "darwin/arm64 darwin/amd64" }
