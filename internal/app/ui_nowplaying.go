@@ -463,6 +463,11 @@ func (a *app) npTabsRow(c *ui.Context, w float32) ui.Element {
 			if ev.Button != 0 {
 				return false
 			}
+			// 只有按在某个标签页上才是这行的：同一行里还坐着「动态效果」
+			// 按钮，它要自己接住点击去开菜单，不能被拖拽吃掉。
+			if a.npTabAt(ev.X) < 0 {
+				return false
+			}
 			a.npTabDrag = true
 			return true
 		case ui.InputPointerMove:
