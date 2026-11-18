@@ -1,0 +1,42 @@
+{
+  "version": "0.4.1",
+  "notes": "新增了几个新的平台，稳固了系统稳定性。新增 2 个背景样式，再次提升用户自定义。",
+  "date": "2026-11-18T04:35:35Z",
+  "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.4.1/echo-cloudmusic-0.4.1-windows-amd64.tar.gz",
+  "size": 24778151,
+  "signature": "z6+576V1L7zQjs5pDlxVqsT9hccQzxQVShNc40xTVBZLsdrPj6jP5v6wHtVLovCqWHyPTuuJUndzCllrH6S4DQ==",
+  "deltas": [
+    {
+      "from": "0.3.8",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.4.1/echo-cloudmusic-0.3.8-to-0.4.1-windows-amd64.delta",
+      "size": 2869490,
+      "signature": "nc59CW43KVyp224LFIHRzSEiT8/mdDEnCcvFnlTLzs6UNGAAbb2iu5eHnbxS0uDgspcuJ/hy66SDv1vbIQa4Cw=="
+    },
+    {
+      "from": "0.3.7",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.4.1/echo-cloudmusic-0.3.7-to-0.4.1-windows-amd64.delta",
+      "size": 14710179,
+      "signature": "goGtmHx8IRPszTC7VE5k/X9ig4wohnX3ka+uWHsPlWB27ZFYl9T4Mf6pJnFqVwu4ANJDfkFP+6uTCagY9yQnAA=="
+    },
+    {
+      "from": "0.3.6",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.4.1/echo-cloudmusic-0.3.6-to-0.4.1-windows-amd64.delta",
+      "size": 18321672,
+      "signature": "W3SMVJyy4TeA05Z/BHCqQ7Hu0K4vojGUQk7QVliE6ak0kXwlZiiolIc5B4kEF3bKpmZAGJ21FP8dsnsICih1Dg=="
+    }
+  ],
+  "previous": [
+    {
+      "version": "0.3.8",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.8/echo-cloudmusic-0.3.8-windows-amd64.tar.gz",
+      "size": 22914974,
+      "signature": "qWQGmlHvoyJaIHV8svddKElYuUv93xKlrE3e2So8ZxhO+JFcejzG6KKYjnTNEvfeS7k6KJz9j20tgDjIrumwBg=="
+    },
+    {
+      "version": "0.3.7",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.7/echo-cloudmusic-0.3.7-windows-amd64.tar.gz",
+      "size": 11265056,
+      "signature": "9XIXZC7fVVtsq4UpyqVT3ggtcMFVxyAL/7cNZl1cV+Kx37dTZDz5T/Ka+bVq+z+DqtkxdMNEzvcof4o9CzHHBA=="
+    }
+  ]
+}

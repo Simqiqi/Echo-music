@@ -1,0 +1,42 @@
+{
+  "version": "0.4.1",
+  "notes": "新增了几个新的平台，稳固了系统稳定性。新增 2 个背景样式，再次提升用户自定义。",
+  "date": "2026-11-18T04:36:47Z",
+  "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.4.1/echo-cloudmusic-0.4.1-windows-arm64.tar.gz",
+  "size": 23872563,
+  "signature": "b8rVS9ijSGQxk9L22RoXau7GEu9dwSqlRHQ/ajD85D9m8d1/Aa/2Q9P8yEzddwWsOaoepUsHAQp7Sy9F2GNeAQ==",
+  "deltas": [
+    {
+      "from": "0.3.8",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.4.1/echo-cloudmusic-0.3.8-to-0.4.1-windows-arm64.delta",
+      "size": 2798547,
+      "signature": "jHVXPW8R2IKR9zUDaq61ety3MfJPRgy2VropsmISmLWS4v0x2eaEebCM3cQiKdObcHvTo5AsLoJwhR7ZVjx6Dg=="
+    },
+    {
+      "from": "0.3.7",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.4.1/echo-cloudmusic-0.3.7-to-0.4.1-windows-arm64.delta",
+      "size": 14550717,
+      "signature": "Bd4TwZ0PF2l+5WtXcy5Si2v6Hs0qkEG6ZGgir1t7TrsH/EpGanuATP72p/ic6oZjnx8XBui+uZifAS/AgpAZAg=="
+    },
+    {
+      "from": "0.3.6",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.4.1/echo-cloudmusic-0.3.6-to-0.4.1-windows-arm64.delta",
+      "size": 18188609,
+      "signature": "2fBeCZC6Y4GdLkhbA3qh3rA7cx2U/l80lT/6x7RXIp7OsaY9Wtooz2RuX6ep0S5/ou4fGLB2ldrSoX3MmRPxDg=="
+    }
+  ],
+  "previous": [
+    {
+      "version": "0.3.8",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.8/echo-cloudmusic-0.3.8-windows-arm64.tar.gz",
+      "size": 22028151,
+      "signature": "/3bXYDfZ9rca3ntQzGcuCPxke2PV30+kHZtZUA+vQbprtGwFw6twJeGfSNnqSlsV2z7ao6znRxe8pyA9vgjnBw=="
+    },
+    {
+      "version": "0.3.7",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.7/echo-cloudmusic-0.3.7-windows-arm64.tar.gz",
+      "size": 10384663,
+      "signature": "lS786HdIVZGFo7BC24SOVtewxg5Twge0YyVhIiigNiR04imnBV0d/ZYkdSX08pV6T2XW1/mySz/JGTiQQvjiBQ=="
+    }
+  ]
+}

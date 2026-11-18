@@ -1,0 +1,42 @@
+{
+  "version": "0.4.1",
+  "notes": "新增了几个新的平台，稳固了系统稳定性。新增 2 个背景样式，再次提升用户自定义。",
+  "date": "2026-11-18T04:42:30Z",
+  "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.4.1/echo-cloudmusic-0.4.1-linux-arm64.tar.gz",
+  "size": 23847789,
+  "signature": "sTrIRda27vCK+mAyUvs0YtaESoxEFukH3r4Q/aH3w4Y7EOvyYg4wO0PkYIxUvHEcE8p1vNsS2uOCqndwoNhZCw==",
+  "deltas": [
+    {
+      "from": "0.3.8",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.4.1/echo-cloudmusic-0.3.8-to-0.4.1-linux-arm64.delta",
+      "size": 2770065,
+      "signature": "iRR16UbAyfajY/2/viiU90BayGeveclHmecAejRb+48o6Q+rTksHUwgn9kfFQKqArRF+kzK0VeHCJC61CLbPBQ=="
+    },
+    {
+      "from": "0.3.7",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.4.1/echo-cloudmusic-0.3.7-to-0.4.1-linux-arm64.delta",
+      "size": 14538843,
+      "signature": "vvWyk7c+7sWqn7+uaXWdBFfLq2P0SxEV8u7dW5rZdhZShTqbKvHUsUdzX2AEBuhtXgkg0k5O8WrSpG/FDEphDw=="
+    },
+    {
+      "from": "0.3.6",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.4.1/echo-cloudmusic-0.3.6-to-0.4.1-linux-arm64.delta",
+      "size": 18237520,
+      "signature": "JLw/4o7Oixu1oMSys36ztvGAiR9Po9PrjGkxouG9QeQV7bYIx43aAHGix3EUEP+atIZQQy9B9OmLbhEKZAPICg=="
+    }
+  ],
+  "previous": [
+    {
+      "version": "0.3.8",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.8/echo-cloudmusic-0.3.8-linux-arm64.tar.gz",
+      "size": 22000461,
+      "signature": "3ac2EP6FS0fQydhX57rIv6NQv103vWGSVilcrdy0637+4mtxkZB3ofaStuTPUk6Kj2ZafGK2sM/nmatFkI94CQ=="
+    },
+    {
+      "version": "0.3.7",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.7/echo-cloudmusic-0.3.7-linux-arm64.tar.gz",
+      "size": 10352375,
+      "signature": "k/otyabX28uIcfW9cdWkdOhbQ+ONvgz6t3wZBvjTscWfNdalDQsRCgf2gnIqpalxNJaKZJjOwZyoq39PXsxfAQ=="
+    }
+  ]
+}
