@@ -71,22 +71,25 @@ func TestFeedbackMailCarriesDiagnostics(t *testing.T) {
 	}
 }
 
-// The five probes are asked together and keep their own results.
+// The probes are asked together and keep their own results, one row per
+// bridge provider among them.
 func TestRunChecksGathersProbes(t *testing.T) {
-	pl, pa, ps, pf, pq := probeLogin, probeAPI, probeSong, probeFeed, probeQishui
-	defer func() { probeLogin, probeAPI, probeSong, probeFeed, probeQishui = pl, pa, ps, pf, pq }()
+	pl, pa, ps, pf, pb := probeLogin, probeAPI, probeSong, probeFeed, probeBridge
+	defer func() { probeLogin, probeAPI, probeSong, probeFeed, probeBridge = pl, pa, ps, pf, pb }()
 	probeLogin = func(*app) checkResult { return checkResult{"登录状态", true, "已登录"} }
 	probeAPI = func() checkResult { return checkResult{"网易云接口", false, "timeout"} }
 	probeSong = func(*app, int64) checkResult { return checkResult{"播放地址", true, "已跳过"} }
 	probeFeed = func() checkResult { return checkResult{"更新镜像", true, "可达"} }
-	probeQishui = func(*app) checkResult { return checkResult{"汽水音乐", true, "未登录，已跳过"} }
+	probeBridge = func(_ *app, prov providerID) checkResult {
+		return checkResult{prov.name(), true, "未登录，已跳过"}
+	}
 
 	a := newTestApp()
 	got := a.runChecks()
-	if len(got) != 5 {
+	if len(got) != 4+len(bridgeProviders) {
 		t.Fatalf("got %d results: %+v", len(got), got)
 	}
-	want := []string{"登录状态", "网易云接口", "播放地址", "更新镜像", "汽水音乐"}
+	want := append([]string{"登录状态", "网易云接口", "播放地址", "更新镜像"}, "汽水音乐", "酷狗音乐", "QQ音乐")
 	for i := range want {
 		if got[i].name != want[i] {
 			t.Errorf("result %d is %q, want %q", i, got[i].name, want[i])
@@ -119,12 +122,12 @@ func TestFinishChecksNotesFailures(t *testing.T) {
 // The settings' check button starts a check, with the probes answered in
 // the test so nothing goes out to the network.
 func TestConnectionCheckButton(t *testing.T) {
-	pl, pa, ps, pf, pq := probeLogin, probeAPI, probeSong, probeFeed, probeQishui
+	pl, pa, ps, pf, pb := probeLogin, probeAPI, probeSong, probeFeed, probeBridge
 	defer func() {
 		// startChecks has a goroutine of its own: let it finish before
 		// the probes it reads are put back.
 		time.Sleep(20 * time.Millisecond)
-		probeLogin, probeAPI, probeSong, probeFeed, probeQishui = pl, pa, ps, pf, pq
+		probeLogin, probeAPI, probeSong, probeFeed, probeBridge = pl, pa, ps, pf, pb
 	}()
 	ok := func(name string) func() checkResult {
 		return func() checkResult { return checkResult{name, true, "可达"} }
@@ -132,11 +135,13 @@ func TestConnectionCheckButton(t *testing.T) {
 	probeLogin = func(*app) checkResult { return checkResult{"登录状态", true, "已登录"} }
 	probeAPI, probeFeed = ok("网易云接口"), ok("更新镜像")
 	probeSong = func(*app, int64) checkResult { return checkResult{"播放地址", true, "已跳过"} }
-	probeQishui = func(*app) checkResult { return checkResult{"汽水音乐", true, "未登录，已跳过"} }
+	probeBridge = func(_ *app, prov providerID) checkResult {
+		return checkResult{prov.name(), true, "未登录，已跳过"}
+	}
 
 	a := newTestApp()
 	a.settings = defaultSettings()
-	tt := ui.NewTester(func(c *ui.Context) { a.settingsTestView(c) }, 620, 1600)
+	tt := ui.NewTester(func(c *ui.Context) { a.settingsTestView(c) }, 620, 1900)
 	tt.Frame()
 	if err := tt.Click("开始检查"); err != nil {
 		t.Fatalf("click: %v", err)

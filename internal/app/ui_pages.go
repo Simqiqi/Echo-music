@@ -1051,6 +1051,9 @@ func (a *app) playlistHeader(c *ui.Context, pl *netease.Playlist) {
 						if m.Item("重命名…").Chosen() {
 							a.startRename(mine)
 						}
+						if m.Item("导出此歌单…").Chosen() {
+							a.exportTracks(pl.Name, pl.Tracks)
+						}
 						m.Separator()
 						if m.Item("删除歌单…").Chosen() {
 							a.confirmDelete(mine)

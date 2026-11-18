@@ -38,6 +38,10 @@ func paintSwatch(style string, tint ui.Color) image.Image {
 		swatchTerrain(s, tint)
 	case "ripple":
 		swatchRipple(s, tint)
+	case "collage":
+		swatchCollage(s, tint)
+	case "pond":
+		swatchPond(s, tint)
 	default:
 		swatchGradient(s, tint)
 	}

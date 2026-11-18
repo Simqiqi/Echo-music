@@ -87,9 +87,9 @@ func (a *app) downloadsPage(c *ui.Context) {
 					for i := range a.downloads.incomplete {
 						a.incompleteDownloadRow(c.Key("inc_"+fmt.Sprintf("%d_%d", a.downloads.incomplete[i].ID, i)), &a.downloads.incomplete[i])
 					}
-})
-			ui.Spacer(c).Height(16)
-		}
+				})
+				ui.Spacer(c).Height(16)
+			}
 
 			// Completed downloads section
 			var total int64
@@ -192,9 +192,9 @@ func (a *app) incompleteDownloadRow(c *ui.Context, e *player.IncompleteDownloadE
 			ui.Text(c, sub).FontSize(12).TextColor(p.muted).SingleLine()
 			ui.Row(c).Height(4).Gap(0).Children(func() {
 				bg := ui.Box(c.Key("pbg")).Height(4).Radius(2).Background(p.hairline).Grow(1)
-if progress > 0 {
-				ui.Box(c.Key("pfg")).Height(4).Radius(2).Background(p.accent).WidthPercent(progress * 100)
-			}
+				if progress > 0 {
+					ui.Box(c.Key("pfg")).Height(4).Radius(2).Background(p.accent).WidthPercent(progress * 100)
+				}
 				_ = bg
 			})
 			status := "下载中..."
@@ -207,10 +207,10 @@ if progress > 0 {
 			ui.Text(c, fmt.Sprintf("%s  ·  %s / %s", status, mb(e.Size), mb(e.TotalSize))).FontSize(11).TextColor(p.faint).SingleLine()
 		})
 		ui.Column(c).Gap(6).AlignItems(ui.End).Children(func() {
-if e.TotalSize > 0 && progress < 1 {
-			if pillButton(c.Key("cancel"), iconClose, "取消", ui.RGB(220, 60, 60), p.text).Clicked() {
-				a.cancelIncompleteDownload(e.Path)
-			}
+			if e.TotalSize > 0 && progress < 1 {
+				if pillButton(c.Key("cancel"), iconClose, "取消", ui.RGB(220, 60, 60), p.text).Clicked() {
+					a.cancelIncompleteDownload(e.Path)
+				}
 			} else {
 				if pillButton(c.Key("retry"), iconRefresh, "重试", p.accent, p.text).Clicked() {
 					a.retryIncompleteDownload(e)
@@ -260,13 +260,13 @@ func (a *app) retryIncompleteDownload(e *player.IncompleteDownloadEntry) {
 			if level == "" {
 				level = "lossless"
 			}
-go func() {
-		ctx := context.Background()
-		_, err := a.pl.Download(ctx, tr.ID, level)
-		if err != nil {
-			fmt.Println("Download error:", err)
-		}
-		a.post(func() {
+			go func() {
+				ctx := context.Background()
+				_, err := a.pl.Download(ctx, tr.ID, level)
+				if err != nil {
+					fmt.Println("Download error:", err)
+				}
+				a.post(func() {
 					a.downloads.loaded = false
 					a.loadDownloads()
 				})

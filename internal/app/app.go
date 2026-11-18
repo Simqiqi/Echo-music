@@ -62,13 +62,10 @@ type app struct {
 	rail      bool    // the directory folded into its icon-only rail
 	sideAnimW float32 // the column's width as it glides open or shut
 
-	profile         *netease.Profile
-	qishui          *sidecar.Account           // 汽水音乐 登录态，nil 表示未登录
-	bridge          *bridgeStore               // 汽水音乐的歌曲与歌单，负数合成 ID 的注册表
-	bridgeVMs       map[providerID]*bridgeRows // 侧栏的行，只在歌单有变化时重建
-	qishuiLists     []sidecar.BridgePlaylist   // 汽水账号的歌单，侧栏列出
-	qishuiPlErr     string                     // 歌单加载失败的原因
-	qishuiCollapsed bool
+	profile   *netease.Profile
+	bridge    *bridgeStore                  // 桥接音源的歌曲与歌单，负数合成 ID 的注册表
+	bridgeVMs map[providerID]*bridgeRows    // 侧栏的行，只在歌单有变化时重建
+	bridgeAcc map[providerID]*bridgeAccount // 各桥接音源的登录态与歌单：汽水/酷狗/QQ
 	mine, saved     []netease.Playlist // the listener's playlists: made, and saved
 	recPlaylists    []netease.Playlist // the day's playlists picked for the listener
 	login           loginState
@@ -310,6 +307,9 @@ func Run() error {
 		a.bridge = newBridgeStore()
 		a.pl.Source = a.bridgeSource
 		a.pl.BridgeLyrics = a.bridgeLyrics
+		a.pl.LyricOffset = func(id int64) time.Duration {
+			return a.settings.lyricOffsetDuration(id)
+		}
 		a.pl.Quality = func() string { return a.settings.Quality }
 		a.pl.EQ = player.NewEQ()
 		a.applyEq()

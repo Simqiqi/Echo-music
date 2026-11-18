@@ -200,6 +200,14 @@ func (a *app) backdrop(c *ui.Context, art *artwork, tint ui.Color) {
 					} else {
 						drawBackdrop(cp, box, art, tint)
 					}
+				case "collage":
+					// Torn paper, tape and scratches: every sheet moves on
+					// its own clock, so the wall is never twice the same.
+					drawCollage(cp, box, tint, float32(bd.drift), bass)
+				case "pond":
+					// A photograph of clear water, bent by the surface as it
+					// moves, with a petal falling now and then.
+					drawPond(cp, box, tint, float32(bd.drift), bass)
 				default:
 					drawBackdrop(cp, box, art, tint)
 				}

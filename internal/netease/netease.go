@@ -485,7 +485,9 @@ const urlRetryDelay = 150 * time.Millisecond
 // heard as the player starting late.
 const riskRetryDelay = time.Second
 
-// Levels are the stream levels, from the lowest.
+// Levels are the stream levels, from the lowest. Only levels served in a
+// codec this player reads are listed; Dolby and master arrive as E-AC-3
+// or other formats there is no decoder for, so they are not offered.
 var Levels = []string{"standard", "higher", "exhigh", "lossless", "hires"}
 
 // Lossless reports whether level streams FLAC.

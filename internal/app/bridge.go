@@ -17,10 +17,48 @@ import (
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 
+	"github.com/simqiqi/simqiqi-music/internal/kugou"
 	"github.com/simqiqi/simqiqi-music/internal/netease"
+	"github.com/simqiqi/simqiqi-music/internal/qq"
 	"github.com/simqiqi/simqiqi-music/internal/qishui"
 	"github.com/simqiqi/simqiqi-music/internal/sidecar"
 )
+
+// bridgeProviders are the sidecar services the app can sign into and list
+// playlists from, in the order the sidebar and the login dialog show them.
+var bridgeProviders = []providerID{provQishui, provKugou, provQQ}
+
+// bridgeAccount is one bridge provider's state: who is signed in there, the
+// playlists the sidebar lists for them, and why those failed to load.
+type bridgeAccount struct {
+	acc       *sidecar.Account         // nil 表示这家没登录
+	lists     []sidecar.BridgePlaylist // 账号的歌单，侧栏列出
+	plErr     string                   // 歌单加载失败的原因
+	collapsed bool                     // 侧栏里这一组的折叠状态
+}
+
+// bridgeOf returns a bridge provider's state, making it on first use.
+func (a *app) bridgeOf(prov providerID) *bridgeAccount {
+	if a.bridgeAcc == nil {
+		a.bridgeAcc = map[providerID]*bridgeAccount{}
+	}
+	st := a.bridgeAcc[prov]
+	if st == nil {
+		st = &bridgeAccount{}
+		a.bridgeAcc[prov] = st
+	}
+	return st
+}
+
+// bridgeAccountOf reports who a bridge provider is signed in as, or nil when
+// nobody is. Reading through this keeps the views from having to know whether
+// the map has been touched yet.
+func (a *app) bridgeAccountOf(prov providerID) *sidecar.Account {
+	if st := a.bridgeAcc[prov]; st != nil {
+		return st.acc
+	}
+	return nil
+}
 
 // bridgeList is a playlist of a sidecar provider, as the registry keeps it.
 type bridgeList struct {
@@ -119,6 +157,9 @@ type bridgeRows struct {
 // ID taken goes through the registry's lock, so the rows are built once
 // per change of the lists rather than once per frame.
 func (a *app) bridgePlaylistVMs(prov providerID, lists []sidecar.BridgePlaylist) []netease.Playlist {
+	if a.bridge == nil {
+		return nil // a test's bare app: no registry to hand IDs out of
+	}
 	if a.bridgeVMs == nil {
 		a.bridgeVMs = map[providerID]*bridgeRows{}
 	}
@@ -161,10 +202,8 @@ func (a *app) loadBridgeLists(prov providerID) {
 				msg = friendlyBridgeErr(err)
 				lists = nil
 			}
-			switch prov {
-			case provQishui:
-				a.qishuiLists, a.qishuiPlErr = lists, msg
-			}
+			st := a.bridgeOf(prov)
+			st.lists, st.plErr = lists, msg
 		})
 	}()
 }
@@ -176,7 +215,14 @@ func bridgeAPI(prov providerID) interface {
 	TrackURL(t sidecar.BridgeTrack, quality string) (*sidecar.BridgeStream, error)
 	Lyrics(t sidecar.BridgeTrack) (string, string, error)
 } {
-	return qishuiAPI{}
+	switch prov {
+	case provKugou:
+		return kugouAPI{}
+	case provQQ:
+		return qqAPI{}
+	default:
+		return qishuiAPI{}
+	}
 }
 
 type qishuiAPI struct{}
@@ -192,6 +238,36 @@ func (qishuiAPI) TrackURL(t sidecar.BridgeTrack, quality string) (*sidecar.Bridg
 }
 func (qishuiAPI) Lyrics(t sidecar.BridgeTrack) (string, string, error) {
 	return qishui.Lyrics(t)
+}
+
+type kugouAPI struct{}
+
+func (kugouAPI) Playlists(limit, offset int) ([]sidecar.BridgePlaylist, error) {
+	return kugou.Playlists(limit, offset)
+}
+func (kugouAPI) PlaylistTracks(id string, limit, offset int) ([]sidecar.BridgeTrack, bool, int, error) {
+	return kugou.PlaylistTracks(id, limit, offset)
+}
+func (kugouAPI) TrackURL(t sidecar.BridgeTrack, quality string) (*sidecar.BridgeStream, error) {
+	return kugou.TrackURL(t, quality)
+}
+func (kugouAPI) Lyrics(t sidecar.BridgeTrack) (string, string, error) {
+	return kugou.Lyrics(t)
+}
+
+type qqAPI struct{}
+
+func (qqAPI) Playlists(limit, offset int) ([]sidecar.BridgePlaylist, error) {
+	return qq.Playlists(limit, offset)
+}
+func (qqAPI) PlaylistTracks(id string, limit, offset int) ([]sidecar.BridgeTrack, bool, int, error) {
+	return qq.PlaylistTracks(id, limit, offset)
+}
+func (qqAPI) TrackURL(t sidecar.BridgeTrack, quality string) (*sidecar.BridgeStream, error) {
+	return qq.TrackURL(t, quality)
+}
+func (qqAPI) Lyrics(t sidecar.BridgeTrack) (string, string, error) {
+	return qq.Lyrics(t)
 }
 
 // bridgeSong looks up what a synthetic song ID stands for: its track and
@@ -294,11 +370,24 @@ func (a *app) bridgeTrack(prov providerID, t sidecar.BridgeTrack) netease.Track 
 	}
 }
 
-// bridgeQuality maps the settings' stream level onto what each provider
-// calls it.
+// bridgeQuality maps the settings' stream level onto what each source calls
+// it, so a song plays under any pick. 汽水音乐 names its rungs
+// standard/high/lossless/hires; 酷狗 and QQ 音乐 count bitrates instead.
 func bridgeQuality(prov providerID, level string) string {
+	switch prov {
+	case provKugou, provQQ:
+		switch level {
+		case "lossless", "hires":
+			return "flac"
+		case "higher", "exhigh":
+			return "320"
+		}
+		return "128"
+	}
 	switch level {
-	case "lossless", "hires":
+	case "hires":
+		return "hires"
+	case "lossless":
 		return "lossless"
 	case "higher", "exhigh":
 		return "high"
@@ -317,10 +406,23 @@ func (a *app) bridgeSource(id int64, level string) (*netease.Stream, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", netease.ErrUnavailable, err)
 	}
-	// The bridge says which container it served: 汽水's AAC arrives already
-	// transcoded to FLAC. Keep that, rather than guessing from the quality
-	// asked for. FLAC is cached as lossless whatever level it was asked at.
+	// The bridge says which container it served, and — where the source names
+	// its rungs — which one it settled on: 酷狗 and QQ 音乐 step down when the
+	// account cannot take the level asked for, so the badge says what really
+	// plays. 汽水音乐 names its rungs differently; those are left to the pick
+	// the listener made.
 	keep := level
+	switch got.Quality {
+	case "128":
+		keep = "standard"
+	case "320":
+		keep = "higher"
+	case "flac":
+		keep = "lossless"
+	}
+	// 汽水's AAC arrives already transcoded to FLAC. Keep that, rather than
+	// guessing from the quality asked for. FLAC is cached as lossless
+	// whatever level it was asked at.
 	if got.Type == "flac" {
 		keep = "lossless"
 	}

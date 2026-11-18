@@ -126,9 +126,15 @@ function rowPlaylist(row) {
 	};
 }
 
-// 把酷狗曲目行规整成统一形状；hash 与 album_audio_id 是取播放地址的凭据。
+// 把酷狗曲目行规整成统一形状。
+//
+// 取播放地址靠 hash；album_audio_id 那一栏酷狗要的是 **MixSongID**（包内部的
+// sheet_song 就把 mixsongid 当 album_audio_id 发出去），不是 audio_id——
+// 两者差着一位数，传错会让酷狗按另一首歌的权限/曲目去解析。
 function rowTrack(d) {
-	const id = String(pick(d, ["album_audio_id", "audio_id", "id"]) ?? "");
+	const mixId = String(pick(d, ["mixsongid", "album_audio_id", "mix_song_id"]) ?? "");
+	const audioId = String(pick(d, ["audio_id", "id"]) ?? "");
+	const id = mixId || audioId;
 	const hash = String(pick(d, ["hash", "FileHash", "fileHash"]) ?? "");
 	if (!id && !hash) return null;
 	const name = String(pick(d, ["name", "songname", "filename", "title"]) ?? "");

@@ -12,7 +12,9 @@ import (
 func TestAccountInfoPerProvider(t *testing.T) {
 	a := newTestApp()
 	a.profile = &netease.Profile{UserID: 1, Nickname: "网易号", AvatarURL: "https://p1.music.126.net/a.jpg"}
-	a.qishui = &sidecar.Account{ID: "2", Name: "汽水号", Avatar: "https://p1.qishui.com/b.png"}
+	a.bridgeOf(provQishui).acc = &sidecar.Account{ID: "2", Name: "汽水号", Avatar: "https://p1.qishui.com/b.png"}
+	a.bridgeOf(provKugou).acc = &sidecar.Account{ID: "3", Name: "酷狗号", Avatar: "https://imge.kugou.com/c.png"}
+	a.bridgeOf(provQQ).acc = &sidecar.Account{ID: "4", Name: "QQ号", Avatar: "https://q.qlogo.cn/d.png"}
 
 	cases := []struct {
 		prov     providerID
@@ -22,6 +24,8 @@ func TestAccountInfoPerProvider(t *testing.T) {
 	}{
 		{provNetease, "网易号", "https://p1.music.126.net/a.jpg", true},
 		{provQishui, "汽水号", "https://p1.qishui.com/b.png", true},
+		{provKugou, "酷狗号", "https://imge.kugou.com/c.png", true},
+		{provQQ, "QQ号", "https://q.qlogo.cn/d.png", true},
 	}
 	for _, c := range cases {
 		name, avatar, loggedIn := a.accountInfo(c.prov)
@@ -33,8 +37,11 @@ func TestAccountInfoPerProvider(t *testing.T) {
 
 	// Signed out, each provider reports nobody, without borrowing the
 	// other providers' accounts.
-	a.profile, a.qishui = nil, nil
-	for _, prov := range []providerID{provNetease, provQishui} {
+	a.profile = nil
+	for _, prov := range bridgeProviders {
+		a.bridgeOf(prov).acc = nil
+	}
+	for _, prov := range append([]providerID{provNetease}, bridgeProviders...) {
 		name, avatar, loggedIn := a.accountInfo(prov)
 		if loggedIn || name != "未登录" || avatar != "" {
 			t.Errorf("%s signed out: got (%q, %q, %v), want (未登录, \"\", false)",
@@ -57,7 +64,7 @@ func TestTopIdentityFollowsLatestLogin(t *testing.T) {
 
 	// Only 汽水 signed in: the bar shows it, though 网易云 (which drives
 	// the library) is not.
-	a.qishui = &sidecar.Account{ID: "2", Name: "汽水号", Avatar: "https://p1.qishui.com/b.png"}
+	a.bridgeOf(provQishui).acc = &sidecar.Account{ID: "2", Name: "汽水号", Avatar: "https://p1.qishui.com/b.png"}
 	a.topProv = provQishui
 	prov, name, avatar, ok := a.topIdentity()
 	if !ok || prov != provQishui || name != "汽水号" || avatar == "" {
@@ -71,7 +78,7 @@ func TestTopIdentityFollowsLatestLogin(t *testing.T) {
 func TestTopAccountPreference(t *testing.T) {
 	a := newTestApp()
 	a.profile = &netease.Profile{UserID: 1, Nickname: "网易号", AvatarURL: "https://p1.music.126.net/a.jpg"}
-	a.qishui = &sidecar.Account{ID: "2", Name: "汽水号", Avatar: "https://p1.qishui.com/b.png"}
+	a.bridgeOf(provQishui).acc = &sidecar.Account{ID: "2", Name: "汽水号", Avatar: "https://p1.qishui.com/b.png"}
 
 	// No choice stored: a bridge account beats 网易云 for the top bar.
 	if got := a.resolveTopAccount(); got != provQishui {
@@ -106,7 +113,7 @@ func TestTopAccountPreference(t *testing.T) {
 func TestTopAccountLogoutClearsPreference(t *testing.T) {
 	a := newTestApp()
 	a.profile = &netease.Profile{UserID: 1, Nickname: "网易号", AvatarURL: "https://p1.music.126.net/a.jpg"}
-	a.qishui = &sidecar.Account{ID: "2", Name: "汽水号", Avatar: "https://p1.qishui.com/b.png"}
+	a.bridgeOf(provQishui).acc = &sidecar.Account{ID: "2", Name: "汽水号", Avatar: "https://p1.qishui.com/b.png"}
 	a.settings.TopAccount = int(provQishui)
 	a.settings.TopAccountManual = true
 	a.finalizeTopAccount()
@@ -138,7 +145,7 @@ func TestFollowAccountDoesNotPin(t *testing.T) {
 	}
 
 	// Then 汽水音乐 signs in: it should take the bar, avatar and all.
-	a.qishui = &sidecar.Account{ID: "2", Name: "汽水号", Avatar: "https://p1.qishui.com/b.png"}
+	a.bridgeOf(provQishui).acc = &sidecar.Account{ID: "2", Name: "汽水号", Avatar: "https://p1.qishui.com/b.png"}
 	a.followAccount(provQishui)
 	a.finalizeTopAccount()
 	prov, name, avatar, ok := a.topIdentity()
@@ -148,7 +155,7 @@ func TestFollowAccountDoesNotPin(t *testing.T) {
 
 	// A pick made by the listener still wins over a later sign-in.
 	a.setTopAccount(provNetease)
-	a.qishui = nil
+	a.bridgeOf(provQishui).acc = nil
 	a.followAccount(provQishui)
 	if a.topProv != provNetease {
 		t.Fatalf("manual pick overridden: topProv=%v, want provNetease", a.topProv)

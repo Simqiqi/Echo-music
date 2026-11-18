@@ -206,13 +206,28 @@ func (c *Client) callWithin(provider, action string, req, resp any, wait time.Du
 
 // StartQR begins a QR login and returns the key plus the QR image (PNG, base64).
 func (c *Client) StartQR(provider string) (key, image string, err error) {
+	return c.startQR(provider, "")
+}
+
+// StartQRMode is StartQR for a provider that has more than one way in: QQ
+// 音乐 can be entered with a QQ scan or a WeChat scan, and mode says which.
+// Providers with a single channel ignore it.
+func (c *Client) StartQRMode(provider, mode string) (key, image string, err error) {
+	return c.startQR(provider, mode)
+}
+
+func (c *Client) startQR(provider, mode string) (key, image string, err error) {
 	var r struct {
 		Key   string `json:"key"`
 		Image string `json:"image"`
 		Text  string `json:"text"`
 		Error string `json:"error"`
 	}
-	if err := c.call(provider, "start", nil, &r); err != nil {
+	var req map[string]string
+	if mode != "" {
+		req = map[string]string{"mode": mode}
+	}
+	if err := c.call(provider, "start", req, &r); err != nil {
 		return "", "", err
 	}
 	if r.Error != "" {

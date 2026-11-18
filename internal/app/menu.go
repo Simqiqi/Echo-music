@@ -45,6 +45,9 @@ func (a *app) setMenu() {
 				a.nowPlaying = false
 				a.newPlaylist(nil)
 			})},
+			mygo.Separator(),
+			{Label: "导入歌单…", Click: run(a.importPlaylist)},
+			{Label: "导出歌单…", Click: run(a.exportPlaylist)},
 		}},
 		{Label: "编辑", Submenu: []*mygo.MenuItem{
 			{Role: mygo.RoleUndo, Label: "撤销"},

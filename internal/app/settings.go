@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
+	"time"
 
 	"github.com/egoist/mygo"
 )
@@ -141,6 +143,16 @@ type settings struct {
 	SidebarDownloads bool `json:"sidebarDownloads"`
 	// SidebarNewAlbums shows "新碟速递" in the sidebar. Default on.
 	SidebarNewAlbums bool `json:"sidebarNewAlbums"`
+	// SidebarOrder is the order of the nine directory entries, by their
+	// ids. Empty means the order they have always had; a saved order that
+	// predates a newly added entry is filled out with the defaults, so an
+	// update never hides a page the listener has not seen before.
+	SidebarOrder []string `json:"sidebarOrder,omitempty"`
+	// LyricOffsets is a timing correction in milliseconds per song, keyed
+	// by the track id. A positive value makes the lyrics arrive earlier:
+	// it is added to the playback position before a line or word is
+	// looked up. An offset stays with the song across plays and restarts.
+	LyricOffsets map[string]int `json:"lyricOffsets,omitempty"`
 
 	path string // where they were loaded from, and are saved to
 }
@@ -236,6 +248,91 @@ func (s settings) sidebarNewAlbums() bool {
 	return s.SidebarNewAlbums
 }
 
+// sidebarNavIDs are the directory's nine pages in the order they have
+// always had. An entry's id is its stable name in the saved order; its
+// icon, label and route live with the sidebar that draws it.
+var sidebarNavIDs = []string{
+	"home", "daily", "weekly", "fm", "weather", "charts", "podcasts", "downloads", "newalbums",
+}
+
+// sidebarOrder returns the page ids in the listener's order. A saved order
+// is completed with any ids it does not yet mention, so a new page appears
+// after an update rather than vanishing; unknown ids in it are ignored.
+func (s settings) sidebarOrder() []string {
+	known := make(map[string]bool, len(sidebarNavIDs))
+	for _, id := range sidebarNavIDs {
+		known[id] = true
+	}
+	out := make([]string, 0, len(sidebarNavIDs))
+	seen := map[string]bool{}
+	for _, id := range s.SidebarOrder {
+		if known[id] && !seen[id] {
+			out = append(out, id)
+			seen[id] = true
+		}
+	}
+	for _, id := range sidebarNavIDs {
+		if !seen[id] {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
+// moveSidebarEntry takes the entry at from and inserts it at to, shifting
+// those between along by one: a page moved down two lands after the two
+// it passed, with their order kept.
+func (s *settings) moveSidebarEntry(from, to int) {
+	order := s.sidebarOrder()
+	if from < 0 || from >= len(order) || to < 0 || to >= len(order) || from == to {
+		return
+	}
+	id := order[from]
+	rest := make([]string, 0, len(order)-1)
+	rest = append(rest, order[:from]...)
+	rest = append(rest, order[from+1:]...)
+	next := make([]string, 0, len(order))
+	next = append(next, rest[:to]...)
+	next = append(next, id)
+	next = append(next, rest[to:]...)
+	s.SidebarOrder = next
+}
+
+// resetSidebarOrder drops a custom order, back to the original directory.
+func (s *settings) resetSidebarOrder() {
+	s.SidebarOrder = nil
+}
+
+// lyricOffset is the timing correction kept for a song, in milliseconds.
+func (s settings) lyricOffset(id int64) int {
+	if s.LyricOffsets == nil {
+		return 0
+	}
+	return s.LyricOffsets[strconv.FormatInt(id, 10)]
+}
+
+// setLyricOffset keeps a song's correction, forgetting it when it is back
+// to zero so that the settings do not fill with untouched songs.
+func (s *settings) setLyricOffset(id int64, ms int) {
+	key := strconv.FormatInt(id, 10)
+	if ms == 0 {
+		delete(s.LyricOffsets, key)
+		if len(s.LyricOffsets) == 0 {
+			s.LyricOffsets = nil
+		}
+		return
+	}
+	if s.LyricOffsets == nil {
+		s.LyricOffsets = make(map[string]int)
+	}
+	s.LyricOffsets[key] = ms
+}
+
+// lyricOffsetDuration is the correction as a duration, for the player.
+func (s settings) lyricOffsetDuration(id int64) time.Duration {
+	return time.Duration(s.lyricOffset(id)) * time.Millisecond
+}
+
 // backdropChoice is a backdrop Now Playing may wear: its id in the
 // settings, and what the settings call it.
 type backdropChoice struct {
@@ -251,6 +348,8 @@ var backdrops = []backdropChoice{
 	{"nebula", "星云"},
 	{"terrain", "地形"},
 	{"ripple", "涟漪"},
+	{"collage", "拼贴"},
+	{"pond", "荷塘"},
 }
 
 // backdropStyle is what Now Playing's backdrop is: the cover's gradient,
@@ -394,6 +493,16 @@ func moveDir(old, dir string) {
 }
 
 // loadSettings reads the settings, or returns the defaults.
+// isQualityLevel reports whether level is one the picker still offers.
+func isQualityLevel(level string) bool {
+	for _, q := range qualityLevels {
+		if q.level == level {
+			return true
+		}
+	}
+	return false
+}
+
 func loadSettings() settings {
 	s := defaultSettings()
 	if path, err := settingsPath(); err == nil {
@@ -401,6 +510,12 @@ func loadSettings() settings {
 			json.Unmarshal(b, &s)
 		}
 		s.path = path
+	}
+	// A level kept from an older build — one the picker no longer offers,
+	// because the player cannot decode it — must not be sent to the API:
+	// it would play nothing. Fall back to the ordinary default.
+	if !isQualityLevel(s.Quality) {
+		s.Quality = defaultSettings().Quality
 	}
 	return s
 }
@@ -438,9 +553,13 @@ func (s settings) applyAppearance() {
 	}
 }
 
-// qualityLevel is the stream level NetEase names a quality by: its full
-// label for the picker, and a short one for the button in the player bar.
-var qualityLevels = []struct{ level, label, short string }{
+// qualityLevels are the five stream levels NetEase serves in a format
+// this player can read: MP3 for the first three, FLAC for the last two.
+// Higher premium levels (master, Dolby) are deliberately not offered —
+// they arrive in codecs here there is no decoder for.
+var qualityLevels = []struct {
+	level, label, short string
+}{
 	{"standard", "标准（128k）", "标准"},
 	{"higher", "较高（192k）", "较高"},
 	{"exhigh", "极高（320k）", "极高"},

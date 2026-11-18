@@ -139,7 +139,7 @@ func TestCmdNumberChoosesTab(t *testing.T) {
 		panes []int
 	}{
 		{netease.Track{ID: 1, Name: "宝船", Duration: 200000}, []int{3, 4, 5, 2, 1},
-			[]int{paneInk, paneNeon, paneWall, paneStage, paneLyrics}},
+			[]int{paneInk, paneWall, paneWall3D, paneStage, paneLyrics}},
 		{netease.Track{ID: 2, Name: "节目", ProgramID: 9, Duration: 200000}, []int{0, 1}, []int{paneComments, paneProgram}},
 	} {
 		a := newTestApp()

@@ -339,6 +339,54 @@ func (a *app) goForward() {
 	a.show(r)
 }
 
+// directoryEntry is one page of the sidebar, with the stable id the
+// settings' order is kept in. Icon, label and route are defined once here
+// so the directory, its folded rail and the settings' ordering controls
+// all agree on what a page is called and where it goes.
+type directoryEntry struct {
+	id, label string
+	icon      *ui.SVG
+	r         route
+	visible   bool
+}
+
+// directoryEntries returns the nine directory pages in the listener's
+// order, each carrying whether its show/hide switch is on.
+func (a *app) directoryEntries() []directoryEntry {
+	s := &a.settings
+	all := map[string]directoryEntry{
+		"home":      {"home", "为你推荐", iconHome, route{page: pageHome}, s.sidebarHome()},
+		"daily":     {"daily", "每日推荐", iconDaily, route{page: pageDaily}, s.sidebarDaily()},
+		"weekly":    {"weekly", "听歌周报", iconWeekly, route{page: pageWeekly}, s.sidebarWeekly()},
+		"fm":        {"fm", "私人 FM", iconRadio, route{page: pageFM}, s.sidebarFM()},
+		"weather":   {"weather", "天气电台", iconWeather, route{page: pageWeather}, s.sidebarWeather()},
+		"charts":    {"charts", "排行榜", iconCharts, route{page: pageCharts}, s.sidebarCharts()},
+		"podcasts":  {"podcasts", "播客", iconPodcast, route{page: pagePodcasts}, s.sidebarPodcasts()},
+		"downloads": {"downloads", "下载管理", iconDownloads, route{page: pageDownloads}, s.sidebarDownloads()},
+		"newalbums": {"newalbums", "新碟速递", iconNewAlbums, route{page: pageNewAlbums}, s.sidebarNewAlbums()},
+	}
+	out := make([]directoryEntry, 0, len(all))
+	for _, id := range s.sidebarOrder() {
+		if e, ok := all[id]; ok {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+// visibleSidebarItems is the directory's pages that are switched on, in
+// the saved order, as the rail and the contents list both show them.
+func (a *app) visibleSidebarItems() []directoryEntry {
+	all := a.directoryEntries()
+	out := make([]directoryEntry, 0, len(all))
+	for _, e := range all {
+		if e.visible {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
 func (a *app) sidebar(c *ui.Context) {
 	// Under the window buttons where they sit over the sidebar, as the
 	// traffic lights do; elsewhere, as close to the top as to the sides.
@@ -362,24 +410,10 @@ func (a *app) sidebar(c *ui.Context) {
 // takes the width back, and the pointer over an item says what it is.
 func (a *app) railNav(c *ui.Context, top float32) {
 	p := a.pal
-	s := &a.settings
-	allItems := []railEntry{
-		{iconHome, "为你推荐", route{page: pageHome}, s.sidebarHome()},
-		{iconDaily, "每日推荐", route{page: pageDaily}, s.sidebarDaily()},
-		{iconWeekly, "听歌周报", route{page: pageWeekly}, s.sidebarWeekly()},
-		{iconRadio, "私人 FM", route{page: pageFM}, s.sidebarFM()},
-		{iconWeather, "天气电台", route{page: pageWeather}, s.sidebarWeather()},
-		{iconCharts, "排行榜", route{page: pageCharts}, s.sidebarCharts()},
-		{iconPodcast, "播客", route{page: pagePodcasts}, s.sidebarPodcasts()},
-		{iconDownloads, "下载管理", route{page: pageDownloads}, s.sidebarDownloads()},
-		{iconNewAlbums, "新碟速递", route{page: pageNewAlbums}, s.sidebarNewAlbums()},
-	}
-	// Filter visible items
-	items := make([]railEntry, 0, len(allItems))
-	for _, it := range allItems {
-		if it.visible {
-			items = append(items, it)
-		}
+	shown := a.visibleSidebarItems()
+	items := make([]railEntry, 0, len(shown))
+	for _, e := range shown {
+		items = append(items, railEntry{icon: e.icon, label: e.label, r: e.r, visible: e.visible})
 	}
 	ui.Column(c).Fill().MinWidth(railWidth-12).
 		Padding(top, 6, 14, 6).Gap(2).AlignItems(ui.Center).DragWindow().Children(func() {
@@ -436,7 +470,6 @@ func (a *app) railItem(c *ui.Context, it *railEntry, index int) {
 // the numbered index of pages and the listener's playlists.
 func (a *app) directory(c *ui.Context, top float32) {
 	p := a.pal
-	s := &a.settings
 	// Where nothing in it takes the press, the sidebar moves the window, as
 	// the title bar it reaches up into would.
 	// The contents keep the full directory width even while the column
@@ -462,41 +495,10 @@ func (a *app) directory(c *ui.Context, top float32) {
 		navWrap.Children(func() {
 			sc := ui.Scroll(c.Key("nav")).TrackScroll(&a.navScroll).Fill().Padding(0, 6).Gap(4)
 			sc.Children(func() {
-				// Build visible nav items based on settings
-				type navItem struct {
-					icon  *ui.SVG
-					label string
-					r     route
-				}
-				allNavItems := []navItem{
-					{iconHome, "为你推荐", route{page: pageHome}},
-					{iconDaily, "每日推荐", route{page: pageDaily}},
-					{iconWeekly, "听歌周报", route{page: pageWeekly}},
-					{iconRadio, "私人 FM", route{page: pageFM}},
-					{iconWeather, "天气电台", route{page: pageWeather}},
-					{iconCharts, "排行榜", route{page: pageCharts}},
-					{iconPodcast, "播客", route{page: pagePodcasts}},
-					{iconDownloads, "下载管理", route{page: pageDownloads}},
-					{iconNewAlbums, "新碟速递", route{page: pageNewAlbums}},
-				}
-				// Visibility checks matching the settings keys
-				visibleChecks := []bool{
-					s.sidebarHome(),
-					s.sidebarDaily(),
-					s.sidebarWeekly(),
-					s.sidebarFM(),
-					s.sidebarWeather(),
-					s.sidebarCharts(),
-					s.sidebarPodcasts(),
-					s.sidebarDownloads(),
-					s.sidebarNewAlbums(),
-				}
 				index := 0
-				for i, item := range allNavItems {
-					if visibleChecks[i] {
-						a.navItem(c, item.icon, item.label, item.r, index)
-						index++
-					}
+				for _, item := range a.visibleSidebarItems() {
+					a.navItem(c, item.icon, item.label, item.r, index)
+					index++
 				}
 				if a.searched.query != "" {
 					a.navItem(c, iconSearch, "搜索结果", a.searched, index)
@@ -504,7 +506,14 @@ func (a *app) directory(c *ui.Context, top float32) {
 				}
 				a.myPlaylists(c, "我的歌单", a.mine, true, &a.mineCollapsed)
 				a.myPlaylists(c, "收藏的歌单", a.saved, false, &a.savedCollapsed)
-				a.bridgeListsSection(c, provQishui, "汽水音乐", a.qishuiLists, a.qishuiPlErr, &a.qishuiCollapsed)
+				// 桥接音源的歌单，各自一组：汽水音乐 / 酷狗音乐 / QQ音乐。
+				for _, prov := range bridgeProviders {
+					st := a.bridgeAcc[prov]
+					if st == nil {
+						continue // 这家还没登录，或歌单还没取回来
+					}
+					a.bridgeListsSection(c, prov, prov.name(), st.lists, st.plErr, &st.collapsed)
+				}
 			})
 			// 顶部柔化：随向上滚动量淡入，把内容溶进背景。
 			// PassThrough：仅作装饰合成层，不拦截指针，否则会盖住顶部「为你推荐」的点击。

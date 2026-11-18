@@ -48,6 +48,11 @@ type Player struct {
 	// BridgeLyrics is where a negative-ID track's lyrics come from, same
 	// shape as NetEase's own: the text, and lrc or yrc for its format.
 	BridgeLyrics func(t netease.Track) (lrc, format string, err error)
+	// LyricOffset, if set, is the timing correction kept for a song. It is
+	// applied once to the timestamps when the lyrics load, so every view
+	// of them — the lines, the words, the gaps, the scroll and the click
+	// to seek — reads the same shifted time.
+	LyricOffset func(id int64) time.Duration
 	// Cache keeps the songs played, if set.
 	Cache *Cache
 	// Changed, if set, hears that what plays, where it is or whether it
@@ -85,6 +90,7 @@ type Player struct {
 
 	lyrics       []lyrics.Line
 	lyricsLoaded bool
+	lyricShift   time.Duration // the correction last applied to lyrics
 
 	// pending holds a seek asked for while the track loads.
 	pending time.Duration
@@ -311,6 +317,18 @@ func (p *Player) refill() {
 func (p *Player) awaitFeed() {
 	p.awaiting = true
 	p.refill()
+}
+
+// Enqueue adds tracks to the end of the queue without disturbing the song
+// that plays, as an imported playlist asks. Tracks already queued stay put.
+func (p *Player) Enqueue(tracks []netease.Track) {
+	if len(tracks) == 0 {
+		return
+	}
+	p.appendTracks(tracks)
+	if p.Changed != nil {
+		p.Changed()
+	}
 }
 
 // appendTracks adds tracks to the end of the queue, but those in it.
@@ -1065,9 +1083,80 @@ func (p *Player) fetchLyrics(gen int, t netease.Track) {
 		}
 		p.post(func() {
 			if gen == p.gen {
-				p.lyrics = lines
-				p.lyricsLoaded = true
+				p.SetLyricsWithOffset(t.ID, lines)
 			}
 		})
 	}()
+}
+
+// SetLyricOffset re-applies a timing correction to the song's lyrics
+// already loaded, so turning the dial takes effect at once rather than
+// waiting for the next song. The raw lines are kept to shift from again.
+func (p *Player) SetLyricOffset(id int64, offset time.Duration) {
+	if !p.lyricsLoaded || p.track == nil || p.track.ID != id || p.LyricOffset == nil {
+		return
+	}
+	// Undo the shift last applied, then apply the new one through the
+	// same path a fresh load uses, from the unshifted copy.
+	raw := unshiftLyrics(p.lyrics, p.lyricShift)
+	p.lyricShift = 0
+	p.setLyricsFrom(raw, offset)
+}
+
+// setLyricsFrom keeps raw lines shifted by offset, without asking the
+// callback: used when the offset itself has just changed.
+func (p *Player) setLyricsFrom(lines []lyrics.Line, shift time.Duration) {
+	p.lyricShift = shift
+	if shift != 0 {
+		shifted := make([]lyrics.Line, len(lines))
+		copy(shifted, lines)
+		for i := range shifted {
+			shifted[i].At += shift
+			shifted[i].End += shift
+			words := make([]lyrics.Word, len(shifted[i].Words))
+			copy(words, shifted[i].Words)
+			for j := range words {
+				words[j].Start += shift
+				words[j].End += shift
+			}
+			shifted[i].Words = words
+		}
+		lines = shifted
+	}
+	p.lyrics = lines
+	p.lyricsLoaded = true
+}
+
+// unshiftLyrics returns lines with a correction taken back off, so the
+// original timestamps can be shifted by a new amount.
+func unshiftLyrics(lines []lyrics.Line, shift time.Duration) []lyrics.Line {
+	if shift == 0 {
+		return lines
+	}
+	out := make([]lyrics.Line, len(lines))
+	copy(out, lines)
+	for i := range out {
+		out[i].At -= shift
+		out[i].End -= shift
+		words := make([]lyrics.Word, len(out[i].Words))
+		copy(words, out[i].Words)
+		for j := range words {
+			words[j].Start -= shift
+			words[j].End -= shift
+		}
+		out[i].Words = words
+	}
+	return out
+}
+
+// SetLyricsWithOffset keeps a song's lines with the listener's timing correction
+// folded into every timestamp. Shifting the data once, here, means the
+// line index, the falling words, the scroll, the gap timings and clicking
+// a line to seek all agree without each having to know about the offset.
+func (p *Player) SetLyricsWithOffset(id int64, lines []lyrics.Line) {
+	shift := time.Duration(0)
+	if p.LyricOffset != nil {
+		shift = p.LyricOffset(id)
+	}
+	p.setLyricsFrom(lines, shift)
 }

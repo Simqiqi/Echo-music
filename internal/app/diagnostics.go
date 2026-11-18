@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/simqiqi/simqiqi-music/internal/netease"
-	"github.com/simqiqi/simqiqi-music/internal/qishui"
 	"github.com/simqiqi/simqiqi-music/internal/sidecar"
 )
 
@@ -132,11 +131,12 @@ var (
 		}
 		return checkResult{"播放地址", true, "取到了播放地址"}
 	}
-	// 汽水音乐走桥接登录：会话存在不等于还好用，所以真去问一次账号，
-	// 顺便把断掉的登录在这里露出来。
-	probeQishui = func(a *app) checkResult {
-		if a.qishui == nil {
-			return checkResult{"汽水音乐", true, "未登录汽水音乐，已跳过"}
+	// 桥接音源走桥接登录：会话存在不等于还好用，所以真去问一次账号，
+	// 顺便把断掉的登录在这里露出来。汽水音乐 / 酷狗音乐 / QQ音乐 各问一次。
+	probeBridge = func(a *app, prov providerID) checkResult {
+		label := prov.name()
+		if a.bridgeAccountOf(prov) == nil {
+			return checkResult{label, true, "未登录" + label + "，已跳过"}
 		}
 		// The bridge may have to start: wait a while for an answer, but
 		// not for ever, or a check would hang on its own.
@@ -146,7 +146,7 @@ var (
 		}
 		asked := make(chan answer, 1)
 		go func() {
-			acc, err := qishui.Profile()
+			acc, err := bridgeProfile(prov)
 			asked <- answer{acc, err}
 		}()
 		var acc *sidecar.Account
@@ -155,19 +155,19 @@ var (
 		case got := <-asked:
 			acc, err = got.acc, got.err
 		case <-time.After(qishuiWait):
-			return checkResult{"汽水音乐", false, "桥接进程没有响应"}
+			return checkResult{label, false, "桥接进程没有响应"}
 		}
 		if err != nil {
-			return checkResult{"汽水音乐", false, cleanDiagnostic(err)}
+			return checkResult{label, false, cleanDiagnostic(err)}
 		}
 		if acc == nil || acc.ID == "" {
-			return checkResult{"汽水音乐", false, "登录已失效，请重新扫码登录"}
+			return checkResult{label, false, "登录已失效，请重新扫码登录"}
 		}
 		who := acc.Name
 		if who == "" {
 			who = "账号"
 		}
-		return checkResult{"汽水音乐", true, "已登录：" + who}
+		return checkResult{label, true, "已登录：" + who}
 	}
 	probeFeed = func() checkResult {
 		u := fmt.Sprintf("https://cdn.jsdelivr.net/gh/Simqiqi/Echo-music@updates/update-%s-%s.json",
@@ -185,20 +185,26 @@ func (a *app) runChecks() []checkResult {
 	if tr := a.pl.Current(); tr != nil {
 		id = tr.ID
 	}
-	out := make([]checkResult, 5)
+	jobs := []func() checkResult{
+		func() checkResult { return probeLogin(a) },
+		probeAPI,
+		func() checkResult { return probeSong(a, id) },
+		probeFeed,
+	}
+	// 桥接的三家各占一行：登录在不在，问一次就知道。
+	for _, prov := range bridgeProviders {
+		prov := prov
+		jobs = append(jobs, func() checkResult { return probeBridge(a, prov) })
+	}
+	out := make([]checkResult, len(jobs))
 	var wg sync.WaitGroup
-	run := func(i int, fn func() checkResult) {
+	for i, fn := range jobs {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			out[i] = fn()
 		}()
 	}
-	run(0, func() checkResult { return probeLogin(a) })
-	run(1, probeAPI)
-	run(2, func() checkResult { return probeSong(a, id) })
-	run(3, probeFeed)
-	run(4, func() checkResult { return probeQishui(a) })
 	wg.Wait()
 	return out
 }

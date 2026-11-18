@@ -1,8 +1,9 @@
 // Echo 云音乐 — 第三方登录桥接进程。
 //
-// 汽水音乐与酷狗音乐的登录签名逻辑都封装在 Node 包里（qishui-music-api、
-// kugoumusicapi），Go 无法直接复现其字节系/酷狗系签名，因此由这个轻量
-// Node 进程负责这两家的扫码登录与会话维护，Go 侧只通过本机 HTTP 与它对话。
+// 汽水音乐、酷狗音乐与 QQ 音乐的登录签名逻辑都封装在 Node 包里
+// （qishui-music-api、kugoumusicapi、@sansenjian/qq-music-api），Go 无法
+// 直接复现其字节系/酷狗系/QQ 系签名，因此由这个轻量 Node 进程负责这几家的
+// 扫码登录与会话维护，Go 侧只通过本机 HTTP 与它对话。
 //
 // 启动后在 stdout 第一行打印 {"ready":true,"port":N}，Go 侧据此找到端口。
 "use strict";
@@ -34,6 +35,7 @@ function loadProvider(name) {
 	if (providers[name]) return providers[name];
 	if (name === "qishui") providers[name] = require("./providers/qishui.cjs").create();
 	else if (name === "kugou") providers[name] = require("./providers/kugou.cjs").create();
+	else if (name === "qq") providers[name] = require("./providers/qq.cjs").create();
 	return providers[name];
 }
 

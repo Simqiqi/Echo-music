@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"math"
 	"time"
 
@@ -609,7 +610,6 @@ func (a *app) npTabs() []npTab {
 		return []npTab{{paneProgram, "简介"}, {paneComments, "评论"}}
 	}
 	return []npTab{{paneLyrics, "歌词"}, {paneStage, "动态"}, {paneInk, "墨迹"},
-		{paneNeon, "霓虹"},
 		{paneWall, "选歌"}, {paneWall3D, "海报墙"}, {paneParticles, "粒子"},
 		{paneKaleido, "万花筒"},
 		{paneComments, "评论"}}
@@ -808,6 +808,74 @@ func (a *app) lyricsPane(c *ui.Context, tr *netease.Track, h float32) {
 	a.timedLines(c, scroll, lines, pos, cur, lag, linesStyle{size: 30, weight: 800, lineHeight: 1.25, quiet: quiet}, nil)
 	// A card of these words, for sharing, over the pane's top right.
 	a.shareLyricsButton(c)
+	a.lyricOffsetButton(c, tr.ID)
+}
+
+// lyricOffsetButton is the small dial over the lyrics that nudges their
+// timing for this song. The correction is folded into the timestamps once
+// when the lines load, so all the views of them move together; turning it
+// here re-shifts the loaded lines and takes effect on the next frame.
+func (a *app) lyricOffsetButton(c *ui.Context, id int64) {
+	ms := a.settings.lyricOffset(id)
+	chosen := "校准歌词"
+	sel := ui.SelectBase(c.Key("lyric-offset"), &chosen)
+	label := "校准歌词"
+	if ms != 0 {
+		label = fmt.Sprintf("歌词 %+0.1fs", float64(ms)/1000)
+	}
+	tr := sel.Trigger.Absolute().Top(0).Right(40).Height(28).PaddingX(9).Radius(9).
+		AlignItems(ui.Center).FocusRing(false).Label(label)
+	fg := white.Alpha(0.42)
+	if tr.Hovered() || sel.Open() {
+		fg = white
+		if ms != 0 {
+			fg = a.songAccent
+		}
+	}
+	tr.Background(white.Alpha(0.08))
+	tr.Children(func() {
+		ui.Text(c, label).FontSize(11).FontWeight(500).TextColor(fg).SingleLine()
+	})
+	const earlier, later, reset = "歌词提前 0.1 秒", "歌词延后 0.1 秒", "恢复默认"
+	sel.Popup(func(panel ui.Element) {
+		pop := popoverColors(a.pal.dark)
+		panel.MinWidth(150).Padding(6).Radius(12).Background(pop.fill).Border(1, pop.edge).
+			Shadow(0, 14, 36, -10, ui.RGBA(0, 0, 0, 0.32))
+		for _, label := range []string{earlier, later, reset} {
+			it := sel.Item(label).Padding(8, 10).Radius(8).AlignItems(ui.Center).Label(label)
+			if it.Highlighted() {
+				it.Background(a.pal.hover)
+			}
+			it.Children(func() { ui.Text(c, label).FontSize(12).Grow(1) })
+		}
+	})
+	if tr.Changed() {
+		switch chosen {
+		case earlier:
+			a.setLyricOffset(id, ms+100)
+		case later:
+			a.setLyricOffset(id, ms-100)
+		case reset:
+			a.setLyricOffset(id, 0)
+		}
+	}
+}
+
+// setLyricOffset keeps a song's new correction, re-shifts the lyrics that
+// are loaded so the change shows at once, and redraws.
+func (a *app) setLyricOffset(id int64, ms int) {
+	if ms > 3000 {
+		ms = 3000
+	}
+	if ms < -3000 {
+		ms = -3000
+	}
+	a.settings.setLyricOffset(id, ms)
+	a.pl.LyricOffset = func(song int64) time.Duration {
+		return a.settings.lyricOffsetDuration(song)
+	}
+	a.pl.SetLyricOffset(id, time.Duration(ms)*time.Millisecond)
+	a.changed()
 }
 
 // linesStyle is how timedLines sets its lines: the size, weight and

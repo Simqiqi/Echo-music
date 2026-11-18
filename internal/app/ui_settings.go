@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"runtime"
 	"time"
 
@@ -281,6 +282,23 @@ func (a *app) settingsBody(c *ui.Context, p palette, liquid bool) {
 			{"downloads", "下载管理", iconDownloads, &s.SidebarDownloads},
 			{"newalbums", "新碟速递", iconNewAlbums, &s.SidebarNewAlbums},
 		}
+		// The chips follow the listener's order, so what is toggled here
+		// stands in the same sequence as the directory itself.
+		byID := make(map[string]int, len(entries))
+		for i, it := range entries {
+			byID[it.id] = i
+		}
+		ordered := make([]struct {
+			id    string
+			label string
+			icon  *ui.SVG
+			on    *bool
+		}, 0, len(entries))
+		for _, id := range s.sidebarOrder() {
+			if i, ok := byID[id]; ok {
+				ordered = append(ordered, entries[i])
+			}
+		}
 		row("动态收缩", "鼠标离开侧边栏时收成一列图标，把宽度让给内容，移回来自动展开；关掉则一直展开", func() {
 			on := s.sidebarAutoCollapse()
 			if ui.Switch(c.Key("sidebar-collapse"), &on).Label("动态收缩").Changed() {
@@ -289,7 +307,7 @@ func (a *app) settingsBody(c *ui.Context, p palette, liquid bool) {
 			}
 		})
 		ui.Row(c).Wrap().Padding(10, 12).Gap(6).Children(func() {
-			for _, it := range entries {
+			for _, it := range ordered {
 				on := *it.on
 				b := ui.ButtonBase(c.Key("sb-" + it.id)).Height(26).PaddingX(11).Gap(6).
 					Radius(999).AlignItems(ui.Center).FocusRing(false).Label(it.label)
@@ -313,6 +331,40 @@ func (a *app) settingsBody(c *ui.Context, p palette, liquid bool) {
 				})
 				if b.Clicked() {
 					*it.on = !on
+					a.changed()
+				}
+			}
+		})
+
+		// Order: a short row per page with two arrows. Keeping the arrows
+		// here, rather than in the directory itself, avoids fighting the
+		// sidebar's drag-to-move-window gesture for the same pointer press.
+		ui.Text(c, "顺序").FontSize(11).FontWeight(600).TextColor(p.muted).Padding(10, 4, 0, 4)
+		dir := a.directoryEntries()
+		ui.Column(c).Padding(2, 8, 8, 8).Gap(2).Children(func() {
+			for i, e := range dir {
+				e, i := e, i
+				ui.Row(c).Height(30).AlignItems(ui.Center).Gap(8).Children(func() {
+					ui.Text(c, fmt.Sprintf("%d", i+1)).FontSize(11).FontWeight(600).TextColor(p.faint).Width(14)
+					ui.Icon(c, e.icon).Size(13, 13).TextColor(p.muted)
+					ui.Text(c, e.label).FontSize(12.5).Grow(1).TextColor(p.text).SingleLine()
+					if !e.visible {
+						ui.Text(c, "已隐藏").FontSize(10.5).TextColor(p.faint)
+					}
+					if i > 0 && iconButton(c.Key("sb-up-"+e.id), iconUp, 13, p.muted, "上移").Clicked() {
+						s.moveSidebarEntry(i, i-1)
+						a.changed()
+					}
+					if i < len(dir)-1 && iconButton(c.Key("sb-down-"+e.id), iconDown, 13, p.muted, "下移").Clicked() {
+						s.moveSidebarEntry(i, i+1)
+						a.changed()
+					}
+				})
+			}
+			if len(s.SidebarOrder) > 0 {
+				if ui.ButtonBase(c.Key("sb-order-reset")).Height(26).PaddingX(11).Radius(999).
+					AlignItems(ui.Center).FocusRing(false).Label("恢复默认顺序").Clicked() {
+					s.resetSidebarOrder()
 					a.changed()
 				}
 			}

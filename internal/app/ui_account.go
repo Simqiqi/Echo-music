@@ -9,26 +9,34 @@ import (
 	"github.com/egoist/mygo/ui"
 	"rsc.io/qr"
 
+	"github.com/simqiqi/simqiqi-music/internal/kugou"
 	"github.com/simqiqi/simqiqi-music/internal/netease"
+	"github.com/simqiqi/simqiqi-music/internal/qq"
 	"github.com/simqiqi/simqiqi-music/internal/qishui"
 	"github.com/simqiqi/simqiqi-music/internal/sidecar"
 )
 
 // providerID names a music service you can sign into. NetEase keeps driving
-// the library; 汽水音乐 logs in through the Node sidecar and lives
-// alongside it, their sessions saved to the same keychain.
+// the library; 汽水音乐, 酷狗音乐 and QQ 音乐 log in through the Node sidecar
+// and live alongside it, their sessions saved to the same keychain.
 type providerID int
 
 const (
 	provNone providerID = iota
 	provNetease
 	provQishui
+	provKugou
+	provQQ
 )
 
 func (p providerID) name() string {
 	switch p {
 	case provQishui:
 		return "汽水音乐"
+	case provKugou:
+		return "酷狗音乐"
+	case provQQ:
+		return "QQ音乐"
 	default:
 		return "网易云音乐"
 	}
@@ -39,6 +47,7 @@ type loginState struct {
 	open     bool
 	gen      int // counts logins, to stop the polls of closed ones
 	provider providerID
+	mode     string // QQ音乐 的扫码通道：qq（QQ App）或 wx（微信）
 	key      string
 	code     *qr.Code   // NetEase's own QR
 	image    *ui.Bitmap // 汽水音乐 PNG QR from the bridge
@@ -52,7 +61,7 @@ type loginState struct {
 
 // boot signs in with the session in the keychain, if any, then loads the
 // home page for whoever is listening. The NetEase library loads first; the
-// 汽水音乐 session restores a moment later, so a slow network there never
+// bridge sessions restore a moment later, so a slow network there never
 // holds up the home page.
 func (a *app) boot() {
 	a.homeLoading = true
@@ -67,14 +76,23 @@ func (a *app) boot() {
 				prof = p
 			}
 		}
-		// 汽水音乐的桥接进程可能比这里慢半拍，恢复失败就重试几次，
-		// 否则一重启就丢了登录态（之前头像因此回退成网易云）。
-		qi, qiOk := a.restoreBridgeLogin(provQishui)
+		// 桥接进程可能比这里慢半拍，恢复失败就重试几次，否则一重启就
+		// 丢了登录态（之前头像因此回退成网易云）。
+		restored := map[providerID]*sidecar.Account{}
+		for _, prov := range bridgeProviders {
+			if acc, ok := a.restoreBridgeLogin(prov); ok {
+				restored[prov] = acc
+			}
+		}
 		a.post(func() {
 			a.signedIn(prof)
-			if qiOk {
-				a.qishui = qi
-				a.loadBridgeLists(provQishui)
+			for _, prov := range bridgeProviders {
+				acc, ok := restored[prov]
+				if !ok {
+					continue
+				}
+				a.bridgeOf(prov).acc = acc
+				a.loadBridgeLists(prov)
 			}
 			a.finalizeTopAccount()
 		})
@@ -90,6 +108,10 @@ func (a *app) restoreBridgeLogin(prov providerID) (*sidecar.Account, bool) {
 	switch prov {
 	case provQishui:
 		restore, profile = qishui.Restore, qishui.Profile
+	case provKugou:
+		restore, profile = kugou.Restore, kugou.Profile
+	case provQQ:
+		restore, profile = qq.Restore, qq.Profile
 	default:
 		return nil, false
 	}
@@ -105,6 +127,20 @@ func (a *app) restoreBridgeLogin(prov providerID) (*sidecar.Account, bool) {
 		time.Sleep(400 * time.Millisecond)
 	}
 	return acc, acc != nil
+}
+
+// bridgeProfile asks a bridge provider who is signed in right now. It is
+// what a connection check uses to tell a live session from a stale one.
+func bridgeProfile(prov providerID) (*sidecar.Account, error) {
+	switch prov {
+	case provQishui:
+		return qishui.Profile()
+	case provKugou:
+		return kugou.Profile()
+	case provQQ:
+		return qq.Profile()
+	}
+	return nil, nil
 }
 
 // signedIn shows what is personal to prof, or to nobody.
@@ -141,9 +177,22 @@ func (a *app) openLogin() {
 }
 
 // openLoginProvider begins a QR sign-in for prov, NetEase or the sidecar
-// providers.
+// providers. QQ音乐 keeps whichever channel the dialog was last on.
 func (a *app) openLoginProvider(prov providerID) {
-	a.login = loginState{open: true, gen: a.login.gen + 1, provider: prov}
+	mode := ""
+	if prov == provQQ {
+		mode = a.login.mode
+		if mode == "" {
+			mode = qq.LoginQQ
+		}
+	}
+	a.openLoginProviderMode(prov, mode)
+}
+
+// openLoginProviderMode is openLoginProvider for QQ音乐, whose two channels
+// (QQ 扫码 / 微信扫码) share everything but the QR that is shown.
+func (a *app) openLoginProviderMode(prov providerID, mode string) {
+	a.login = loginState{open: true, gen: a.login.gen + 1, provider: prov, mode: mode}
 	gen := a.login.gen
 	switch prov {
 	case provNetease:
@@ -151,6 +200,13 @@ func (a *app) openLoginProvider(prov providerID) {
 	case provQishui:
 		a.startBridgeLogin(gen, provQishui, qishui.StartQR, qishui.CheckQR,
 			func() (*sidecar.Account, error) { return qishui.Profile() }, qishui.Save)
+	case provKugou:
+		a.startBridgeLogin(gen, provKugou, kugou.StartQR, kugou.CheckQR,
+			func() (*sidecar.Account, error) { return kugou.Profile() }, kugou.Save)
+	case provQQ:
+		a.startBridgeLogin(gen, provQQ,
+			func() (string, string, error) { return qq.StartQR(mode) }, qq.CheckQR,
+			func() (*sidecar.Account, error) { return qq.Profile() }, qq.Save)
 	}
 }
 
@@ -313,11 +369,9 @@ func (a *app) pollBridgeLogin(gen int, prov providerID, key string,
 					if acc != nil {
 						l.scanner, l.avatar = acc.Name, acc.Avatar
 						a.followAccount(prov)
-						switch prov {
-						case provQishui:
-							a.qishui = acc
-							a.loadBridgeLists(provQishui)
-						}
+						st := a.bridgeOf(prov)
+						st.acc = acc
+						a.loadBridgeLists(prov)
 					}
 					a.closeLoginSoon(gen)
 				case state == "expired":
@@ -355,16 +409,17 @@ func (a *app) signOut() {
 }
 
 // logoutProvider signs out the chosen provider. NetEase clears the library
-// too; 汽水音乐 only forgets its own session.
+// too; the bridge providers only forget their own session.
 func (a *app) logoutProvider(prov providerID) {
 	a.login.gen++
 	switch prov {
 	case provNetease:
 		a.signedIn(nil)
 		go netease.Logout()
-	case provQishui:
-		a.qishui, a.qishuiLists, a.qishuiPlErr = nil, nil, ""
-		go qishui.Logout()
+	case provQishui, provKugou, provQQ:
+		st := a.bridgeOf(prov)
+		st.acc, st.lists, st.plErr = nil, nil, ""
+		go logoutBridge(prov)
 	}
 	// 退出的是顶栏那位，就清掉偏好、换成还登着的另一家。
 	if providerID(a.settings.TopAccount) == prov {
@@ -375,12 +430,29 @@ func (a *app) logoutProvider(prov providerID) {
 	a.finalizeTopAccount()
 }
 
+// logoutBridge forgets a bridge provider's session, its own copy of the
+// credentials included.
+func logoutBridge(prov providerID) {
+	switch prov {
+	case provQishui:
+		_ = qishui.Logout()
+	case provKugou:
+		_ = kugou.Logout()
+	case provQQ:
+		_ = qq.Logout()
+	}
+}
+
 // providerAccent is the brand color each login uses, so the dialog reads
-// as 网易云 / 汽水音乐 at a glance.
+// as 网易云 / 汽水音乐 / 酷狗音乐 / QQ音乐 at a glance.
 func providerAccent(prov providerID) ui.Color {
 	switch prov {
 	case provQishui:
 		return ui.Hex("#12C2B4") // 汽水 青绿
+	case provKugou:
+		return ui.Hex("#1D8BF1") // 酷狗 蓝
+	case provQQ:
+		return ui.Hex("#31C27C") // QQ音乐 绿
 	default:
 		return ui.Hex("#C20C0C") // 网易云 红
 	}
@@ -410,14 +482,24 @@ func (a *app) loginDialog(c *ui.Context) {
 
 	ui.DialogBase(c.Key("login"), &l.open, func(backdrop, panel ui.Element) {
 		backdrop.Background(ui.RGBA(0, 0, 0, 0.35))
-		panel.Width(320).Padding(24, 22, 24, 20).Radius(24).Gap(14).AlignItems(ui.Center).
+		// 四个平台的分段控件会把面板撑宽：内容区要容得下 4×最长标签。
+		panel.Width(380).Padding(24, 22, 24, 20).Radius(24).Gap(14).AlignItems(ui.Center).
 			Background(p.bg).Border(1, p.hairline).Shadow(0, 24, 60, -12, ui.RGBA(0, 0, 0, 0.4)).
 			Transition(ui.ElementTransition{Animation: &ui.Snappy, Enter: &ui.Motion{Scale: 0.94}, Exit: &ui.Motion{Scale: 0.96}})
 
-		// 平台选择：网易云 / 汽水音乐。providers 的顺序与标签一一对应，
-		// 这样 segment 的 0 基下标就能正确映射到 providerID，而不会因为
-		// provNone 占用了 0 而整体错位（之前选「汽水音乐」会去启动网易云的二维码）。
-		providers := []providerID{provNetease, provQishui}
+		// 平台选择：网易云 / 汽水音乐 / 酷狗音乐 / QQ音乐。providers 的顺序与
+		// 标签一一对应，这样 segment 的 0 基下标就能正确映射到 providerID，
+		// 而不会因为 provNone 占用了 0 而整体错位（之前选「汽水音乐」会去
+		// 启动网易云的二维码）。
+		providers := append([]providerID{provNetease}, bridgeProviders...)
+		labels := make([]string, 0, len(providers))
+		for _, p := range providers {
+			if p == provNetease {
+				labels = append(labels, "网易云")
+				continue
+			}
+			labels = append(labels, p.name())
+		}
 		sel := 0
 		for i, p := range providers {
 			if p == a.login.provider {
@@ -425,10 +507,27 @@ func (a *app) loginDialog(c *ui.Context) {
 				break
 			}
 		}
-		if segmented(c, &sel, "网易云", "汽水音乐") && a.login.open {
+		if segmented(c, &sel, labels...) && a.login.open {
 			a.post(func() { a.openLoginProvider(providers[sel]) })
 		}
 		a.login.provider = providers[sel]
+
+		// QQ音乐 有两条通道：QQ 扫码与微信扫码。其余平台只有一条，不显示。
+		if l.provider == provQQ {
+			ch := 0
+			if l.mode == qq.LoginWeChat {
+				ch = 1
+			}
+			if segmented(c, &ch, "QQ 扫码", "微信扫码") && a.login.open {
+				mode := qq.LoginQQ
+				if ch == 1 {
+					mode = qq.LoginWeChat
+				}
+				if mode != l.mode {
+					a.post(func() { a.openLoginProviderMode(provQQ, mode) })
+				}
+			}
+		}
 		accent := providerAccent(l.provider)
 
 		ui.Text(c, title).FontSize(22).FontWeight(700)
@@ -513,30 +612,27 @@ func (a *app) profileName() string {
 	return a.profile.Nickname
 }
 
-// firstSignedIn names the account to fall back to: NetEase, then 汽水音乐.
+// firstSignedIn names the account to fall back to: a bridge provider, then
+// NetEase.
 func (a *app) firstSignedIn() providerID {
-	switch {
-	case a.profile != nil:
-		return provNetease
-	case a.qishui != nil:
-		return provQishui
+	for _, prov := range bridgeProviders {
+		if a.bridgeAccountOf(prov) != nil {
+			return prov
+		}
 	}
 	return provNetease
 }
 
 // accountSignedIn reports whether prov's account is currently loaded.
 func (a *app) accountSignedIn(prov providerID) bool {
-	switch prov {
-	case provNetease:
+	if prov == provNetease {
 		return a.profile != nil
-	case provQishui:
-		return a.qishui != nil
 	}
-	return false
+	return a.bridgeAccountOf(prov) != nil
 }
 
 // resolveTopAccount picks the account the top bar shows: the listener's
-// saved choice when it is still signed in, else the 汽水音乐 account over
+// saved choice when it is still signed in, else a bridge account over
 // 网易云 by default, else whatever is signed in.
 func (a *app) resolveTopAccount() providerID {
 	// Only a pick the listener made themselves pins the bar; a value an old
@@ -544,8 +640,10 @@ func (a *app) resolveTopAccount() providerID {
 	if pref := providerID(a.settings.TopAccount); a.settings.TopAccountManual && pref != provNone && a.accountSignedIn(pref) {
 		return pref
 	}
-	if a.qishui != nil {
-		return provQishui
+	for _, prov := range bridgeProviders {
+		if a.bridgeAccountOf(prov) != nil {
+			return prov
+		}
 	}
 	if a.profile != nil {
 		return provNetease
@@ -645,8 +743,8 @@ func (a *app) accountMenu(c *ui.Context, row ui.Element) {
 		const w = 248
 		panel.Width(w)
 
-		// 两个平台的账号状态：已登录显示昵称与头像，未登录可一键登录。
-		for _, prov := range []providerID{provNetease, provQishui} {
+		// 各平台的账号状态：已登录显示昵称与头像，未登录可一键登录。
+		for _, prov := range append([]providerID{provNetease}, bridgeProviders...) {
 			a.accountRow(c, prov)
 		}
 
@@ -762,15 +860,14 @@ func (a *app) accountRow(c *ui.Context, prov providerID) {
 // accountInfo returns the signed-in name, avatar URL, and whether prov is
 // signed in.
 func (a *app) accountInfo(prov providerID) (name, avatar string, loggedIn bool) {
-	switch prov {
-	case provQishui:
-		if a.qishui != nil {
-			return a.qishui.Name, a.qishui.Avatar, true
+	if prov != provNetease {
+		if acc := a.bridgeAccountOf(prov); acc != nil {
+			return acc.Name, acc.Avatar, true
 		}
-	default:
-		if a.profile != nil {
-			return a.profile.Nickname, a.profile.AvatarURL, true
-		}
+		return "未登录", "", false
+	}
+	if a.profile != nil {
+		return a.profile.Nickname, a.profile.AvatarURL, true
 	}
 	return "未登录", "", false
 }
