@@ -1,0 +1,28 @@
+# 跑测试：每一次推送与每一个 PR 都验一遍单元测试与 vet。
+#
+# 此前只有 Release 工作流，而它只在打 tag 时构建、不跑测试，于是几条早就红了的
+# 测试（帧预算、舞台菜单、歌曲菜单）在仓库里躺了很久没人发现。这里把它们挡在
+# 前面：红了就看得到，不用等发版。
+name: Test
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Vet
+        run: go vet ./...
+      # 只跑 internal：cmd 与 examples 是构建路径，由 Release 工作流覆盖。
+      - name: Test
+        run: go test ./internal/... -timeout 40m
