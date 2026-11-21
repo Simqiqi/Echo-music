@@ -206,6 +206,16 @@ function create() {
 		// 又只认抖音自家的请求头，播放器拿着它去拉常被回 403（用户看到的是
 		// "加载失败，再点一次试试"）。所以不论什么容器，都先由桥接把整首取
 		// 回本地（MP4/AAC 顺便转成 FLAC），播放器只跟本机地址打交道。
+		// 往歌单里加歌：汽水按歌单 id 与一组歌曲 id 添加。搬运歌单时用它。
+		async playlistAdd(body) {
+			const listID = String(body?.id ?? "");
+			const ids = (body?.ids ?? []).map((v) => String(v)).filter(Boolean);
+			if (!listID || ids.length === 0) return { error: "缺少歌单或歌曲" };
+			const r = await api.request("playlist_add_tracks", { id: listID, ids });
+			if (!r.ok) return { error: r.error?.message || r.error?.code || "添加失败" };
+			return { added: ids.length };
+		},
+
 		async url(body) {
 			const quality = ["standard", "high", "lossless", "hires"].includes(body?.quality) ? body.quality : "high";
 			const id = String(body?.id ?? "");

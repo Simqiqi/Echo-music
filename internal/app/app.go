@@ -77,6 +77,8 @@ type app struct {
 	bridge    *bridgeStore                  // 桥接音源的歌曲与歌单，负数合成 ID 的注册表
 	bridgeVMs map[providerID]*bridgeRows    // 侧栏的行，只在歌单有变化时重建
 	bridgeAcc map[providerID]*bridgeAccount // 各桥接音源的登录态与歌单：汽水/酷狗/QQ
+	migrate   *migrateState               // 正在进行的歌单搬运，供提示行读取
+	migratePick migratePicker            // 搬运到桥接音源时选目标歌单的弹窗
 	mine, saved     []netease.Playlist // the listener's playlists: made, and saved
 	recPlaylists    []netease.Playlist // the day's playlists picked for the listener
 	login           loginState

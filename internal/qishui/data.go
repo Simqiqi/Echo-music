@@ -53,3 +53,12 @@ func Search(keyword string, limit, offset int) ([]sidecar.BridgeTrack, bool, int
 	return c.Search("qishui", keyword, limit, offset)
 }
 
+// AddTracks adds tracks, by 汽水's own ids, to one of the account's
+// playlists. It reports how many went in.
+func AddTracks(listID string, ids []string) (int, error) {
+	c, err := sidecar.Shared()
+	if err != nil {
+		return 0, err
+	}
+	return c.PlaylistAdd("qishui", listID, ids)
+}

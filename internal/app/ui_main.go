@@ -209,6 +209,7 @@ func (a *app) view(c *ui.Context) {
 	a.loginDialog(c)
 	a.playlistNameDialog(c)
 	a.deletePlaylistDialog(c)
+	a.migratePickerDialog(c)
 	if a.toast != "" {
 		c.Toast(a.toast)
 		a.toast = ""

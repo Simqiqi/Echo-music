@@ -71,6 +71,20 @@ func (c *Client) Search(provider, keyword string, limit, offset int) (items []Br
 	return r.Items, r.HasMore, r.NextOffset, nil
 }
 
+// PlaylistAdd adds tracks to one of a bridge provider's own playlists,
+// by that provider's playlist id and its ids for the tracks. It reports
+// how many went in.
+func (c *Client) PlaylistAdd(provider, listID string, ids []string) (int, error) {
+	var r struct {
+		Added int `json:"added"`
+	}
+	body := map[string]any{"id": listID, "ids": ids}
+	if err := c.call(provider, "playlistAdd", body, &r); err != nil {
+		return 0, err
+	}
+	return r.Added, nil
+}
+
 // BridgeStream is where a bridge track streams from, and in which format.
 // Type is mp3 or flac, the two the player decodes: 汽水's AAC comes back
 // converted to FLAC by the bridge, ready to stream from the bridge's own
