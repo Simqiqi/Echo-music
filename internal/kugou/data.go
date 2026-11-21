@@ -41,3 +41,15 @@ func Lyrics(t sidecar.BridgeTrack) (string, string, error) {
 	}
 	return c.Lyrics("kugou", t)
 }
+
+// Search finds tracks by keyword in 酷狗音乐's own catalogue, limit from
+// offset. The bool says whether more follow, next where the next page
+// begins.
+func Search(keyword string, limit, offset int) ([]sidecar.BridgeTrack, bool, int, error) {
+	c, err := sidecar.Shared()
+	if err != nil {
+		return nil, false, 0, err
+	}
+	return c.Search("kugou", keyword, limit, offset)
+}
+

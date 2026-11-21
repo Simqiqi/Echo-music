@@ -194,6 +194,24 @@ async function kgDownloadLyric(id, accesskey) {
 	}
 }
 
+// 搜索结果用的是老式的大写字段（FileName 是「歌手 - 歌名」、FileHash、
+// MixSongID、Duration 是秒…），与歌单里的 lowercase 字段不同，先归一成
+// rowTrack 认得的样子。
+function rowFromSearch(row) {
+	const song = String(row?.OriSongName ?? "").trim();
+	const singer = String(row?.SingerName ?? "").trim();
+	const name = song && singer ? `${singer} - ${song}` : String(row?.FileName ?? song);
+	return {
+		mixsongid: row?.MixSongID ?? row?.MixSongId,
+		audio_id: row?.Audioid ?? row?.AudioId,
+		hash: row?.FileHash,
+		name,
+		album_name: row?.AlbumName,
+		duration: row?.Duration,
+		cover: row?.Image || row?.AlbumImage,
+	};
+}
+
 function create() {
 	const cookie = genDevice();
 
@@ -267,6 +285,30 @@ function create() {
 		status,
 
 		// 当前账号的歌单。与汽水统一用 offset/limit 分页（酷狗按 page 换算）。
+		// 搜索：酷狗的搜索接口按关键词给歌曲（song/album/author/mv 都支持，
+		// 这里只取歌曲）。分页是页码，按 offset 换算。
+		async search(body) {
+			const keyword = String(body?.keyword ?? "").trim();
+			if (!keyword) return { items: [] };
+			const limit = Math.min(50, Math.max(1, Number(body?.limit) || 30));
+			const offset = Math.max(0, Number(body?.offset) || 0);
+			const page = Math.floor(offset / limit) + 1;
+			const r = await api.search({
+				keywords: keyword,
+				page,
+				pagesize: limit,
+				type: "song",
+				cookie,
+			});
+			const rows = findList(r?.body ?? {}) || [];
+			const items = rows.map(rowFromSearch).map(rowTrack).filter(Boolean);
+			return {
+				items,
+				hasMore: rows.length >= limit,
+				nextOffset: offset + rows.length,
+			};
+		},
+
 		async playlists(body) {
 			const pagesize = 30;
 			const page = Math.floor(Math.max(0, Number(body?.offset) || 0) / pagesize) + 1;

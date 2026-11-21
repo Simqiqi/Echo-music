@@ -41,6 +41,17 @@ type route struct {
 	// query and kind are what a search page searched for.
 	query string
 	kind  netease.SearchType
+	// src is the catalogue a search page searches, when it is not 网易云:
+	// 汽水音乐 / 酷狗音乐 / QQ 音乐 各有自己的搜索。零值即网易云。
+	src providerID
+}
+
+// source is the catalogue a route searches: the one it names, or 网易云.
+func (r route) source() providerID {
+	if r.src == provNone {
+		return provNetease
+	}
+	return r.src
 }
 
 // app is the state both windows show. Everything in it is read and changed

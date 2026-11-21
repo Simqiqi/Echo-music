@@ -268,6 +268,30 @@ function create() {
 		},
 
 		// 当前账号的歌单（含「我喜欢」以外的自建与收藏）。
+		// 搜索：QQ 的搜索接口按关键词给歌曲。
+		async search(body) {
+			const keyword = String(body?.keyword ?? "").trim();
+			if (!keyword) return { items: [] };
+			const limit = Math.min(50, Math.max(1, Number(body?.limit) || 30));
+			const offset = Math.max(0, Number(body?.offset) || 0);
+			const page = Math.floor(offset / limit) + 1;
+			let data;
+			try {
+				data = unwrap(
+					await svc.getSearchByKey({
+						params: { w: keyword, n: limit, p: page, catZhida: 1, remoteplace: "txt.yqq.song" },
+						option: withCookie(),
+					}),
+				);
+			} catch (err) {
+				return { error: "QQ音乐：" + errText(err) };
+			}
+			const rows = data?.response?.data?.song?.list || findList(data?.response?.data) || [];
+			if (!Array.isArray(rows)) return { error: "无法解析搜索结果" };
+			const items = rows.map(rowTrack).filter(Boolean);
+			return { items, hasMore: rows.length >= limit, nextOffset: offset + rows.length };
+		},
+
 		async playlists(body) {
 			if (!sessionCookie()) return { error: "QQ音乐：还没有登录" };
 			const limit = Math.min(100, Math.max(1, Number(body?.limit) || 100));

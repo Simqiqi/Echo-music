@@ -161,6 +161,22 @@ function create() {
 		},
 
 		// 当前账号的歌单（自己创建的与收藏的），分页。
+		// 搜索：汽水的搜索按关键词给歌曲，分页由包内部把游标换算成 offset。
+		async search(body) {
+			const keyword = String(body?.keyword ?? "").trim();
+			if (!keyword) return { items: [] };
+			const limit = Math.min(50, Math.max(1, Number(body?.limit) || 30));
+			const offset = Math.max(0, Number(body?.offset) || 0);
+			const r = await api.request("search", { query: keyword, limit, offset });
+			if (!r.ok) return { error: r.error?.message || r.error?.code || "搜索失败" };
+			const items = (r.data?.items || []).map(rowTrack).filter(Boolean);
+			return {
+				items,
+				hasMore: Boolean(r.data?.hasMore),
+				nextOffset: Number(r.data?.nextOffset) || offset + items.length,
+			};
+		},
+
 		async playlists(body) {
 			const r = await api.request("user_playlists", {
 				limit: Math.min(Number(body?.limit) || 30, 100),

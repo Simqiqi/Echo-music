@@ -15,7 +15,11 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # macOS：这些测试是为这个平台写的（窗口、声卡、渲染都不缺），同一个用例在
+    # ubuntu runner 上会因为「没有音频设备」之类的环境差异报假警——notch 的问候、
+    # 粒子歌词的高亮、设置里的开关都属这一类。公开仓库在 GitHub 上跑 macOS runner
+    # 不额外计费。
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
