@@ -3,7 +3,6 @@ package app
 import (
 	"testing"
 
-	"github.com/simqiqi/simqiqi-music/internal/sidecar"
 )
 
 // A route that names no catalogue searches 网易云: provNone is the zero
@@ -18,19 +17,13 @@ func TestRouteSourceDefaultsToNetease(t *testing.T) {
 	}
 }
 
-// The catalogues a search offers are 网易云 plus whichever bridge
-// providers are signed in, in the order the app lists them.
-func TestSearchSourcesListsSignedInBridges(t *testing.T) {
+// The catalogues a search offers are 网易云 and every bridge provider, in
+// the order the app lists them: a source nobody is signed in to is still
+// offered, because the page asks for the sign-in itself.
+func TestSearchSourcesOfferEveryCatalogue(t *testing.T) {
 	a := newTestApp()
-
-	if got := a.searchSources(); len(got) != 1 || got[0] != provNetease {
-		t.Fatalf("with nobody signed in, the sources are %v, want only 网易云", got)
-	}
-
-	a.bridgeOf(provQQ).acc = &sidecar.Account{ID: "1", Name: "QQ号"}
-	a.bridgeOf(provKugou).acc = &sidecar.Account{ID: "2", Name: "酷狗号"}
 	got := a.searchSources()
-	want := []providerID{provNetease, provKugou, provQQ} // bridgeProviders 的顺序：汽水/酷狗/QQ
+	want := []providerID{provNetease, provQishui, provKugou, provQQ}
 	if len(got) != len(want) {
 		t.Fatalf("the sources are %v, want %v", got, want)
 	}

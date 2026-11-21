@@ -113,6 +113,11 @@ func (a *app) moreBridgeResults(r route, d *searchData) {
 		return
 	}
 	prov := r.source()
+	// 没登录就别去问了：页面这时候正在请人登录。
+	if a.bridgeAccountOf(prov) == nil {
+		d.bPage.loading = false
+		return
+	}
 	d.bPage.loading, d.bPage.err = true, ""
 	offset := d.bNext
 	go func() {
@@ -159,8 +164,15 @@ func (a *app) searchPage(c *ui.Context) {
 	d := a.searches[r]
 	header := func(c *ui.Context) { a.searchHeader(c, d) }
 	more := func() { a.moreResults(r, d) }
-	// 桥接音源的搜索只有歌曲一种结果，直接列出来。
-	if r.source() != provNetease {
+	// 桥接音源的搜索只有歌曲一种结果，直接列出来；还没登录就先请登录。
+	if src := r.source(); src != provNetease {
+		if a.bridgeAccountOf(src) == nil {
+			a.scrollPage(c, func() {
+				header(c)
+				a.bridgeSearchLogin(c, src)
+			})
+			return
+		}
 		if !d.bPage.loaded && d.bPage.loading {
 			a.trackSkeleton(c, a.pageShimmer(c), true, header)
 			return
@@ -212,6 +224,24 @@ func (a *app) searchPage(c *ui.Context) {
 	})
 }
 
+// bridgeSearchLogin asks for a sign-in before that catalogue can be
+// searched: a bridge source searches its own account, so there is nothing
+// to look for until somebody is signed in.
+func (a *app) bridgeSearchLogin(c *ui.Context, prov providerID) {
+	p := a.pal
+	ui.Column(c).Padding(44, 0).AlignSelf(ui.Center).AlignItems(ui.Center).Gap(14).Children(func() {
+		ui.Box(c).Size(50, 50).Radius(25).Background(p.hover).Center().Children(func() {
+			ui.Icon(c, iconNote).Size(18, 18).TextColor(p.faint)
+		})
+		ui.Text(c, "在 "+prov.name()+" 登录后，就能在它自己的曲库里搜歌").FontSize(13).TextColor(p.muted)
+		b := pillButton(c, nil, "登录"+prov.name(), providerAccent(prov), ui.RGB(255, 255, 255))
+		b.Label("登录" + prov.name())
+		if b.Clicked() {
+			a.openLoginProvider(prov)
+		}
+	})
+}
+
 // searchEmptyBridge is searchEmpty for a bridge source's results.
 func (a *app) searchEmptyBridge(c *ui.Context, d *searchData) {
 	if d.bPage.loaded && len(d.bTracks) == 0 {
@@ -226,15 +256,10 @@ func (a *app) searchEmpty(c *ui.Context, d *searchData) {
 }
 
 // searchSources are the catalogues a search can be run against: 网易云
-// always, plus whichever bridge providers are signed in.
+// 与三家桥接音源都摆出来，没登录的那家点进去会请先登录——这样「这里还能
+// 搜别家」是看得见的，而不是登录之后才发现。
 func (a *app) searchSources() []providerID {
-	srcs := []providerID{provNetease}
-	for _, prov := range bridgeProviders {
-		if a.bridgeAccountOf(prov) != nil {
-			srcs = append(srcs, prov)
-		}
-	}
-	return srcs
+	return append([]providerID{provNetease}, bridgeProviders...)
 }
 
 // searchHeader is what was searched for, how many it found, the catalogues
