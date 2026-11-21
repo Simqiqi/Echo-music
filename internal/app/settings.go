@@ -57,6 +57,10 @@ type settings struct {
 	// ParticleShape is the shape of the specks of the particles page: 0
 	// round, 1 square, 2 a star of four points.
 	ParticleShape int `json:"particleShape,omitempty"`
+	// EqGains are the equalizer's ten bands, in decibels, from 31 Hz up:
+	// the truth the player is set to, whatever named the shape. Empty
+	// means every band stands at nought.
+	EqGains []float64 `json:"eqGains,omitempty"`
 	// EqPreset is the equalizer's shape, as eqPresets names it, "" being
 	// that it stands aside.
 	EqPreset string `json:"eqPreset,omitempty"`

@@ -141,7 +141,7 @@ func TestConnectionCheckButton(t *testing.T) {
 
 	a := newTestApp()
 	a.settings = defaultSettings()
-	tt := ui.NewTester(func(c *ui.Context) { a.settingsTestView(c) }, 620, 1900)
+	tt := ui.NewTester(func(c *ui.Context) { a.settingsTestView(c) }, 620, 2400)
 	tt.Frame()
 	if err := tt.Click("开始检查"); err != nil {
 		t.Fatalf("click: %v", err)

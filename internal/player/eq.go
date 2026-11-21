@@ -10,8 +10,10 @@ import (
 // decoder, so that it works whatever plays, and steps aside at once when
 // every band stands at nought.
 
-// eqFreqs are the bands' middle frequencies, hertz, an octave apart.
-var eqFreqs = [10]float64{31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000}
+// EQFreqs are the bands' middle frequencies, hertz, an octave apart. The
+// app labels the sliders with them, so they are the same ten the filters
+// use: a band the listener moves is a band they see.
+var EQFreqs = [10]float64{31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000}
 
 // EQ is the ten bands, their gains, and the filters' state.
 type EQ struct {
@@ -76,7 +78,7 @@ func (e *EQ) reset() {
 	for i := range e.f {
 		e.f[i] = biquad{}
 		if on && e.sr > 0 {
-			e.f[i].peaking(eqFreqs[i], float64(e.sr), e.gains[i], 1.1)
+			e.f[i].peaking(EQFreqs[i], float64(e.sr), e.gains[i], 1.1)
 		}
 	}
 }

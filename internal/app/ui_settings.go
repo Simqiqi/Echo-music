@@ -174,21 +174,20 @@ func (a *app) settingsBody(c *ui.Context, p palette, liquid bool) {
 				a.changed()
 			}
 		})
-		row("均衡器", "按预设调整音色的走向，对每一首歌都生效", func() {
-			labels := make([]string, len(player.EQPresets))
-			chosen := labels[0]
-			for i, p := range player.EQPresets {
-				labels[i] = p.Label
-				if p.Label == s.EqPreset {
-					chosen = p.Label
+		row("均衡器", "十段调整，从低音到高音，对每一首歌都生效", func() {
+			labels := make([]string, 0, len(player.EQPresets)+1)
+			for _, pr := range player.EQPresets {
+				labels = append(labels, pr.Label)
+			}
+			labels = append(labels, eqCustom)
+			chosen := s.eqShape()
+			if fieldSelect(c.Key("eq"), &chosen, labels, p).Changed() {
+				if g, ok := eqPresetGains(chosen); ok {
+					a.setEqGains(g)
 				}
 			}
-			if fieldSelect(c.Key("eq"), &chosen, labels, p).Changed() {
-				s.EqPreset = chosen
-				a.applyEq()
-				a.changed()
-			}
 		})
+		a.eqBands(c, p)
 		row("音量均衡", "按网易云音乐测得的响度调整每首歌的音量，让歌曲听起来一样响", func() {
 			if ui.Switch(c.Key("normalize"), &s.Normalize).Label("音量均衡").Changed() {
 				a.pl.SetVolume(a.volume)
@@ -475,13 +474,166 @@ func (a *app) settingsBody(c *ui.Context, p palette, liquid bool) {
 	})
 }
 
-// applyEq sets the player's equalizer to the shape the settings name.
+// applyEq sets the player's equalizer to the bands the settings hold.
 func (a *app) applyEq() {
-	for _, p := range player.EQPresets {
-		if p.Label == a.settings.EqPreset {
-			a.pl.EQ.Set(p.Gains)
-			return
+	a.pl.EQ.Set(a.settings.eqGains())
+}
+
+// eqGains is the ten bands the settings stand at, padded to ten and
+// clamped to what the filters take.
+func (s settings) eqGains() [10]float64 {
+	var out [10]float64
+	if len(s.EqGains) == 0 {
+		// 只记了预设名字的那些设置（这个字段之前只有名字）：按名字还原一次，
+		// 之后就由十段增益自己说了算。
+		if g, ok := eqPresetGains(s.EqPreset); ok {
+			return g
+		}
+		return out
+	}
+	for i := range out {
+		if i < len(s.EqGains) {
+			out[i] = min(max(s.EqGains[i], -12), 12)
 		}
 	}
-	a.pl.EQ.Set([10]float64{})
+	return out
+}
+
+// setEqGains records the bands, and keeps the preset's name only while
+// the bands are still the preset's own.
+func (a *app) setEqGains(gains [10]float64) {
+	s := &a.settings
+	s.EqGains = make([]float64, 10)
+	copy(s.EqGains, gains[:])
+	s.EqPreset = ""
+	for _, p := range player.EQPresets {
+		if p.Label != "" && p.Gains == gains {
+			s.EqPreset = p.Label
+			break
+		}
+	}
+	a.applyEq()
+	// 均衡器只动声音，不动外观：所以不走 changed() 里那一趟主题应用。
+	a.settings.save()
+	a.redraw()
+}
+
+// eqPresetGains is the shape a preset names, and whether it names one.
+func eqPresetGains(label string) ([10]float64, bool) {
+	for _, p := range player.EQPresets {
+		if p.Label == label {
+			return p.Gains, true
+		}
+	}
+	return [10]float64{}, false
+}
+
+// eqCustom is what the picker says once the listener moves a band away
+// from every preset's own shape.
+const eqCustom = "自定义"
+
+// eqShape is the name of the shape the bands are in: a preset's, when they
+// are still that preset's own, else 自定义 — or 关闭 when every band
+// stands at nought.
+func (s settings) eqShape() string {
+	gains := s.eqGains()
+	flat := true
+	for _, g := range gains {
+		if g != 0 {
+			flat = false
+			break
+		}
+	}
+	if flat {
+		return "关闭"
+	}
+	if s.EqPreset != "" {
+		return s.EqPreset
+	}
+	return eqCustom
+}
+
+// eqBandLabel names a band by its middle frequency, as the sliders show
+// it: 31, 62, 125 … 8k, 16k.
+func eqBandLabel(i int) string {
+	f := player.EQFreqs[i]
+	if f >= 1000 {
+		return fmt.Sprintf("%gk", f/1000)
+	}
+	return fmt.Sprintf("%g", f)
+}
+
+// eqBandValue is a band's gain as its readout shows it.
+func eqBandValue(db float64) string {
+	if db == 0 {
+		return "0"
+	}
+	return fmt.Sprintf("%+.1f", db)
+}
+
+// eqBands is the ten sliders under the equalizer row: one per band, the
+// bass first, each with what it lifts or lowers. Moving any of them makes
+// the shape the listener's own, and the picker above says so.
+func (a *app) eqBands(c *ui.Context, p palette) {
+	gains := a.settings.eqGains()
+	moved := false
+	ui.Column(c).Padding(4, 16, 14, 16).Gap(2).Children(func() {
+		for i := range gains {
+			v := gains[i]
+			ui.Row(c).Gap(10).AlignItems(ui.Center).Children(func() {
+				ui.Text(c, eqBandLabel(i)).FontSize(11).TextColor(p.muted).Width(34).TextAlign(ui.End)
+				sl := ui.SliderBase(c.Key("eq-band-"+fmt.Sprintf("%d", i)), &v, -12, 12).
+					Grow(1).Height(22).PaddingX(9).Step(0.5).FocusRing(false).Label("均衡器 " + eqBandLabel(i))
+				eqSliderDraw(sl, &v, p)
+				if sl.Changed() {
+					gains[i] = v
+					moved = true
+				}
+				ui.Text(c, eqBandValue(v)).FontSize(11).TextColor(p.faint).Width(30).TextAlign(ui.Start)
+			})
+		}
+		ui.Row(c).Gap(8).AlignItems(ui.Center).Margin(6, 0, 0, 0).Children(func() {
+			ui.Text(c, "拖动任意一段即成为自定义").FontSize(11).TextColor(p.faint).Grow(1)
+			reset := ui.ButtonBase(c.Key("eq-flat")).Height(24).PaddingX(10).Radius(6).
+				AlignItems(ui.Center).FocusRing(false).Label("归零")
+			if reset.Hovered() {
+				reset.Background(p.hover)
+			}
+			reset.Children(func() {
+				ui.Text(c, "归零").FontSize(11.5).FontWeight(600).TextColor(p.muted)
+			})
+			if reset.Clicked() {
+				a.setEqGains([10]float64{})
+			}
+		})
+	})
+	if moved {
+		a.setEqGains(gains)
+	}
+}
+
+// eqSliderDraw draws a band's slider as the settings draw one: a thin
+// track, filled with the accent from the middle out — a band lifted
+// rightwards, a band lowered leftwards — with a round knob on it.
+func eqSliderDraw(s ui.Element, value *float64, p palette) {
+	const knob, track = 16, 4
+	s.Draw(func(pt *ui.Painter, r ui.Rect) {
+		left, right := r.X+knob/2, r.X+r.W-knob/2
+		y := r.Y + (r.H-track)/2
+		v := float32(max(0, min(1, (*value+12)/24)))
+		x := left + (right-left)*v
+		mid := left + (right-left)/2
+		pt.Fill(ui.Rect{X: left, Y: y, W: right - left, H: track}, p.press, track/2)
+		lo, hi := min(mid, x), max(mid, x)
+		if hi-lo > 0.5 {
+			pt.Fill(ui.Rect{X: lo, Y: y, W: hi - lo, H: track}, p.accent, track/2)
+		}
+		k := ui.Rect{X: x - knob/2, Y: r.Y + (r.H-knob)/2, W: knob, H: knob}
+		pt.Shadow(k, knob/2, 0, 0.5, 1.5, 0, ui.RGBA(0, 0, 0, 0.3))
+		fill := ui.RGB(255, 255, 255)
+		if s.Pressed() {
+			fill = fill.Mix(ui.RGB(0, 0, 0), 0.06)
+		}
+		pt.Fill(k, fill, knob/2)
+	})
 }
