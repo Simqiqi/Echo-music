@@ -516,35 +516,40 @@ func (a *app) directory(c *ui.Context, top float32) {
 					a.bridgeListsSection(c, prov, prov.name(), st.lists, st.plErr, &st.collapsed)
 				}
 			})
-			// 顶部柔化：随向上滚动量淡入，把内容溶进背景。
-			// PassThrough：仅作装饰合成层，不拦截指针，否则会盖住顶部「为你推荐」的点击。
-			ui.Box(c.Key("nav-top-fade")).Absolute().Top(0).Left(0).Right(0).Height(26).PassThrough().
-				Draw(func(dr *ui.Painter, r ui.Rect) {
-					top := float32(0)
-					if a.navScroll.Y > 0 {
-						top = a.navScroll.Y / 24
-						if top > 1 {
-							top = 1
+			// 柔化层用不透明的页面底色画，落在液态玻璃那种半透明材质上会
+			// 留下一块实色——深色下就是侧栏底部那条「黑影」。玻璃的模糊本身
+			// 已经让边缘软下来，所以只有侧栏不透明（关掉玻璃）时才画这两层。
+			if !a.settings.glassOn() {
+				// 顶部柔化：随向上滚动量淡入，把内容溶进背景。
+				// PassThrough：仅作装饰合成层，不拦截指针，否则会盖住顶部「为你推荐」的点击。
+				ui.Box(c.Key("nav-top-fade")).Absolute().Top(0).Left(0).Right(0).Height(26).PassThrough().
+					Draw(func(dr *ui.Painter, r ui.Rect) {
+						top := float32(0)
+						if a.navScroll.Y > 0 {
+							top = a.navScroll.Y / 24
+							if top > 1 {
+								top = 1
+							}
 						}
-					}
-					if top > 0.01 {
-						dr.FillGradient(r, ui.LinearGradient{From: a.pal.bg.Alpha(top), To: a.pal.bg.Alpha(0), Angle: 90}, 0)
-					}
-				})
-			// 底部柔化：随接近底部淡入。PassThrough 同上，避免遮挡底部项点击。
-			ui.Box(c.Key("nav-bot-fade")).Absolute().Bottom(0).Left(0).Right(0).Height(26).PassThrough().
-				Draw(func(dr *ui.Painter, r ui.Rect) {
-					bot := float32(0)
-					if a.navScroll.MaxY > 0 && a.navScroll.Y < a.navScroll.MaxY {
-						bot = (a.navScroll.MaxY - a.navScroll.Y) / 24
-						if bot > 1 {
-							bot = 1
+						if top > 0.01 {
+							dr.FillGradient(r, ui.LinearGradient{From: a.pal.bg.Alpha(top), To: a.pal.bg.Alpha(0), Angle: 90}, 0)
 						}
-					}
-					if bot > 0.01 {
-						dr.FillGradient(r, ui.LinearGradient{From: a.pal.bg.Alpha(0), To: a.pal.bg.Alpha(bot), Angle: 90}, 0)
-					}
-				})
+					})
+				// 底部柔化：随接近底部淡入。PassThrough 同上，避免遮挡底部项点击。
+				ui.Box(c.Key("nav-bot-fade")).Absolute().Bottom(0).Left(0).Right(0).Height(26).PassThrough().
+					Draw(func(dr *ui.Painter, r ui.Rect) {
+						bot := float32(0)
+						if a.navScroll.MaxY > 0 && a.navScroll.Y < a.navScroll.MaxY {
+							bot = (a.navScroll.MaxY - a.navScroll.Y) / 24
+							if bot > 1 {
+								bot = 1
+							}
+						}
+						if bot > 0.01 {
+							dr.FillGradient(r, ui.LinearGradient{From: a.pal.bg.Alpha(0), To: a.pal.bg.Alpha(bot), Angle: 90}, 0)
+						}
+					})
+			}
 		})
 	})
 }
