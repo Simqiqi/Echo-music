@@ -12,6 +12,7 @@ import (
 	"github.com/egoist/mygo/ui"
 
 	"github.com/simqiqi/simqiqi-music/internal/netease"
+	"github.com/simqiqi/simqiqi-music/internal/sidecar"
 )
 
 // Clicking the account row drops its menu, which takes the focus so the
@@ -30,12 +31,15 @@ func TestAccountMenu(t *testing.T) {
 	if !a.accountOpen || !tt.HasText("退出登录") {
 		t.Fatalf("menu not open: %v", a.accountOpen)
 	}
-	if !tt.Focused("我的主页") {
+	if !tt.Focused("网易云音乐·我的主页") {
 		t.Fatal("the first item has no focus")
 	}
-	tt.Key(0, ui.KeyDown)
-	tt.Key(0, ui.KeyDown)
-	tt.Frame()
+	// 每一行都有自己的「我的主页」，加上未登录那几行的「登录」，按几次 Down
+	// 总能走到「退出登录」——这里不写死次数，免得菜单一加东西这条就红。
+	for i := 0; i < 8 && !tt.Focused("退出登录"); i++ {
+		tt.Key(0, ui.KeyDown)
+		tt.Frame()
+	}
 	if !tt.Focused("退出登录") {
 		t.Fatal("Down did not move to signing out")
 	}
@@ -69,7 +73,7 @@ func TestAccountMenuOpensOwnPage(t *testing.T) {
 	tt.Frame()
 	tt.Click("小明")
 	tt.Frame()
-	if err := tt.Click("我的主页"); err != nil {
+	if err := tt.Click("网易云音乐·我的主页"); err != nil {
 		t.Fatal(err)
 	}
 	tt.Frame()
@@ -217,5 +221,68 @@ func TestAccountMenuFrames(t *testing.T) {
 		f, _ := os.Create(filepath.Join(dir, name))
 		png.Encode(f, out)
 		f.Close()
+	}
+}
+
+// 每家那一行的「我的主页」打开的是它自己：网易云去用户页，桥接音源去
+// 应用内的「我的 <平台>」页（本地就有账号与歌单，不必联网）。
+func TestAccountRowHomePerProvider(t *testing.T) {
+	detail, playlists := userDetail, userPlaylists
+	defer func() { userDetail, userPlaylists = detail, playlists }()
+	userDetail = func(id int64) (*netease.User, error) { return &netease.User{UserID: id, Nickname: "小明"}, nil }
+	userPlaylists = func(int64) ([]netease.Playlist, []netease.Playlist, error) { return nil, nil, nil }
+
+	a := newTestApp()
+	a.settings = defaultSettings()
+	a.profile = &netease.Profile{UserID: 42, Nickname: "小明"}
+	a.bridgeOf(provQQ).acc = &sidecar.Account{ID: "1", Name: "QQ号"}
+	// 顶栏得先是网易云，昵称才会显示在账号入口上（菜单从那里打开）。
+	a.setTopAccount(provNetease)
+	tt := ui.NewTester(a.view, 1000, 700)
+	tt.Frame()
+
+	// QQ 那一行的「我的主页」：站内页，来源是 QQ 音乐。
+	if err := tt.Click("小明"); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	if err := tt.Click("QQ音乐·我的主页"); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	if a.route.page != pageUser || a.route.source() != provQQ {
+		t.Fatalf("route = %+v, want QQ 音乐的站内主页", a.route)
+	}
+	if a.accountOpen {
+		t.Fatal("the menu stayed open")
+	}
+	if a.route.id != 0 {
+		t.Errorf("route id = %d, want 0: 桥接音源的主页不按用户 id 取", a.route.id)
+	}
+}
+
+// 顶栏账号改成点整行切换（原来行内有个「设为常用」按键）。
+func TestAccountRowClickSwitchesTop(t *testing.T) {
+	a := newTestApp()
+	a.settings = defaultSettings()
+	a.profile = &netease.Profile{UserID: 1, Nickname: "小明"}
+	a.bridgeOf(provQishui).acc = &sidecar.Account{ID: "2", Name: "汽水号"}
+	a.setTopAccount(provNetease) // 顶栏先给网易云，点行才有得切
+	tt := ui.NewTester(a.view, 1000, 700)
+	tt.Frame()
+
+	if err := tt.Click("小明"); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	if a.topProv != provNetease {
+		t.Fatalf("top is %v, want 网易云 before the click", a.topProv)
+	}
+	if err := tt.Click("汽水号"); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	if a.topProv != provQishui {
+		t.Fatalf("top is %v, want 汽水音乐 after clicking its row", a.topProv)
 	}
 }

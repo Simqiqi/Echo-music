@@ -190,6 +190,10 @@ func publicPlaylists(lists []netease.Playlist, uid int64) []netease.Playlist {
 }
 
 func (a *app) userPage(c *ui.Context) {
+	if src := a.route.source(); src != provNetease {
+		a.bridgeUserPage(c, src)
+		return
+	}
 	id := a.route.id
 	d := a.users[id]
 	if d.user == nil {
@@ -379,4 +383,53 @@ func (a *app) userRow(c *ui.Context, u *netease.User) {
 	if row.Clicked() {
 		a.open(route{page: pageUser, id: u.UserID})
 	}
+}
+
+// bridgeUserPage is 我的主页 for a bridge provider. 汽水音乐 / 酷狗音乐 /
+// QQ 音乐 have no user page the app can fetch: what it has of the account
+// is its name, its picture and its playlists, which the sidebar lists too.
+// The playlists open like any other.
+func (a *app) bridgeUserPage(c *ui.Context, prov providerID) {
+	acc := a.bridgeAccountOf(prov)
+	if acc == nil {
+		a.centered(c, "还没有登录 "+prov.name(), func() { a.openLoginProvider(prov) })
+		return
+	}
+	st := a.bridgeOf(prov)
+	onGlass := a.settings.glassOn()
+	tint := a.avatarTint(acc.Avatar, acc.Name)
+	a.scrollPage(c, func() {
+		p := a.pal
+		head := ui.Row(c.Key("bridge-user-head")).Gap(30).Padding(26, 30).AlignItems(ui.Center).Radius(28).Clip()
+		if onGlass {
+			head.Material(glass.Glass{Clarity: a.glassClarity(0.4)})
+			head.Draw(a.userWash(tint, 28))
+		} else {
+			head.Background(p.sidebar).Border(1, p.hairline).Shadow(0, 16, 44, -20, p.cardShade)
+		}
+		head.Children(func() {
+			a.userPhoto(c, acc.Avatar, onGlass, 152)
+			ui.Column(c).Grow(1).Shrink(1).MinWidth(0).Gap(9).Children(func() {
+				ui.Text(c, prov.name()).FontSize(12).FontWeight(600).TextColor(p.accent)
+				ui.Text(c, acc.Name).FontSize(30).FontWeight(800).SingleLine()
+				word := "个歌单"
+				ui.Text(c, fmt.Sprintf("共 %d %s", len(st.lists), word)).FontSize(12.5).TextColor(p.muted)
+				if st.plErr != "" {
+					ui.Text(c, st.plErr).FontSize(12).TextColor(p.muted)
+				}
+			})
+		})
+		a.section(c, "我的歌单")
+		switch {
+		case len(st.lists) == 0:
+			a.empty(c, "暂无歌单")
+		default:
+			lists := a.bridgePlaylistVMs(prov, st.lists)
+			ui.Grid(c).Columns(a.columns(c, 168)).GapX(20).GapY(28).Children(func() {
+				for i := range lists {
+					a.playlistCard(c.Key(lists[i].ID), &lists[i])
+				}
+			})
+		}
+	})
 }

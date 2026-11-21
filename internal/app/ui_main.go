@@ -285,7 +285,10 @@ func (a *app) load(r route) {
 	case pageAlbum:
 		a.loadAlbum(r.id)
 	case pageUser:
-		a.loadUser(r.id)
+		// 桥接音源的「我的主页」用的是本地已有的账号与歌单，不向网易云取。
+		if r.source() == provNetease {
+			a.loadUser(r.id)
+		}
 	case pagePodcast:
 		a.loadPodcast(r.id)
 	case pagePodcasts:
@@ -952,6 +955,9 @@ func (a *app) navName() string {
 	case pageAlbum:
 		return "专辑"
 	case pageUser:
+		if src := a.route.source(); src != provNetease {
+			return src.name()
+		}
 		return "用户"
 	}
 	return "Echo"
