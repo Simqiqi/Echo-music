@@ -1053,6 +1053,19 @@ func (a *app) pageOf(c *ui.Context) {
 
 // centered shows a message, with a retry button if retry is set: what a
 // page shows in place of what failed to load.
+// centeredAction is centered for a page whose button does something other
+// than retrying: the label says what it does — 「登录酷狗音乐」, say — since
+// a button that signs you in reading 「重试」 is a lie.
+func (a *app) centeredAction(c *ui.Context, msg, label string, action func()) {
+	top, bottom := a.insets(c)
+	ui.Column(c).Grow(1).Padding(top, 0, bottom, 0).Center().Gap(12).Children(func() {
+		ui.Text(c, msg).TextColor(a.pal.muted).FontSize(13)
+		if action != nil && ui.Button(c, label).Clicked() {
+			action()
+		}
+	})
+}
+
 func (a *app) centered(c *ui.Context, err string, retry func()) {
 	top, bottom := a.insets(c)
 	ui.Column(c).Grow(1).Padding(top, 0, bottom, 0).Center().Gap(12).Children(func() {

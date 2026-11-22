@@ -249,7 +249,7 @@ func (a *app) startBridgeLogin(gen int, prov providerID,
 				return
 			}
 			if err != nil {
-				a.login.err = "无法获取二维码，请确认已安装 Node.js 且网络畅通"
+				a.login.err = qrErrText(err)
 				return
 			}
 			a.login.key, a.login.image, a.login.state = key, bmp, "waiting"
@@ -263,6 +263,21 @@ func (a *app) startBridgeLogin(gen int, prov providerID,
 // the prefix of, or an http(s) URL to fetch. The old code assumed base64
 // and failed the moment a provider returned a URL, which left the QR blank
 // on 汽水音乐 — the "登陆二维码有问题" the listener hits there.
+// qrErrText says why a login code could not be fetched, in the words of
+// the failure itself. The old line blamed Node and the network whoever was
+// at fault, which left a listener with nothing to act on.
+func qrErrText(err error) string {
+	msg := cleanDiagnostic(err)
+	switch {
+	case strings.Contains(msg, "node"), strings.Contains(msg, "Node"), strings.Contains(msg, "未找到"):
+		return "取二维码失败：" + msg
+	case strings.Contains(msg, "退出"):
+		return "取二维码失败：" + msg + "（Node 可能不兼容，试试 /usr/local/bin/node）"
+	default:
+		return "取二维码失败：" + msg
+	}
+}
+
 func decodeLoginQR(image string) (*ui.Bitmap, error) {
 	var raw []byte
 	var err error
