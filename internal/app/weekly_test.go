@@ -58,25 +58,33 @@ func TestEQFilters(t *testing.T) {
 	if buf[0] != 0.5 {
 		t.Errorf("a flat equalizer changed the sound to %v", buf[0])
 	}
-	// The bass lifted: a low tone comes through standing.
-	var gains [10]float64
-	gains[0] = 12
-	eq.Set(gains)
-	eq.SetStream(44100, 1)
-	n := 4410
-	one := make([]float32, n)
-	for i := range one {
-		one[i] = float32(math.Sin(2 * math.Pi * 60 * float64(i) / 44100))
-	}
-	eq.Process(one)
-	var peak float64
-	for _, v := range one {
-		if a := math.Abs(float64(v)); a > peak {
-			peak = a
+	// The bass lifted: a low tone comes through standing. It is compared
+	// with a tone the bands leave alone rather than with the input, since
+	// the equalizer holds back the headroom its own boost needs — a +12dB
+	// band means everything else is quieter by that much.
+	tone := func(hz float64) float64 {
+		var gains [10]float64
+		gains[0] = 12
+		e := player.NewEQ()
+		e.Set(gains)
+		e.SetStream(44100, 1)
+		one := make([]float32, 4410)
+		for i := range one {
+			one[i] = float32(math.Sin(2 * math.Pi * hz * float64(i) / 44100))
 		}
+		e.Process(one)
+		var peak float64
+		for _, v := range one[441:] { // 跳过起振
+			if a := math.Abs(float64(v)); a > peak {
+				peak = a
+			}
+		}
+		return peak
 	}
-	if peak < 0.9 {
-		t.Errorf("the bass lifted to a peak of %v, want the low tone standing", peak)
+	// 60Hz 落在 31Hz 那段的肩上也照样被抬（比值受预放大影响，只要明显高于
+	// 没被动过的 1kHz 就说明均衡器在起作用）。
+	if low, high := tone(60), tone(1000); low <= high*1.5 {
+		t.Errorf("60Hz 出来是 %v，没被抬的 1kHz 是 %v：低音没有被抬起来", low, high)
 	}
 }
 
