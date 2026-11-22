@@ -1,0 +1,42 @@
+{
+  "version": "0.4.2",
+  "notes": "新增了 QQ 音乐，四家平台可以一起用；搜索与歌单在四家之间打通，歌单还能从一个平台搬到另一个。新增均衡器，音色可以逐段调。修复了酷狗头像不显示、微信登录 QQ 音乐后资料与歌单取不到、侧栏底部一块色块、以及音量偏高时的破音。登录一次之后，重新安装不用再扫码。",
+  "date": "2026-11-22T04:56:59Z",
+  "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.4.2/echo-cloudmusic-0.4.2-darwin-amd64.tar.gz",
+  "size": 26655418,
+  "signature": "YGkhG929Po23NOLJFhAP9onPkx5cdsyxG4k6KEzFGxHT1uvX6eHD4MQuXi6PIEtADkA2nGSNZffIACMyf1/ADQ==",
+  "deltas": [
+    {
+      "from": "0.4.1",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.4.2/echo-cloudmusic-0.4.1-to-0.4.2-darwin-amd64.delta",
+      "size": 1095633,
+      "signature": "AFS74bXrjwulV+crcrWqzpCbX4m9vNFTeZB9R6JPNthKHN0e63koPScUtvOGwKvx1pHNA1ujoBJtbhcC4yjxDw=="
+    },
+    {
+      "from": "0.3.8",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.4.2/echo-cloudmusic-0.3.8-to-0.4.2-darwin-amd64.delta",
+      "size": 3337197,
+      "signature": "DRmnXfDfvY8OJWhokb6+YhEBZHtMZwK917wa6mpDRxNUqK3nAhyGORuE7W4f6KSzLO297K5wW/Cnolf1Bio9DA=="
+    },
+    {
+      "from": "0.3.7",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.4.2/echo-cloudmusic-0.3.7-to-0.4.2-darwin-amd64.delta",
+      "size": 15001414,
+      "signature": "ppOB5g898W4I5Ggc5FVwuJ6VOvhYdPQNZj+Jsm/fx2ova03Ya5Op/qAzZ927Nyg+aNAJHC4E/ck8oRNAbzKQAg=="
+    }
+  ],
+  "previous": [
+    {
+      "version": "0.4.1",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.4.1/echo-cloudmusic-0.4.1-darwin-amd64.tar.gz",
+      "size": 26625861,
+      "signature": "uSSult7oHU6064Z2s1iwyzVOU5GIl6CrK446pmiKWfIHcl4KM8RCwV3ZDE+0leZC1Ogm3yGXbRpJA+xTBjJmBQ=="
+    },
+    {
+      "version": "0.3.8",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.8/echo-cloudmusic-0.3.8-darwin-amd64.tar.gz",
+      "size": 24686620,
+      "signature": "3aE02L62ZZxYfukqHU8rLe9vYwYxZql0MWEo+cKJCdOIJxyWa0kBohkrOQg/88fnr4IOsKZqpN5tIPDMskOxAA=="
+    }
+  ]
+}

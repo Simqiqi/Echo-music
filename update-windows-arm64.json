@@ -1,0 +1,42 @@
+{
+  "version": "0.4.2",
+  "notes": "新增了 QQ 音乐，四家平台可以一起用；搜索与歌单在四家之间打通，歌单还能从一个平台搬到另一个。新增均衡器，音色可以逐段调。修复了酷狗头像不显示、微信登录 QQ 音乐后资料与歌单取不到、侧栏底部一块色块、以及音量偏高时的破音。登录一次之后，重新安装不用再扫码。",
+  "date": "2026-11-22T05:01:08Z",
+  "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.4.2/echo-cloudmusic-0.4.2-windows-arm64.tar.gz",
+  "size": 23903298,
+  "signature": "1mDg+IJzek+MHjWHkK8sq11o9OHjvt7eg/VH4YGuPbczd57tP9rbngMXNdQ465ERZOrIUbrXx+jimNaUUthqBg==",
+  "deltas": [
+    {
+      "from": "0.4.1",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.4.2/echo-cloudmusic-0.4.1-to-0.4.2-windows-arm64.delta",
+      "size": 782443,
+      "signature": "2yan4lGHPs3svuVL3gdVLojHp3PMAWzmcVoThREChgkFVBXqJB+TsFNQknd5uLG4XiS8o1syoTKTWQLuVsNdAw=="
+    },
+    {
+      "from": "0.3.8",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.4.2/echo-cloudmusic-0.3.8-to-0.4.2-windows-arm64.delta",
+      "size": 2907707,
+      "signature": "7SjGGqeiX4SUpGMPP8NTSRwkK1l3LXlsdhJW+SThJDYOUDiDUABosyQdsg8TPHYGao2TFffG0b3SO2bZMz46DQ=="
+    },
+    {
+      "from": "0.3.7",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.4.2/echo-cloudmusic-0.3.7-to-0.4.2-windows-arm64.delta",
+      "size": 14617160,
+      "signature": "rB0qqwsGNf2lHWWdnbYZCWPLiRStDn1HCBfzvXQ82iZ+fthbnHO+YJB0jDHBGR9jU5HJLiOS76VbXT5BHCLGAw=="
+    }
+  ],
+  "previous": [
+    {
+      "version": "0.4.1",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.4.1/echo-cloudmusic-0.4.1-windows-arm64.tar.gz",
+      "size": 23872563,
+      "signature": "b8rVS9ijSGQxk9L22RoXau7GEu9dwSqlRHQ/ajD85D9m8d1/Aa/2Q9P8yEzddwWsOaoepUsHAQp7Sy9F2GNeAQ=="
+    },
+    {
+      "version": "0.3.8",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.8/echo-cloudmusic-0.3.8-windows-arm64.tar.gz",
+      "size": 22028151,
+      "signature": "/3bXYDfZ9rca3ntQzGcuCPxke2PV30+kHZtZUA+vQbprtGwFw6twJeGfSNnqSlsV2z7ao6znRxe8pyA9vgjnBw=="
+    }
+  ]
+}

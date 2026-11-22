@@ -1,0 +1,42 @@
+{
+  "version": "0.4.2",
+  "notes": "新增了 QQ 音乐，四家平台可以一起用；搜索与歌单在四家之间打通，歌单还能从一个平台搬到另一个。新增均衡器，音色可以逐段调。修复了酷狗头像不显示、微信登录 QQ 音乐后资料与歌单取不到、侧栏底部一块色块、以及音量偏高时的破音。登录一次之后，重新安装不用再扫码。",
+  "date": "2026-11-22T05:03:35Z",
+  "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.4.2/echo-cloudmusic-0.4.2-linux-arm64.tar.gz",
+  "size": 23875882,
+  "signature": "9uc9JhshedclZ73HgsdnL9N/NI4Jpy0vBoPFSFgLaz4lgymCS7MkzDshFYNrK0Dyn9m86DEbIlYxHm4dEtxqDA==",
+  "deltas": [
+    {
+      "from": "0.4.1",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.4.2/echo-cloudmusic-0.4.1-to-0.4.2-linux-arm64.delta",
+      "size": 834036,
+      "signature": "yT0hTSUD2rsd/k91HTK6zIuPGcegQNBWsI49FD3YUeu0zGrVgIakpopgwlPV92wptzsT3suNSM0IHeTEFuQqCw=="
+    },
+    {
+      "from": "0.3.8",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.4.2/echo-cloudmusic-0.3.8-to-0.4.2-linux-arm64.delta",
+      "size": 2884361,
+      "signature": "QO7wfrYVJOt46YhJ29i1TPLXa4PF/RiJu/lh2/iDZbYDug87m05Uh8WBfuqv/XDbYFJLp4gSFGzC1Pvj91KJCg=="
+    },
+    {
+      "from": "0.3.7",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.4.2/echo-cloudmusic-0.3.7-to-0.4.2-linux-arm64.delta",
+      "size": 14585358,
+      "signature": "LOTwvwD474k67O7LCFoSEVahiue2yyKgG+iYymPiDDdJzkX32oHSQvoZgHUmhHNw+L+e5QwJwH6T7gfbSX1GAQ=="
+    }
+  ],
+  "previous": [
+    {
+      "version": "0.4.1",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.4.1/echo-cloudmusic-0.4.1-linux-arm64.tar.gz",
+      "size": 23847789,
+      "signature": "sTrIRda27vCK+mAyUvs0YtaESoxEFukH3r4Q/aH3w4Y7EOvyYg4wO0PkYIxUvHEcE8p1vNsS2uOCqndwoNhZCw=="
+    },
+    {
+      "version": "0.3.8",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.8/echo-cloudmusic-0.3.8-linux-arm64.tar.gz",
+      "size": 22000461,
+      "signature": "3ac2EP6FS0fQydhX57rIv6NQv103vWGSVilcrdy0637+4mtxkZB3ofaStuTPUk6Kj2ZafGK2sM/nmatFkI94CQ=="
+    }
+  ]
+}

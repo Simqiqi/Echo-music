@@ -1,0 +1,42 @@
+{
+  "version": "0.4.2",
+  "notes": "新增了 QQ 音乐，四家平台可以一起用；搜索与歌单在四家之间打通，歌单还能从一个平台搬到另一个。新增均衡器，音色可以逐段调。修复了酷狗头像不显示、微信登录 QQ 音乐后资料与歌单取不到、侧栏底部一块色块、以及音量偏高时的破音。登录一次之后，重新安装不用再扫码。",
+  "date": "2026-11-22T04:54:15Z",
+  "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.4.2/echo-cloudmusic-0.4.2-darwin-arm64.tar.gz",
+  "size": 25758780,
+  "signature": "8qO/yypnznX28Tp3mB6SHFmlFq5QPFtX1rXhfP0nmh+oYl4KUZhuBGCTYKCnXfnfw/X6xMSjkIbJwn+zi8CoBQ==",
+  "deltas": [
+    {
+      "from": "0.4.1",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.4.2/echo-cloudmusic-0.4.1-to-0.4.2-darwin-arm64.delta",
+      "size": 925166,
+      "signature": "pICkX+GOmC+xWeb971bKXDTJ3QMc1F9H0jz3g3HGdfCZZW1X48UjVYgqjp9xZKTX8rXZfbcZ3tRsDZIqOF4pBg=="
+    },
+    {
+      "from": "0.3.8",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.4.2/echo-cloudmusic-0.3.8-to-0.4.2-darwin-arm64.delta",
+      "size": 3184695,
+      "signature": "1eDIF56+jBynkq+Iphz0EF0Koc7uHz/dZjGhYjLFLEmK3MpHzaNVAxBQkqI7I9JFs6EhYH0pu91o/cRDAlQkBA=="
+    },
+    {
+      "from": "0.3.7",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.4.2/echo-cloudmusic-0.3.7-to-0.4.2-darwin-arm64.delta",
+      "size": 14883164,
+      "signature": "OAVRGQTNIQlPk2wj8d+hy1wv3eOWXIRmoBJIh6uHC7OY+MWtzh4Jd6p4/6zWcNwhXu+O4DnNOMt5eN1r1Tq8Cg=="
+    }
+  ],
+  "previous": [
+    {
+      "version": "0.4.1",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.4.1/echo-cloudmusic-0.4.1-darwin-arm64.tar.gz",
+      "size": 25731974,
+      "signature": "HpIeqOqwPXBVharfgTKGRhJ/fwvD3uBfvvXvM2X+yYyv4WLTiobSet/S5OtKv6UAriGqRDYvkqu5YOuTgw1WDA=="
+    },
+    {
+      "version": "0.3.8",
+      "url": "https://gh-proxy.com/https://github.com/Simqiqi/Echo-music/releases/download/v0.3.8/echo-cloudmusic-0.3.8-darwin-arm64.tar.gz",
+      "size": 23819300,
+      "signature": "/Zjuwd9KBeyDzYF/mk0eH/JATjEmBpMeueV08nm8XntqUKJgmrhry3hLXwMgL79eBh1QsQ2vW5x7+txkAuVwDg=="
+    }
+  ]
+}
