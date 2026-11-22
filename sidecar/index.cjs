@@ -80,7 +80,7 @@ function readBody(req) {
 }
 
 const ACTIONS = new Set(["start", "check", "status", "session", "restore", "logout",
-	"playlists", "playlist", "url", "lyric"]);
+	"playlists", "playlist", "playlistAdd", "search", "url", "lyric"]);
 
 const server = http.createServer(async (req, res) => {
 	// 仅本机回环访问。

@@ -11,8 +11,8 @@ import (
 
 	"github.com/simqiqi/simqiqi-music/internal/kugou"
 	"github.com/simqiqi/simqiqi-music/internal/netease"
-	"github.com/simqiqi/simqiqi-music/internal/qq"
 	"github.com/simqiqi/simqiqi-music/internal/qishui"
+	"github.com/simqiqi/simqiqi-music/internal/qq"
 	"github.com/simqiqi/simqiqi-music/internal/sidecar"
 )
 
@@ -249,7 +249,7 @@ func (a *app) startBridgeLogin(gen int, prov providerID,
 				return
 			}
 			if err != nil {
-				a.login.err = "无法获取二维码，请确认已安装 Node.js 且网络畅通"
+				a.login.err = qrErrText(err)
 				return
 			}
 			a.login.key, a.login.image, a.login.state = key, bmp, "waiting"
@@ -263,6 +263,21 @@ func (a *app) startBridgeLogin(gen int, prov providerID,
 // the prefix of, or an http(s) URL to fetch. The old code assumed base64
 // and failed the moment a provider returned a URL, which left the QR blank
 // on 汽水音乐 — the "登陆二维码有问题" the listener hits there.
+// qrErrText says why a login code could not be fetched, in the words of
+// the failure itself. The old line blamed Node and the network whoever was
+// at fault, which left a listener with nothing to act on.
+func qrErrText(err error) string {
+	msg := cleanDiagnostic(err)
+	switch {
+	case strings.Contains(msg, "node"), strings.Contains(msg, "Node"), strings.Contains(msg, "未找到"):
+		return "取二维码失败：" + msg
+	case strings.Contains(msg, "退出"):
+		return "取二维码失败：" + msg + "（Node 可能不兼容，试试 /usr/local/bin/node）"
+	default:
+		return "取二维码失败：" + msg
+	}
+}
+
 func decodeLoginQR(image string) (*ui.Bitmap, error) {
 	var raw []byte
 	var err error
@@ -743,34 +758,16 @@ func (a *app) accountMenu(c *ui.Context, row ui.Element) {
 		const w = 248
 		panel.Width(w)
 
-		// 各平台的账号状态：已登录显示昵称与头像，未登录可一键登录。
+		// 各平台的账号状态：已登录显示昵称与头像，未登录可一键登录。每家
+		// 那一行自带「我的主页」，所以这里不再单列一项。
+		first := true
 		for _, prov := range append([]providerID{provNetease}, bridgeProviders...) {
-			a.accountRow(c, prov)
+			a.accountRow(c, prov, first)
+			first = false
 		}
 
 		ui.Box(c).Height(0.5).Margin(4, 8).Background(pop.edge)
-		// 「我的主页」与「退出登录」说的是网易云账号；只登了汽水音乐时
-		// 不出现，那两家的退出在各自那一行上。
-		first := true
-		if a.profile != nil {
-			// 我的主页 is 网易云's: a listener signed in to 汽水音乐 alone
-			// has no page here to open.
-			home := a.menuItem(c, iconUser, "我的主页", "")
-			if first {
-				home.AutoFocus()
-				first = false
-			}
-			if home.Clicked() {
-				a.accountOpen = false
-				a.open(route{page: pageUser, id: a.profile.UserID})
-			}
-			ui.Box(c).Height(0.5).Margin(4, 8).Background(pop.edge)
-		}
 		settings := a.menuItem(c, iconSettings, "设置…", shortcut)
-		if first {
-			settings.AutoFocus()
-			first = false
-		}
 		if settings.Clicked() {
 			a.accountOpen = false
 			a.openSettings()
@@ -787,12 +784,18 @@ func (a *app) accountMenu(c *ui.Context, row ui.Element) {
 
 // accountRow is one line of the account menu: the service's mark, its
 // signed-in name, and a button to log in or out.
-func (a *app) accountRow(c *ui.Context, prov providerID) {
+func (a *app) accountRow(c *ui.Context, prov providerID, focusFirst bool) {
 	p := a.pal
 	name, avatarURL, loggedIn := a.accountInfo(prov)
 	row := ui.Row(c.Key("acct-"+prov.name())).Padding(6, 8).Gap(10).Radius(8).AlignItems(ui.Center)
 	if row.Hovered() {
 		row.Background(p.press)
+	}
+	// 顶栏那一位原来是行内的「设为常用」按键；按键让位给「我的主页」之后，
+	// 换账号就点这一行，靠悬停提示说明。
+	switcher := loggedIn && prov != a.topProv
+	if switcher {
+		row.Tooltip("点击使用这个账号")
 	}
 	row.Children(func() {
 		if loggedIn && avatarURL != "" {
@@ -806,20 +809,28 @@ func (a *app) accountRow(c *ui.Context, prov providerID) {
 			ui.Text(c, prov.name()).FontSize(12.5).FontWeight(600).SingleLine()
 			ui.Text(c, name).FontSize(11).TextColor(p.faint).SingleLine()
 		})
-		// 动作区：登录、退出，或把已登录但非顶栏的账号设为顶栏。
+		// 动作区：我的主页、登录或退出。
 		ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
-			if loggedIn && prov != a.topProv {
-				set := ui.ButtonBase(c.Key("acct-" + prov.name() + "-top")).Height(24).PaddingX(10).Radius(6).
-					AlignItems(ui.Center).FocusRing(false).Label("设为常用")
-				if set.Hovered() {
-					set.Background(p.hover)
+			if loggedIn {
+				home := ui.ButtonBase(c.Key("acct-" + prov.name() + "-home")).Height(24).PaddingX(10).Gap(0).Radius(6).
+					AlignItems(ui.Center).FocusRing(false).Label(prov.name() + "·我的主页").Tooltip("在 " + prov.name() + " 的主页")
+				if focusFirst {
+					home.AutoFocus()
 				}
-				set.Children(func() {
-					ui.Text(c, "设为常用").FontSize(11.5).FontWeight(600).TextColor(p.accent)
+				if home.Hovered() {
+					home.Background(p.hover)
+				}
+				home.Children(func() {
+					ui.Text(c, "我的主页").FontSize(11.5).FontWeight(600).TextColor(p.muted)
 				})
-				if set.Clicked() {
-					a.setTopAccount(prov)
+				if home.Clicked() {
 					a.accountOpen = false
+					// 网易云的主页按用户 id 取；桥接音源的主页就是这个账号本身。
+					var id int64
+					if prov == provNetease && a.profile != nil {
+						id = a.profile.UserID
+					}
+					a.open(route{page: pageUser, id: id, src: prov})
 				}
 			}
 			if loggedIn && prov == a.topProv {
@@ -843,6 +854,9 @@ func (a *app) accountRow(c *ui.Context, prov providerID) {
 				}
 			} else {
 				btn.TextColor(p.accent).Label("登录")
+				if focusFirst {
+					btn.AutoFocus()
+				}
 				if btn.Hovered() {
 					btn.Background(p.hover)
 				}
@@ -855,6 +869,10 @@ func (a *app) accountRow(c *ui.Context, prov providerID) {
 			}
 		})
 	})
+	if switcher && row.Clicked() {
+		a.setTopAccount(prov)
+		a.accountOpen = false
+	}
 }
 
 // accountInfo returns the signed-in name, avatar URL, and whether prov is

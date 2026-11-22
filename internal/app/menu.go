@@ -48,6 +48,10 @@ func (a *app) setMenu() {
 			mygo.Separator(),
 			{Label: "导入歌单…", Click: run(a.importPlaylist)},
 			{Label: "导出歌单…", Click: run(a.exportPlaylist)},
+			mygo.Separator(),
+			// 搬运会把歌写进目标平台的账号里，所以只在这一步做、也只在菜单里点。
+			{Label: "搬运当前歌单到网易云…", Click: run(a.migrateToNetease)},
+			{Label: "搬运当前歌单到汽水音乐…", Click: run(a.migrateToQishuiPick)},
 		}},
 		{Label: "编辑", Submenu: []*mygo.MenuItem{
 			{Role: mygo.RoleUndo, Label: "撤销"},

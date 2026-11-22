@@ -227,11 +227,13 @@ function create() {
 	// profileOf 问一次上游拿昵称与头像；离线就退回上次记住的。
 	async function profileOf() {
 		if (!state.uin) return null;
-		// 头像地址是算出来的，不联网也能给。
-		if (!state.avatar) state.avatar = `https://q.qlogo.cn/headimg_dl?dst_uin=${state.uin}&spec=140`;
+		// qlogo 只认 QQ 号：微信登录或加密 uin（十几个数字那种）取不到图，
+		// 给了也是 404，所以只在这种 uin 上用它兜底。
+		if (!state.avatar && isQQNumber(state.uin)) {
+			state.avatar = `https://q.qlogo.cn/headimg_dl?dst_uin=${state.uin}&spec=140`;
+		}
 		try {
-			const data = unwrap(await svc.getUserDetail({ uin: state.uin, cookie: sessionCookie() }));
-			const creator = data?.data?.creator || data?.creator || {};
+			const creator = await profileCreator(state.uin);
 			const nick = String(creator.nick || creator.hostname || creator.name || "").trim();
 			if (nick) state.nickname = nick;
 			const pic = String(creator.headpic || creator.avatarUrl || "").trim();
@@ -248,6 +250,26 @@ function create() {
 			avatar: state.avatar,
 			isVip: Boolean(state.isVip),
 		};
+	}
+
+	// profileCreator 取账号资料。QQ 号登录的账号认 uin；微信扫码登录的账号
+	// 认的是 cookie 里的身份，带 uin 反而取不到（code 1000），所以那样时再问
+	// 一次 uin=0——交给服务器从 cookie 认人。
+	async function profileCreator(uin) {
+		// 资料在 response.data.creator 里（老接口的样子），三层都要找一遍。
+		const creatorOf = (body) =>
+			body?.response?.data?.creator || body?.data?.creator || body?.creator || {};
+		let creator = creatorOf(unwrap(await svc.getUserDetail({ uin, cookie: sessionCookie() })));
+		if (!creator.nick && !creator.headpic) {
+			const other = creatorOf(unwrap(await svc.getUserDetail({ uin: 0, cookie: sessionCookie() })));
+			if (other.nick || other.headpic) creator = other;
+		}
+		return creator;
+	}
+
+	// isQQNumber 说这个 uin 看着像 QQ 号（微信登录与加密 uin 都不是）。
+	function isQQNumber(value) {
+		return /^\d{5,12}$/.test(String(value ?? ""));
 	}
 
 	// playableOf 一律由桥接把整首取回本地再给播放器：QQ 的直链有时效，
@@ -268,20 +290,47 @@ function create() {
 		},
 
 		// 当前账号的歌单（含「我喜欢」以外的自建与收藏）。
+		// 搜索：QQ 的搜索接口按关键词给歌曲。
+		async search(body) {
+			const keyword = String(body?.keyword ?? "").trim();
+			if (!keyword) return { items: [] };
+			const limit = Math.min(50, Math.max(1, Number(body?.limit) || 30));
+			const offset = Math.max(0, Number(body?.offset) || 0);
+			const page = Math.floor(offset / limit) + 1;
+			let data;
+			try {
+				data = unwrap(
+					await svc.getSearchByKey({
+						params: { w: keyword, n: limit, p: page, catZhida: 1, remoteplace: "txt.yqq.song" },
+						option: withCookie(),
+					}),
+				);
+			} catch (err) {
+				return { error: "QQ音乐：" + errText(err) };
+			}
+			const rows = data?.response?.data?.song?.list || findList(data?.response?.data) || [];
+			if (!Array.isArray(rows)) return { error: "无法解析搜索结果" };
+			const items = rows.map(rowTrack).filter(Boolean);
+			return { items, hasMore: rows.length >= limit, nextOffset: offset + rows.length };
+		},
+
 		async playlists(body) {
 			if (!sessionCookie()) return { error: "QQ音乐：还没有登录" };
 			const limit = Math.min(100, Math.max(1, Number(body?.limit) || 100));
 			const offset = Math.max(0, Number(body?.offset) || 0);
-			const data = unwrap(
-				await svc.getUserPlaylists({
-					uin: state.uin,
-					offset,
-					limit,
-					cookie: sessionCookie(),
-				}),
-			);
-			const rows = data?.response?.data?.playlists ?? (findList(data) || []);
-			if (!Array.isArray(rows)) return { error: "无法解析歌单列表" };
+			const ask = async (uin) => {
+				const data = unwrap(
+					await svc.getUserPlaylists({ uin, offset, limit, cookie: sessionCookie() }),
+				);
+				const rows = data?.response?.data?.playlists ?? (findList(data) || []);
+				return Array.isArray(rows) ? rows : [];
+			};
+			let rows = await ask(state.uin);
+			// 微信登录的账号带 uin 会失败或给空（502 / code 1000），
+			// 这时用 uin=0 让服务器从 cookie 认人，歌单才出得来。
+			if (rows.length === 0 && !isQQNumber(state.uin)) {
+				rows = await ask(0);
+			}
 			const items = rows.map(rowPlaylist).filter(Boolean);
 			return {
 				items,

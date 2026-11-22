@@ -41,3 +41,24 @@ func Lyrics(t sidecar.BridgeTrack) (string, string, error) {
 	}
 	return c.Lyrics("qishui", t)
 }
+
+// Search finds tracks by keyword in 汽水音乐's own catalogue, limit from
+// offset. The bool says whether more follow, next where the next page
+// begins.
+func Search(keyword string, limit, offset int) ([]sidecar.BridgeTrack, bool, int, error) {
+	c, err := sidecar.Shared()
+	if err != nil {
+		return nil, false, 0, err
+	}
+	return c.Search("qishui", keyword, limit, offset)
+}
+
+// AddTracks adds tracks, by 汽水's own ids, to one of the account's
+// playlists. It reports how many went in.
+func AddTracks(listID string, ids []string) (int, error) {
+	c, err := sidecar.Shared()
+	if err != nil {
+		return 0, err
+	}
+	return c.PlaylistAdd("qishui", listID, ids)
+}

@@ -55,6 +55,36 @@ func (c *Client) PlaylistTracks(provider, id string, limit, offset int) (items [
 	return r.Items, r.HasMore, r.NextOffset, nil
 }
 
+// Search finds tracks by keyword in a bridge provider's own catalogue,
+// limit from offset. The bool says whether more follow, next where the
+// next page begins.
+func (c *Client) Search(provider, keyword string, limit, offset int) (items []BridgeTrack, hasMore bool, next int, err error) {
+	var r struct {
+		Items      []BridgeTrack `json:"items"`
+		HasMore    bool          `json:"hasMore"`
+		NextOffset int           `json:"nextOffset"`
+	}
+	body := map[string]any{"keyword": keyword, "limit": limit, "offset": offset}
+	if err := c.call(provider, "search", body, &r); err != nil {
+		return nil, false, 0, err
+	}
+	return r.Items, r.HasMore, r.NextOffset, nil
+}
+
+// PlaylistAdd adds tracks to one of a bridge provider's own playlists,
+// by that provider's playlist id and its ids for the tracks. It reports
+// how many went in.
+func (c *Client) PlaylistAdd(provider, listID string, ids []string) (int, error) {
+	var r struct {
+		Added int `json:"added"`
+	}
+	body := map[string]any{"id": listID, "ids": ids}
+	if err := c.call(provider, "playlistAdd", body, &r); err != nil {
+		return 0, err
+	}
+	return r.Added, nil
+}
+
 // BridgeStream is where a bridge track streams from, and in which format.
 // Type is mp3 or flac, the two the player decodes: 汽水's AAC comes back
 // converted to FLAC by the bridge, ready to stream from the bridge's own

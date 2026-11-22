@@ -212,6 +212,7 @@ func (a *app) loadBridgeLists(prov providerID) {
 func bridgeAPI(prov providerID) interface {
 	Playlists(limit, offset int) ([]sidecar.BridgePlaylist, error)
 	PlaylistTracks(id string, limit, offset int) ([]sidecar.BridgeTrack, bool, int, error)
+	Search(keyword string, limit, offset int) ([]sidecar.BridgeTrack, bool, int, error)
 	TrackURL(t sidecar.BridgeTrack, quality string) (*sidecar.BridgeStream, error)
 	Lyrics(t sidecar.BridgeTrack) (string, string, error)
 } {
@@ -233,6 +234,9 @@ func (qishuiAPI) Playlists(limit, offset int) ([]sidecar.BridgePlaylist, error) 
 func (qishuiAPI) PlaylistTracks(id string, limit, offset int) ([]sidecar.BridgeTrack, bool, int, error) {
 	return qishui.PlaylistTracks(id, limit, offset)
 }
+func (qishuiAPI) Search(keyword string, limit, offset int) ([]sidecar.BridgeTrack, bool, int, error) {
+	return qishui.Search(keyword, limit, offset)
+}
 func (qishuiAPI) TrackURL(t sidecar.BridgeTrack, quality string) (*sidecar.BridgeStream, error) {
 	return qishui.TrackURL(t, quality)
 }
@@ -248,6 +252,9 @@ func (kugouAPI) Playlists(limit, offset int) ([]sidecar.BridgePlaylist, error) {
 func (kugouAPI) PlaylistTracks(id string, limit, offset int) ([]sidecar.BridgeTrack, bool, int, error) {
 	return kugou.PlaylistTracks(id, limit, offset)
 }
+func (kugouAPI) Search(keyword string, limit, offset int) ([]sidecar.BridgeTrack, bool, int, error) {
+	return kugou.Search(keyword, limit, offset)
+}
 func (kugouAPI) TrackURL(t sidecar.BridgeTrack, quality string) (*sidecar.BridgeStream, error) {
 	return kugou.TrackURL(t, quality)
 }
@@ -262,6 +269,9 @@ func (qqAPI) Playlists(limit, offset int) ([]sidecar.BridgePlaylist, error) {
 }
 func (qqAPI) PlaylistTracks(id string, limit, offset int) ([]sidecar.BridgeTrack, bool, int, error) {
 	return qq.PlaylistTracks(id, limit, offset)
+}
+func (qqAPI) Search(keyword string, limit, offset int) ([]sidecar.BridgeTrack, bool, int, error) {
+	return qq.Search(keyword, limit, offset)
 }
 func (qqAPI) TrackURL(t sidecar.BridgeTrack, quality string) (*sidecar.BridgeStream, error) {
 	return qq.TrackURL(t, quality)

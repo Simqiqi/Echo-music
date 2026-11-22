@@ -41,6 +41,17 @@ type route struct {
 	// query and kind are what a search page searched for.
 	query string
 	kind  netease.SearchType
+	// src is the catalogue a search page searches, when it is not 网易云:
+	// 汽水音乐 / 酷狗音乐 / QQ 音乐 各有自己的搜索。零值即网易云。
+	src providerID
+}
+
+// source is the catalogue a route searches: the one it names, or 网易云.
+func (r route) source() providerID {
+	if r.src == provNone {
+		return provNetease
+	}
+	return r.src
 }
 
 // app is the state both windows show. Everything in it is read and changed
@@ -66,6 +77,8 @@ type app struct {
 	bridge    *bridgeStore                  // 桥接音源的歌曲与歌单，负数合成 ID 的注册表
 	bridgeVMs map[providerID]*bridgeRows    // 侧栏的行，只在歌单有变化时重建
 	bridgeAcc map[providerID]*bridgeAccount // 各桥接音源的登录态与歌单：汽水/酷狗/QQ
+	migrate   *migrateState               // 正在进行的歌单搬运，供提示行读取
+	migratePick migratePicker            // 搬运到桥接音源时选目标歌单的弹窗
 	mine, saved     []netease.Playlist // the listener's playlists: made, and saved
 	recPlaylists    []netease.Playlist // the day's playlists picked for the listener
 	login           loginState

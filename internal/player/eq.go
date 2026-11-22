@@ -10,8 +10,10 @@ import (
 // decoder, so that it works whatever plays, and steps aside at once when
 // every band stands at nought.
 
-// eqFreqs are the bands' middle frequencies, hertz, an octave apart.
-var eqFreqs = [10]float64{31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000}
+// EQFreqs are the bands' middle frequencies, hertz, an octave apart. The
+// app labels the sliders with them, so they are the same ten the filters
+// use: a band the listener moves is a band they see.
+var EQFreqs = [10]float64{31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000}
 
 // EQ is the ten bands, their gains, and the filters' state.
 type EQ struct {
@@ -20,6 +22,12 @@ type EQ struct {
 	sr    int
 	ch    int
 	f     [10]biquad
+	// preamp is what the samples are multiplied by before the filters, so
+	// that a lifted band cannot push them past full scale. Bands only
+	// ever add — a peaking filter lifts its middle without touching the
+	// rest — so without this the louder parts of a loud master would
+	// clip, which is heard as a crackle that is not in the recording.
+	preamp float64
 }
 
 // biquad is one peaking filter, and its state for both channels.
@@ -76,9 +84,51 @@ func (e *EQ) reset() {
 	for i := range e.f {
 		e.f[i] = biquad{}
 		if on && e.sr > 0 {
-			e.f[i].peaking(eqFreqs[i], float64(e.sr), e.gains[i], 1.1)
+			e.f[i].peaking(EQFreqs[i], float64(e.sr), e.gains[i], 1.1)
 		}
 	}
+	e.preamp = 1
+	if on && e.sr > 0 {
+		e.preamp = math.Pow(10, -e.peak()/20)
+	}
+}
+
+// peak is the most the whole cascade lifts any frequency, in decibels:
+// what the samples have to be scaled back by to leave room for it. It is
+// the cascade's own magnitude response, swept in fine steps rather than
+// guessed from the gains — ten bands an octave apart overlap, and their
+// middles are not the only place the lift adds up.
+func (e *EQ) peak() float64 {
+	if e.sr <= 0 {
+		return 0
+	}
+	most := 0.0
+	nyquist := float64(e.sr) / 2
+	for f := 10.0; f < nyquist; f *= 1.02 {
+		w := 2 * math.Pi * f / float64(e.sr)
+		re, im := 1.0, 0.0
+		for i := range e.f {
+			b := &e.f[i]
+			// H(e^{jw}) for b0..b2 / 1, a1, a2.
+			cos1, sin1 := math.Cos(w), math.Sin(w)
+			cos2, sin2 := math.Cos(2*w), math.Sin(2*w)
+			numRe := b.b0 + b.b1*cos1 + b.b2*cos2
+			numIm := -(b.b1*sin1 + b.b2*sin2)
+			denRe := 1 + b.a1*cos1 + b.a2*cos2
+			denIm := -(b.a1*sin1 + b.a2*sin2)
+			den := denRe*denRe + denIm*denIm
+			if den == 0 {
+				continue
+			}
+			hRe := (numRe*denRe + numIm*denIm) / den
+			hIm := (numIm*denRe - numRe*denIm) / den
+			re, im = re*hRe-im*hIm, re*hIm+im*hRe
+		}
+		if db := 20 * math.Log10(math.Hypot(re, im)); db > most {
+			most = db
+		}
+	}
+	return most
 }
 
 // peaking sets the filter to a peaking band of f0 hertz, of gain g
@@ -119,6 +169,11 @@ func (e *EQ) Process(buf []float32) {
 		return
 	}
 	ch := e.ch
+	if e.preamp != 1 {
+		for i := range buf {
+			buf[i] = float32(float64(buf[i]) * e.preamp)
+		}
+	}
 	for i := range e.f {
 		f := &e.f[i]
 		if f.b0 == 1 && f.b1 == 0 && f.b2 == 0 && f.a1 == 0 && f.a2 == 0 {
@@ -132,6 +187,15 @@ func (e *EQ) Process(buf []float32) {
 				f.y2[c], f.y1[c] = f.y1[c], y
 				buf[n+c] = float32(y)
 			}
+		}
+	}
+	// 预放大是照滤波器峰值算的，样本之间的过冲仍可能略微越界；这里只是
+	// 别让它以别的样子响出来（负值回绕听起来是咔哒声）。
+	for i, v := range buf {
+		if v > 1 {
+			buf[i] = 1
+		} else if v < -1 {
+			buf[i] = -1
 		}
 	}
 }

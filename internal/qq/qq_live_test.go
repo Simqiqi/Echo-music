@@ -32,3 +32,21 @@ func TestBridgeHandsBackAQR(t *testing.T) {
 		t.Errorf("CheckQR(unknown key) = %q, %v; want expired", state, err)
 	}
 }
+// Searching QQ's own catalogue finds songs, each with the ids playback
+// needs. LIVE=1 runs it: it starts the bridge and reaches QQ.
+func TestBridgeSearchFindsSongs(t *testing.T) {
+	if os.Getenv("LIVE") == "" {
+		t.Skip("LIVE is not set: skipping the bridge and QQ's search")
+	}
+	items, _, _, err := Search("周杰伦", 5, 0)
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if len(items) == 0 {
+		t.Fatal("search found nothing")
+	}
+	first := items[0]
+	if first.ID == "" || first.Name == "" {
+		t.Errorf("a result came back without an id or a name: %+v", first)
+	}
+}

@@ -1,8 +1,8 @@
 // Package secretstore keeps small secrets (a provider's login session) in
 // the same place NetEase's session lives: the system keychain in a release
-// build, a private file in the user-data dir while developing. Development
-// uses a file because every rebuild re-signs the app and the keychain would
-// prompt before each one read it.
+// build, and a private file in the user-data dir as well — because every
+// rebuild re-signs the app, and the keychain turns away what another
+// signature stored, which used to sign the listener out on each rebuild.
 //
 // 汽水音乐's session is larger than what the keychain keeps per item
 // (mygo.MaxSecretSize, 2560 bytes: it carries a device certificate), so a
@@ -12,7 +12,6 @@
 package secretstore
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 
@@ -24,28 +23,33 @@ import (
 const keyRoom = mygo.MaxSecretSize - 64
 
 // Get reads secret name, returning (nil, nil) when it is not stored.
+//
+// The file is asked first: it is where this build wrote the secret, reading
+// it never prompts, and the keychain can take long enough to answer — a
+// rebuilt app's signature no longer matches what stored the item, so macOS
+// has to decide — that a sign-in restored at startup would give up waiting
+// and leave the listener looking signed out. Only a secret the keychain
+// holds and the file does not is asked of the keychain.
 func Get(name string) ([]byte, error) {
+	if b, err := readFile(name); err != nil || len(b) > 0 {
+		return b, err
+	}
 	if !mygo.IsDev() {
-		b, err := mygo.Secrets.Get(name)
-		switch {
-		case err == nil:
+		if b, err := mygo.Secrets.Get(name); err == nil {
 			return b, nil
-		case !errors.Is(err, mygo.ErrSecretNotFound):
-			return nil, err
 		}
 	}
-	return readFile(name)
+	return nil, nil
 }
 
-// Set writes secret name, overwriting any previous value.
+// Set writes secret name, overwriting any previous value: the keychain,
+// for a release build to keep it in, and always the file beside the app's
+// other session data (owner-only) — so that a later build the keychain
+// turns away can still read it. NetEase's own session lives in that file
+// too, so this is the same bargain the app already makes.
 func Set(name string, b []byte) error {
 	if !mygo.IsDev() && len(b) <= keyRoom {
-		if err := mygo.Secrets.Set(name, b); err == nil {
-			removeFile(name)
-			return nil
-		}
-		// The keychain refused it for another reason (a locked or
-		// unavailable store): the file keeps the listener signed in too.
+		_ = mygo.Secrets.Set(name, b)
 	}
 	return writeFile(name, b)
 }

@@ -27,7 +27,7 @@ func TestFeedbackButtonsOpenMail(t *testing.T) {
 			openExternal = func(raw string) error { opened = raw; return nil }
 			defer func() { openExternal = real }()
 
-			tt := ui.NewTester(func(c *ui.Context) { a.settingsTestView(c) }, 620, 1900)
+			tt := ui.NewTester(func(c *ui.Context) { a.settingsTestView(c) }, 620, 2400)
 			tt.Frame()
 			if err := tt.Click(tc.button); err != nil {
 				t.Fatalf("click on %q: %v", tc.button, err)

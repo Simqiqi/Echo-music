@@ -190,6 +190,10 @@ func publicPlaylists(lists []netease.Playlist, uid int64) []netease.Playlist {
 }
 
 func (a *app) userPage(c *ui.Context) {
+	if src := a.route.source(); src != provNetease {
+		a.bridgeUserPage(c, src)
+		return
+	}
 	id := a.route.id
 	d := a.users[id]
 	if d.user == nil {
@@ -209,7 +213,7 @@ func (a *app) userPage(c *ui.Context) {
 	onGlass := a.settings.glassOn()
 	tint := a.avatarTint(u.AvatarURL, u.Nickname)
 	a.scrollPage(c, func() {
-		a.userHero(c, u, d, own, onGlass, tint)
+		a.userHero(c, u, d, own, onGlass, tint, neteaseCounts(u, d))
 		a.section(c, "创建的歌单")
 		switch {
 		case d.loading > 0:
@@ -234,7 +238,20 @@ func (a *app) userPage(c *ui.Context) {
 // apart as a row of their own — who they follow, who follows them, and
 // the playlists they made. Without the glass it is a quiet plate of the
 // sidebar's tone, so the same shape reads in either appearance.
-func (a *app) userHero(c *ui.Context, u *netease.User, d *userData, own, onGlass bool, tint ui.Color) {
+// heroCount is one number of a user page's head: the count, and what it
+// counts.
+type heroCount struct{ n, label string }
+
+// neteaseCounts are 网易云's own numbers, for a listener's page there.
+func neteaseCounts(u *netease.User, d *userData) []heroCount {
+	return []heroCount{
+		{count(u.Follows), "关注"},
+		{count(u.Followeds), "粉丝"},
+		{count(len(d.playlists)), "歌单"},
+	}
+}
+
+func (a *app) userHero(c *ui.Context, u *netease.User, d *userData, own, onGlass bool, tint ui.Color, counts []heroCount) {
 	p := a.pal
 	head := ui.Row(c.Key("user-head")).Gap(30).Padding(26, 30).AlignItems(ui.Center).Radius(28).Clip()
 	if onGlass {
@@ -259,11 +276,7 @@ func (a *app) userHero(c *ui.Context, u *netease.User, d *userData, own, onGlass
 				ui.Text(c, u.Signature).FontSize(12.5).TextColor(p.muted).MaxLines(2).LineHeight(1.5)
 			}
 			ui.Row(c).Margin(10, 0, 0, 0).Gap(0).AlignItems(ui.Center).Children(func() {
-				for i, s := range []struct{ n, label string }{
-					{count(u.Follows), "关注"},
-					{count(u.Followeds), "粉丝"},
-					{count(len(d.playlists)), "歌单"},
-				} {
+				for i, s := range counts {
 					if i > 0 {
 						ui.Box(c).Width(1).Height(28).Margin(0, 20).Background(p.hairline)
 					}
@@ -379,4 +392,45 @@ func (a *app) userRow(c *ui.Context, u *netease.User) {
 	if row.Clicked() {
 		a.open(route{page: pageUser, id: u.UserID})
 	}
+}
+
+// bridgeUserPage is 我的主页 for a bridge provider. 汽水音乐 / 酷狗音乐 /
+// QQ 音乐 have no user page the app can fetch, so this wears the same
+// shape as 网易云's — the same head, the same section — with what the app
+// does have of that account: its name, its picture and its playlists.
+// 关注 and 粉丝 are 网易云's own numbers and are not shown; a listener
+// comparing the two pages should see one layout, not two.
+func (a *app) bridgeUserPage(c *ui.Context, prov providerID) {
+	acc := a.bridgeAccountOf(prov)
+	if acc == nil {
+		// 还没登录：这里给的是登录入口，所以按钮得写「登录」，不是「重试」。
+		a.centeredAction(c, "还没有登录"+prov.name(), "登录"+prov.name(), func() {
+			a.openLoginProvider(prov)
+		})
+		return
+	}
+	st := a.bridgeOf(prov)
+	lists := a.bridgePlaylistVMs(prov, st.lists)
+	u := &netease.User{Nickname: acc.Name, AvatarURL: acc.Avatar}
+	d := &userData{user: u, playlists: lists}
+	onGlass := a.settings.glassOn()
+	tint := a.avatarTint(acc.Avatar, acc.Name)
+	a.scrollPage(c, func() {
+		a.userHero(c, u, d, true, onGlass, tint, []heroCount{{count(len(lists)), "歌单"}})
+		a.section(c, "创建的歌单")
+		switch {
+		case len(lists) == 0:
+			if st.plErr != "" {
+				a.empty(c, st.plErr)
+			} else {
+				a.empty(c, "暂无歌单")
+			}
+		default:
+			ui.Grid(c).Columns(a.columns(c, 168)).GapX(20).GapY(28).Children(func() {
+				for i := range lists {
+					a.playlistCard(c.Key(lists[i].ID), &lists[i])
+				}
+			})
+		}
+	})
 }
