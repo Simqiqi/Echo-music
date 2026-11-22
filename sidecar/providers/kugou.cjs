@@ -6,6 +6,12 @@
 "use strict";
 
 const crypto = require("node:crypto");
+
+// 概念版(lite)的 token 与完整版不通用，而这个包的签名、加密、请求头都按
+// process.env.platform 分两套。只在 cookie 里写 KUGOU_API_PLATFORM 不够：
+// 那样大部分请求会按完整版签名，于是像用户资料这类接口直接回 20018，头像
+// 一直取不到。必须在 require 之前把进程级的 platform 定下来。
+process.env.platform = "lite";
 const api = require("kugoumusicapi");
 const media = require("../media.cjs");
 
@@ -260,7 +266,8 @@ function create() {
 			const id = String(inner.userid ?? inner.user_id ?? cookie.userid ?? "");
 			if (id) {
 				nickname = String(inner.nickname ?? inner.nick_name ?? nickname);
-				avatar = String(inner.imgurl ?? inner.imgUrl ?? inner.avatar ?? avatar);
+				// 酷狗把头像放在 pic 上（imgurl/avatar 是别家的叫法）。
+				avatar = String(inner.pic || inner.imgurl || inner.imgUrl || inner.avatar || avatar);
 				// 记下昵称头像，离线或重启恢复后无需再联网即可显示。
 				cookie.nickname = nickname;
 				cookie.avatar = avatar;
