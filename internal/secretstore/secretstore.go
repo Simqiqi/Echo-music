@@ -22,18 +22,24 @@ import (
 // keychain's limit, less a margin, since it counts the value in UTF-8.
 const keyRoom = mygo.MaxSecretSize - 64
 
-// Get reads secret name, returning (nil, nil) when it is not stored. The
-// keychain is asked first; anything it refuses falls through to the file.
-// A rebuilt app is the case that matters: its signature no longer matches
-// what stored the secret, so the keychain turns it away, and before this
-// the listener was signed out by a mere rebuild.
+// Get reads secret name, returning (nil, nil) when it is not stored.
+//
+// The file is asked first: it is where this build wrote the secret, reading
+// it never prompts, and the keychain can take long enough to answer — a
+// rebuilt app's signature no longer matches what stored the item, so macOS
+// has to decide — that a sign-in restored at startup would give up waiting
+// and leave the listener looking signed out. Only a secret the keychain
+// holds and the file does not is asked of the keychain.
 func Get(name string) ([]byte, error) {
+	if b, err := readFile(name); err != nil || len(b) > 0 {
+		return b, err
+	}
 	if !mygo.IsDev() {
 		if b, err := mygo.Secrets.Get(name); err == nil {
 			return b, nil
 		}
 	}
-	return readFile(name)
+	return nil, nil
 }
 
 // Set writes secret name, overwriting any previous value: the keychain,
