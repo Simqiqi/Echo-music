@@ -1,0 +1,68 @@
+name: 报告问题
+description: 闪退、播放异常、界面错乱、音源登录不上……都填这里
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        先说一句：**汽水 / 酷狗 / QQ 音乐**需要本机装有 Node.js（≥ 20），只用网易云则不需要——这一条能解释不少"登录不上"。
+  - type: input
+    id: version
+    attributes:
+      label: 应用版本
+      description: 设置页底部或「关于」里可以看到，也可以在 Release 页面对一下
+      placeholder: 0.4.2
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: 系统
+      options:
+        - macOS（Apple Silicon）
+        - macOS（Intel）
+        - Windows x64
+        - Windows arm64
+        - Linux x64
+        - Linux arm64
+    validations:
+      required: true
+  - type: dropdown
+    id: source
+    attributes:
+      label: 出问题时在放哪家的歌
+      options:
+        - 网易云音乐
+        - 汽水音乐
+        - 酷狗音乐
+        - QQ 音乐
+        - 没有在播放 / 与音源无关
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 一步一步写，能稳定复现最好
+      placeholder: |
+        1. 打开……
+        2. 点……
+        3. 看到……
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望的样子
+      placeholder: 我期望它……
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志 / 截图
+      description: 设置 → 报告问题可以把日志打包发来；界面问题请附截图或录屏
+      render: text
+    validations:
+      required: false

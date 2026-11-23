@@ -1,0 +1,34 @@
+# 代码扫描：Go 与官网的 TypeScript。
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 3 * * 1" # 每周一凌晨，顺带盯住新出现的规则
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  analyze:
+    name: 分析 ${{ matrix.language }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [go, javascript-typescript]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        if: matrix.language == 'go'
+        with:
+          go-version-file: go.mod
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+      - uses: github/codeql-action/autobuild@v4
+      - uses: github/codeql-action/analyze@v4
