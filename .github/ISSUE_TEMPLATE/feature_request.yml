@@ -1,0 +1,38 @@
+name: 想要个新功能
+description: 说清你想解决什么，比说清想要什么更有用
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        先看看 [README 的功能](#) 与 [CHANGELOG](../blob/main/CHANGELOG.md) 里有没有——有些想法可能已经在路上了。
+  - type: textarea
+    id: problem
+    attributes:
+      label: 你遇到的是什么事
+      description: 描述场景，而不是直接给方案
+      placeholder: 每次……的时候，我得……
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: 你的想法
+      description: 有就写，没有也行
+    validations:
+      required: false
+  - type: dropdown
+    id: area
+    attributes:
+      label: 大概是哪一块
+      options:
+        - 播放与音质
+        - 界面与动效
+        - 音源（登录 / 歌单 / 搜索 / 搬运）
+        - 歌词
+        - 下载与缓存
+        - 桌面集成（刘海、媒体键、快捷键）
+        - 其他
+    validations:
+      required: true

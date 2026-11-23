@@ -1,0 +1,48 @@
+# 依赖自动提更新：Go 模块、官网与桥接进程的 npm 包。
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "deps(go)"
+    groups:
+      go:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "deps(site)"
+    groups:
+      site:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /website
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "deps(website)"
+    groups:
+      website:
+        patterns: ["*"]
+
+  # 桥接进程的三家音源包：升级后要确认扫码登录与取流仍然可用。
+  - package-ecosystem: npm
+    directory: /sidecar
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "deps(sidecar)"
+    open-pull-requests-limit: 3
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "deps(ci)"

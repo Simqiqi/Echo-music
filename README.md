@@ -168,6 +168,14 @@ go test ./internal/...   # 运行测试
 
 本仓库自 2026 年 11 月起独立演进，不再合并原项目的提交。界面与功能的改动集中在 `internal/app/`，特效在 `internal/fx/`，播放器的扩展在 `internal/player/`，音源接入在 `internal/{netease,qishui,kugou,qq}/` 与 `sidecar/`。
 
+<div align="center">
+
+<br>
+
+[![Star History](https://api.star-history.com/svg?repos=Simqiqi/Echo-music&type=Date)](https://star-history.com/#Simqiqi/Echo-music&Date)
+
+</div>
+
 ## 致谢与声明
 
 ### 致谢
