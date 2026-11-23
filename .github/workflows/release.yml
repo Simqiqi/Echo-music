@@ -69,7 +69,7 @@ jobs:
       # The 汽水/酷狗 login bridge (sidecar/) is plain Node and ships inside
       # the bundle via mygo.json's "resources". Its node_modules is gitignored,
       # so install it here so mygo copies it into every platform's build.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "20"
       - name: Install sidecar dependencies
